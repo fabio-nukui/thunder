@@ -23,15 +23,15 @@ RUN useradd -m -s /bin/bash -N -u $UID $USER && \
 
 USER $USER
 
-# RUN conda install --quiet --yes \
-#         'boto3==1.17.69' \
-#         'cachetools==4.2.2' \
-#         'httpx==0.18.1' \
-#         'python-json-logger==2.0.1' \
-#         'pyyaml==5.4.1' \
-#         'watchtower==1.0.6' && \
-#     conda clean --all -f -y && \
-#     fix-permissions $HOME $CONDA_DIR
+RUN conda install --quiet --yes \
+        'boto3==1.18.44' \
+        'cachetools==4.2.2' \
+        'httpx==0.19.0' \
+        'python-json-logger==2.0.1' \
+        'pyyaml==5.4.1' \
+        'watchtower==1.0.6' && \
+    conda clean --all -f -y && \
+    fix-permissions $HOME $CONDA_DIR
 
 ENV PATH="${HOME}/.local/bin:${PATH}"
 
@@ -71,44 +71,44 @@ RUN apt-get -q update && \
 
 USER $USER
 
-# RUN conda install --quiet --yes \
-#         'autopep8' \
-#         'bottleneck' \
-#         'dtale' \
-#         'flake8' \
-#         'ipython' \
-#         'ipywidgets' \
-#         'isort' \
-#         'ipympl' \
-#         'jupyterlab' \
-#         'jupyterlab_execute_time' \
-#         'line_profiler' \
-#         'matplotlib' \
-#         'nodejs' \
-#         'numexpr' \
-#         'pandas' \
-#         'plotly' \
-#         'qgrid' && \
-#     conda clean --all -f -y  && \
-#     npm cache clean --force  && \
-#     jupyter notebook --generate-config  && \
-#     jupyter lab clean && \
-#     rm -rf $HOME/.cache/yarn  && \
-#     fix-permissions $HOME $CONDA_DIR
+RUN conda install --quiet --yes \
+        'autopep8' \
+        'bottleneck' \
+        'dtale' \
+        'flake8' \
+        'ipython' \
+        'ipywidgets' \
+        'isort' \
+        'ipympl' \
+        'jupyterlab' \
+        'jupyterlab_execute_time' \
+        'line_profiler' \
+        'matplotlib' \
+        'nodejs' \
+        'numexpr' \
+        'pandas' \
+        'plotly' \
+        'qgrid' && \
+    conda clean --all -f -y  && \
+    npm cache clean --force  && \
+    jupyter notebook --generate-config  && \
+    jupyter lab clean && \
+    rm -rf $HOME/.cache/yarn  && \
+    fix-permissions $HOME $CONDA_DIR
 
-# RUN jupyter labextension install -y \
-#         jupyterlab-chart-editor \
-#         jupyterlab-kernelspy \
-#         jupyterlab-plotly \
-#     jupyter lab clean && \
-#     jlpm cache clean && \
-#     npm cache clean --force && \
-#     rm -rf $HOME/.node-gyp && \
-#     rm -rf $HOME/.local && \
-#     fix-permissions $HOME $CONDA_DIR
+RUN jupyter labextension install -y \
+        jupyterlab-chart-editor \
+        jupyterlab-kernelspy \
+        jupyterlab-plotly \
+    jupyter lab clean && \
+    jlpm cache clean && \
+    npm cache clean --force && \
+    rm -rf $HOME/.node-gyp && \
+    rm -rf $HOME/.local && \
+    fix-permissions $HOME $CONDA_DIR
 
-# COPY docker/jupyter_lab_config.py $HOME/.jupyter/
+COPY docker/jupyter_lab_config.py $HOME/.jupyter/
 
-# COPY docker/tracker.jupyterlab-settings $HOME/.jupyter/lab/user-settings/@jupyterlab/notebook-extension/tracker.jupyterlab-settings
+COPY docker/tracker.jupyterlab-settings $HOME/.jupyter/lab/user-settings/@jupyterlab/notebook-extension/tracker.jupyterlab-settings
 
-# COPY docker/shortcuts.jupyterlab-settings $HOME/.jupyter/lab/user-settings/@jupyterlab/shortcuts-extension/shortcuts.jupyterlab-settings
+COPY docker/shortcuts.jupyterlab-settings $HOME/.jupyter/lab/user-settings/@jupyterlab/shortcuts-extension/shortcuts.jupyterlab-settings
