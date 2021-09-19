@@ -1,0 +1,58 @@
+# dependencies
+/node_modules
+
+# testing
+/coverage
+
+# Distribution / packaging
+dist/
+/build
+/libs
+**/artifacts/*.json
+.deps
+
+# misc
+.env*
+env/
+.bash_history
+.gitconfig
+.cache
+.local
+.python_history
+/docker/git_commit
+
+# jupyter notebooks
+*.ipynb
+
+# connections
+*.ipc
+
+# MacOS file
+.DS_Store
+
+# Logs
+*.log
+/logs
+
+# IDEs/editors
+.idea
+*.iml
+.vscode*
+*~
+
+# Serverless
+.serverless
+
+# compiled
+*.pyc
+__pycache__
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+
+# certificates/keys
+*.key
+*.pem
