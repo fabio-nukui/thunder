@@ -1,7 +1,7 @@
 ########################################### BASE ###################################################
 FROM condaforge/miniforge3:4.10.3-5 as base
 
-ARG USER=user
+ARG USER=thunder
 ARG UID=1000
 ARG GID=100
 ARG HOME=/home/$USER
@@ -29,8 +29,13 @@ RUN conda install --quiet --yes \
         'httpx==0.19.0' \
         'python-json-logger==2.0.1' \
         'pyyaml==5.4.1' \
-        'watchtower==1.0.6' && \
+        'watchtower==1.0.6' \
+        'web3==5.23.1' && \
     conda clean --all -f -y && \
+    fix-permissions $HOME $CONDA_DIR
+
+RUN pip install --no-cache-dir \
+        'terra_sdk==0.14.0' && \
     fix-permissions $HOME $CONDA_DIR
 
 ENV PATH="${HOME}/.local/bin:${PATH}"

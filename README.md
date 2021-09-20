@@ -1,6 +1,6 @@
-# terrarb
+# thunder
 
-Arbitrage in Terra blockchain
+Arbitrage strategies
 
 
 ## Requirements

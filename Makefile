@@ -29,14 +29,14 @@ export PRINT_HELP_PYSCRIPT
 ## VARIABLES
 ###################################################################################################
 
-IMAGE_NAME = terrarb
+IMAGE_NAME = thunder
 CONTAINER_USER = user
-DEV_IMAGE_NAME = terrarb-dev
-DEV_CONTAINER_NAME = terrarb-dev
-LAB_CONTAINER_NAME = terrarb-lab
-ARBITRAGE_CONTAINER_NAME = terrarb-strat-${STRATEGY}
+DEV_IMAGE_NAME = thunder-dev
+DEV_CONTAINER_NAME = thunder-dev
+LAB_CONTAINER_NAME = thunder-lab
+ARBITRAGE_CONTAINER_NAME = thunder-strat-${STRATEGY}
 JUPYTER_PORT=8888
-DATA_SOURCE = s3://terrarb
+DATA_SOURCE = s3://crypto-thunder
 PYTHON = python3
 GIT_BRANCH = $(shell git rev-parse --verify --short=12 HEAD)
 
