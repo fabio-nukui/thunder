@@ -30,6 +30,7 @@ export PRINT_HELP_PYSCRIPT
 ###################################################################################################
 
 IMAGE_NAME = terrarb
+CONTAINER_USER = user
 DEV_IMAGE_NAME = terrarb-dev
 DEV_CONTAINER_NAME = terrarb-dev
 LAB_CONTAINER_NAME = terrarb-lab
@@ -54,7 +55,7 @@ start-dev: ## Start docker container for development
 ifeq ($(shell docker ps -a --format "{{.Names}}" | grep ^$(DEV_CONTAINER_NAME)$$),)
 	docker run -it \
 		--net=host \
-		-v $(PWD):/home/terrarb/work \
+		-v $(PWD):/home/$(CONTAINER_USER)/work \
 		--name $(DEV_CONTAINER_NAME) \
 		--env-file $(ENV_FILE) \
 		$(DEV_IMAGE_NAME)
@@ -66,7 +67,7 @@ start-lab: ## Start docker container running jupyterlab
 ifeq ($(shell docker ps -a --format "{{.Names}}" | grep ^$(LAB_CONTAINER_NAME)$$),)
 	docker run -it \
 		--net=host \
-		-v $(PWD):/home/terrarb/work \
+		-v $(PWD):/home/$(CONTAINER_USER)/work \
         -p $(JUPYTER_PORT):$(JUPYTER_PORT) \
 		--name $(LAB_CONTAINER_NAME) \
 		--env-file $(ENV_FILE) \
@@ -86,8 +87,7 @@ build: ## Build docker prod image
 start: ## Start docker container running arbitrage strategy "$STRAT" (e.g.: make start STRAT=1)
 	docker run --rm -d \
 		--net=host \
-		-v $(PWD)/logs:/home/terrarb/work/logs \
-		-v $(PWD)/strategy_files:/home/terrarb/work/strategy_files \
+		-v $(PWD)/logs:/home/$(CONTAINER_USER)/work/logs \
 		--name $(ARBITRAGE_CONTAINER_NAME) \
 		--env-file $(ENV_FILE) \
 		$(IMAGE_NAME)
