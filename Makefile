@@ -32,6 +32,7 @@ export PRINT_HELP_PYSCRIPT
 IMAGE_NAME = thunder
 CONTAINER_USER = thunder
 DEV_IMAGE_NAME = thunder-dev
+LAB_IMAGE_NAME = thunder-lab
 DEV_CONTAINER_NAME = thunder-dev
 LAB_CONTAINER_NAME = thunder-lab
 ARBITRAGE_CONTAINER_NAME = thunder-strat-${STRATEGY}
@@ -63,6 +64,10 @@ else
 	docker start -i $(DEV_CONTAINER_NAME)
 endif
 
+build-lab: ## Build docker lab image
+	echo $(GIT_BRANCH) > docker/git_commit
+	docker build --target lab -t $(LAB_IMAGE_NAME) -f docker/Dockerfile .
+
 start-lab: ## Start docker container running jupyterlab
 ifeq ($(shell docker ps -a --format "{{.Names}}" | grep ^$(LAB_CONTAINER_NAME)$$),)
 	docker run -it \
@@ -71,7 +76,7 @@ ifeq ($(shell docker ps -a --format "{{.Names}}" | grep ^$(LAB_CONTAINER_NAME)$$
         -p $(JUPYTER_PORT):$(JUPYTER_PORT) \
 		--name $(LAB_CONTAINER_NAME) \
 		--env-file $(ENV_FILE) \
-		$(DEV_IMAGE_NAME) \
+		$(LAB_IMAGE_NAME) \
 		jupyter lab --port=$(JUPYTER_PORT)
 else
 	docker start -i $(LAB_CONTAINER_NAME)
