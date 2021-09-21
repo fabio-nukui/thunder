@@ -1,8 +1,12 @@
-from chains import terra
+from chains.terra import TerraClient
+from chains.evm import BSCClient, EthereumClient
 
 
 def main():
-    terra_wallet = terra.core.get_wallet()
+    terra = TerraClient()
+    bsc = BSCClient()
+    ethereum = EthereumClient()
+    print(terra, bsc, ethereum)
 
 
 if __name__ == '__main__':

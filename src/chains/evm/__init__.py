@@ -1,8 +1,10 @@
-from . import core, curve, lido, one_inch
+from . import curve, lido, one_inch
+from .client import BSCClient, EthereumClient
 
 __all__ = [
-    'core',
     'curve',
     'lido',
     'one_inch',
+    'EthereumClient',
+    'BSCClient',
 ]

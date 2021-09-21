@@ -30,7 +30,7 @@ export PRINT_HELP_PYSCRIPT
 ###################################################################################################
 
 IMAGE_NAME = thunder
-CONTAINER_USER = user
+CONTAINER_USER = thunder
 DEV_IMAGE_NAME = thunder-dev
 DEV_CONTAINER_NAME = thunder-dev
 LAB_CONTAINER_NAME = thunder-lab

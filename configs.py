@@ -3,19 +3,31 @@ import os
 # Logs
 LOG_AWS = os.getenv('LOG_AWS') == 'True'
 
-# Terra blockchain configs
-CHAIN_ID = os.getenv('FCD_URI', 'columbus-4')
-LCD_URI = os.getenv('LCD_URI', 'https://lcd.terra.dev')
-FCD_URI = os.getenv('FCD_URI', 'https://fcd.terra.dev')
+# Secrets
+SECRET_NAME_MNEMONIC = os.environ['SECRET_NAME_MNEMONIC']
+SECRET_NAME_BINANCE_KEY = os.environ['SECRET_NAME_BINANCE_KEY']
+
+# Terra
+TERRA_CHAIN_ID = os.getenv('TERRA_CHAIN_ID', 'columbus-4')
+TERRA_LCD_URI = os.getenv('TERRA_LCD_URI', 'https://lcd.terra.dev')
+TERRA_FCD_URI = os.getenv('TERRA_FCD_URI', 'https://fcd.terra.dev')
+TERRA_CACHE_TTL = float(os.getenv('TERRA_CACHE_TTL', '2.0'))
+TERRA_POLL_INTERVAL = float(os.getenv('TERRA_POLL_INTERVAL', '0.001'))
 TERRA_GAS_ADJUSTMENT = float(os.getenv('GAS_ADJUSTMENT', '1.4'))
 
-# Secrets
-MNEMONIC_SECRET_NAME = os.environ['MNEMONIC_SECRET_NAME']
-BINANCE_KEY_SECRET_NAME = os.environ['BINANCE_KEY_SECRET_NAME']
+# Ethereum
+ETHEREUM_CHAIN_ID = int(os.getenv('ETHEREUM_CHAIN_ID', '1'))
+ETHEREUM_RPC_URI = os.getenv('ETHEREUM_RPC_URI', 'http://localhost:8545')
+ETHEREUM_CACHE_TTL = float(os.getenv('ETHEREUM_CACHE_TTL', '5.0'))
+ETHEREUM_POLL_INTERVAL = float(os.getenv('ETHEREUM_POLL_INTERVAL', '0.1'))
+ETHEREUM_WEB3_MIDDEWARES = os.getenv('ETHEREUM_WEB3_MIDDEWARES', '').split(',')
 
-# Connection params
-CACHE_TTL = float(os.environ['CACHE_TTL'])
-POLL_INTERVAL = float(os.environ['POLL_INTERVAL'])
+# Binance Smart Chain
+BSC_CHAIN_ID = int(os.getenv('BSC_CHAIN_ID', '56'))
+BSC_RPC_URI = os.getenv('BSC_RPC_URI', 'http://localhost:8547')
+BSC_CACHE_TTL = float(os.getenv('BSC_CACHE_TTL', '3.0'))
+BSC_POLL_INTERVAL = float(os.getenv('BSC_POLL_INTERVAL', '0.1'))
+BSC_WEB3_MIDDEWARES = os.getenv('BSC_WEB3_MIDDEWARES', 'geth_poa_middleware').split(',')
 
 # Arbitrage params
 STRATEGY = os.getenv('STRATEGY', 'no_strategy')
