@@ -3,7 +3,7 @@ import utils
 
 
 def hd_wallet(secret_name: str = configs.SECRET_NAME_MNEMONIC) -> dict:
-    secret = utils.aws.get_secret(secret_name, decode_json=True)
+    secret = utils.aws.get_secret(secret_name)
     assert 'mnemonic' in secret
 
     secret.setdefault('account', 0)
@@ -12,7 +12,7 @@ def hd_wallet(secret_name: str = configs.SECRET_NAME_MNEMONIC) -> dict:
 
 
 def binance_api(secret_name: str = configs.SECRET_NAME_BINANCE_KEY) -> dict:
-    secret = utils.aws.get_secret(secret_name, decode_json=True)
+    secret = utils.aws.get_secret(secret_name)
     assert 'api_key' in secret
     assert 'api_secret' in secret
 
