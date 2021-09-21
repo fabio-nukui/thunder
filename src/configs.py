@@ -13,7 +13,7 @@ TERRA_LCD_URI = os.getenv('TERRA_LCD_URI', 'https://lcd.terra.dev')
 TERRA_FCD_URI = os.getenv('TERRA_FCD_URI', 'https://fcd.terra.dev')
 TERRA_CACHE_TTL = float(os.getenv('TERRA_CACHE_TTL', '2.0'))
 TERRA_POLL_INTERVAL = float(os.getenv('TERRA_POLL_INTERVAL', '0.001'))
-TERRA_GAS_ADJUSTMENT = float(os.getenv('GAS_ADJUSTMENT', '1.4'))
+TERRA_GAS_ADJUSTMENT = float(os.getenv('TERRA_GAS_ADJUSTMENT', '1.45'))
 
 # Ethereum
 ETHEREUM_CHAIN_ID = int(os.getenv('ETHEREUM_CHAIN_ID', '1'))
