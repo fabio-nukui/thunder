@@ -11,12 +11,17 @@ dist/
 **/artifacts/*.json
 .deps
 
-# misc
-.env*
+# caches
+/*_cache
+.cache
+
+# environment variables
 env/
+.env*
+
+# misc
 .bash_history
 .gitconfig
-.cache
 .local
 .python_history
 /docker/git_commit
