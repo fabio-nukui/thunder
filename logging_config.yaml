@@ -1,0 +1,52 @@
+version: 1
+disable_existing_loggers: False
+formatters:
+  json:
+    format: "%(levelname)s %(message)s"
+    class: pythonjsonlogger.jsonlogger.JsonFormatter
+  plaintext:
+    format: "[%(asctime)s] (%(filename)s:%(lineno)s) %(levelname)s: %(message)s"
+handlers:
+  console:
+    class: logging.StreamHandler
+    formatter: plaintext
+    level: DEBUG
+    stream: ext://sys.stdout
+  logfile:
+    class: logging.handlers.RotatingFileHandler
+    formatter: plaintext
+    level: DEBUG
+    filename: logs/thunder.log
+    maxBytes: 104857600
+    backupCount: 5
+  watchtower:
+    class: watchtower.CloudWatchLogHandler
+    formatter: json
+    level: INFO
+    log_group: flash
+    send_interval: 5
+    create_log_group: True
+root:
+  level: DEBUG
+  handlers: [console, logfile, watchtower]
+loggers:
+  asyncio:
+    level: WARNING
+  botocore:
+    level: WARNING
+  urllib3:
+    level: WARNING
+  hpack:
+    level: WARNING
+  httpx:
+    level: WARNING
+  matplotlib:
+    level: WARNING
+  parso:
+    level: WARNING
+  s3transfer:
+    level: WARNING
+  web3:
+    level: WARNING
+  websockets:
+    level: WARNING

@@ -48,9 +48,9 @@ RUN mkdir ${HOME}/work
 WORKDIR ${HOME}/work
 
 # ########################################### PROD #################################################
-# FROM base as prod
+FROM base as prod
 
-# COPY --chown=$USER:$GID app.py logging_config.yaml ${HOME}/work/
+COPY --chown=$USER:$GID app.py logging_config.yaml ${HOME}/work/
 
 # COPY --chown=$USER:$GID abis ${HOME}/work/abis
 
@@ -58,11 +58,11 @@ WORKDIR ${HOME}/work
 
 # COPY --chown=$USER:$GID deployed_contracts ${HOME}/work/deployed_contracts
 
-# COPY --chown=$USER:$GID src ${HOME}/work/src
+COPY --chown=$USER:$GID src ${HOME}/work/src
 
-# COPY --chown=$USER:$GID docker/git_commit ${HOME}/work/git_commit
+COPY --chown=$USER:$GID docker/git_commit ${HOME}/work/git_commit
 
-# CMD ["python", "app.py"]
+CMD ["python", "app.py"]
 
 ############################################ DEV ###################################################
 FROM base as dev
