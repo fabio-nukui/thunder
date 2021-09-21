@@ -1,15 +1,12 @@
 from __future__ import annotations
 
-from enum import Enum
-
 from terra_sdk.core import Coin, Dec, Numeric
 
 from .client import TerraClient
 
 
 class CW20Token:
-    def __init__(self, chain_id: str, contract_addr: str, symbol: str, decimals: int):
-        self.chain_id = chain_id
+    def __init__(self, contract_addr: str, symbol: str, decimals: int):
         self.contract_addr = contract_addr
         self.symbol = symbol
         self.decimals = decimals
@@ -20,53 +17,33 @@ class CW20Token:
     def __eq__(self, other) -> bool:
         if not isinstance(other, type(self)):
             return False
-        return self.chain_id == other.chain_id and self.contract_addr == other.contract_addr
+        return self.contract_addr == other.contract_addr
 
     @classmethod
     def from_contract(cls, contract_addr: str, client: TerraClient) -> CW20Token:
-        data = client.lcd.wasm.contract_query(contract_addr, {'token_info': {}})
-        return cls(client.chain_id, contract_addr, data['symbol'], data['decimals'])
-
-
-class TokenType(str, Enum):
-    native = 'native'
-    cw20 = 'cw20'
-
-
-class Token:
-    denom = ''
-    token: CW20Token
-
-    def __init__(self, value: str | CW20Token) -> None:
-        self.value = value
-        if isinstance(value, str):
-            self.token_type = TokenType.native
-            self.denom = value
-        elif isinstance(value, CW20Token):
-            self.token_type = TokenType.cw20
-            self.token = value
-        else:
-            raise TypeError(f'Unexpexted input type {type(value)=}')
-
-    def __repr__(self) -> str:
-        return f'{self.__class__.__name__}(value={self.value})'
+        msg = client.lcd.wasm.contract_query(contract_addr, {'token_info': {}})
+        return cls(contract_addr, msg['symbol'], msg['decimals'])
 
     def to_msg(self) -> dict:
-        if self.token_type == TokenType.native:
-            return {'native_token': {'denom': self.denom}}
-        elif self.token_type == TokenType.cw20:
-            return {'token': {'contract_addr': self.token.contract_addr}}
-        raise Exception
+        return {'token': {'contract_addr': self.contract_addr}}
+
+
+class NativeToken:
+    def __init__(self, denom: str):
+        self.denom = denom
+
+    def to_msg(self) -> dict:
+        return {'native_token': {'denom': self.denom}}
 
 
 class TokenAmount:
-    def __init__(self, token: Token, amount: Numeric.Input):
+    def __init__(self, token: NativeToken | CW20Token, amount: Numeric.Input):
         self.token = token
         self.amount = Dec(amount)
 
     @classmethod
     def from_coin(cls, coin: Coin) -> TokenAmount:
-        token = Token(coin.denom)
+        token = NativeToken(coin.denom)
         amount = Dec(coin.amount)
         return cls(token, amount)
 
