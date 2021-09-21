@@ -1,5 +1,5 @@
-from chains.terra import TerraClient
 from chains.evm import BSCClient, EthereumClient
+from chains.terra import TerraClient
 
 
 def main():

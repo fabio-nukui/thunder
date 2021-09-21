@@ -112,10 +112,10 @@ get-env: ## Download .env files
 	aws s3 sync $(DATA_SOURCE)/env env
 
 isort: ## Fix import sorting order
-	docker exec -it $(LAB_CONTAINER_NAME) isort -y -rc src scripts app.py
+	docker exec -it $(DEV_CONTAINER_NAME) isort src app.py
 
 lint: ## Run code style checker
-	docker exec -it $(LAB_CONTAINER_NAME) flake8 src scripts app.py
+	docker exec -it $(DEV_CONTAINER_NAME) flake8 src app.py
 
 test: ## Run test cases in tests directory
-	docker exec -it $(LAB_CONTAINER_NAME) pytest -v tests
+	docker exec -it $(DEV_CONTAINER_NAME) pytest -v tests
