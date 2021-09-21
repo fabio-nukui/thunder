@@ -85,7 +85,7 @@ endif
 rm-dev: ## Remove stopped dev container
 	docker rm $(DEV_CONTAINER_NAME)
 
-build: ## Build docker prod image
+build: check-all ## Build docker prod image
 	echo $(GIT_BRANCH) > docker/git_commit
 	docker build --target prod -t $(IMAGE_NAME) -f docker/Dockerfile .
 
@@ -102,8 +102,6 @@ stop:  ## Stop docker conteiner running strategy "$STRAT" (e.g.: make stop STRAT
 
 restart: build stop start  ## Restart running strategy "$STRAT" with updated code
 
-check-all: isort lint test ## Run tests and code style
-
 upload-notebooks: ## Upload jupyter notebooks
 	aws s3 sync \
 		--exclude='.gitkeep' \
@@ -115,6 +113,12 @@ download-notebooks: ## Download jupyter notebooks
 
 get-env: ## Download .env files
 	aws s3 sync $(DATA_SOURCE)/env env
+
+check-all: isort lint mypy test check-clean-tree ## Run all checks and tests
+
+check-clean-tree: ## Fail if git tree has unstaged/uncommited changes
+	git update-index --refresh
+	git diff-index --quiet HEAD -- || exit 1
 
 isort: ## Check import sorts
 	docker exec $(DEV_CONTAINER_NAME) isort -c src tests app.py
