@@ -1,0 +1,1 @@
+make isort lint mypy
