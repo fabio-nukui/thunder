@@ -46,7 +46,7 @@ RUN mkdir ${HOME}/work
 
 WORKDIR ${HOME}/work
 
-# ########################################### PROD ###################################################
+# ########################################### PROD #################################################
 # FROM base as prod
 
 # COPY --chown=$USER:$GID app.py logging_config.yaml ${HOME}/work/
@@ -78,16 +78,25 @@ USER $USER
 
 RUN conda install --quiet --yes \
         'autopep8' \
-        'bottleneck' \
-        'dtale' \
         'flake8' \
         'ipython' \
-        'ipywidgets' \
         'isort' \
+        'line_profiler' \
+        'mypy' \
+        'pytest' && \
+    conda clean --all -f -y  && \
+    fix-permissions $HOME $CONDA_DIR
+
+############################################ LAB ###################################################
+FROM dev as lab
+
+RUN conda install --quiet --yes \
+        'bottleneck' \
+        'dtale' \
+        'ipywidgets' \
         'ipympl' \
         'jupyterlab' \
         'jupyterlab_execute_time' \
-        'line_profiler' \
         'matplotlib' \
         'nodejs' \
         'numexpr' \
