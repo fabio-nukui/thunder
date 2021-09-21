@@ -1,10 +1,7 @@
-from . import core, terraswap
-
+from . import terraswap
 from .client import TerraClient
 
-
 __all__ = [
-    'core',
     'terraswap',
     'TerraClient',
 ]

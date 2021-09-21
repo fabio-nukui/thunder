@@ -30,28 +30,24 @@ class EVMClient:
         hd_wallet_index: int = 0,
         timeout: int = DEFAULT_CONN_TIMEOUT,
     ):
-        w3 = get_w3(endpoint_uri, middlewares, timeout)
+        self.endpoint_uri = endpoint_uri
+        self.chain_id = chain_id
+        self.middlewares = middlewares
+        self.timeout = timeout
+
+        self.w3 = get_w3(endpoint_uri, middlewares, timeout)
+
         secret = auth_secrets.hd_wallet()
-        account = Account.from_mnemonic(
+        self.account = Account.from_mnemonic(
             secret['mnemonic'],
             account_path=f"m/44'/{coin_type}'/{secret['account']}'/0/{hd_wallet_index}",
         )
-
-        self.endpoint_uri = endpoint_uri
-        self.middlewares = middlewares
-        self.chain_id = chain_id
-
-        self.w3 = w3
-        self.account = account
 
     def __repr__(self) -> str:
         return (
             f'{self.__class__.__name__}(endpoint_uri={self.endpoint_uri},'
             f'address={self.account.address})'
         )
-
-    def reconnect(self):
-        self.w3 = get_w3(self.endpoint_uri, self.middlewares)
 
 
 class EthereumClient(EVMClient):
