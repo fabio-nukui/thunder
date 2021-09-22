@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from terra_sdk.core import Coin, Dec, Numeric
 
 from .client import TerraClient
@@ -81,33 +83,34 @@ class TokenAmount:
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}({self.token}, {self.amount.to_short_str()})'
 
+    def _to_dec(self, value) -> Dec:
+        if isinstance(value, type(self)):
+            assert self.token == value.token
+            return value.amount
+        if isinstance(value, (str, int, float, Decimal, Dec)):
+            return Dec(value)
+        raise TypeError
+
     def __eq__(self, other) -> bool:
-        assert isinstance(other, type(self)) and self.token == other.token
-        return self.amount == other.amount
+        return self.amount == self._to_dec(other)
 
     def __lt__(self, other) -> bool:
-        assert isinstance(other, type(self)) and self.token == other.token
-        return self.amount < other.amount
+        return self.amount < self._to_dec(other)
 
     def __le__(self, other) -> bool:
-        assert isinstance(other, type(self)) and self.token == other.token
-        return self.amount <= other.amount
+        return self.amount <= self._to_dec(other)
 
     def __gt__(self, other) -> bool:
-        assert isinstance(other, type(self)) and self.token == other.token
-        return self.amount > other.amount
+        return self.amount > self._to_dec(other)
 
     def __ge__(self, other) -> bool:
-        assert isinstance(other, type(self)) and self.token == other.token
-        return self.amount >= other.amount
+        return self.amount >= self._to_dec(other)
 
     def __add__(self, other) -> TokenAmount:
-        assert isinstance(other, type(self)) and self.token == other.token
-        return TokenAmount(self.token, self.amount + other.amount)
+        return TokenAmount(self.token, self.amount + self._to_dec(other))
 
     def __sub__(self, other) -> TokenAmount:
-        assert isinstance(other, type(self)) and self.token == other.token
-        return TokenAmount(self.token, self.amount - other.amount)
+        return TokenAmount(self.token, self.amount - self._to_dec(other))
 
     def __mul__(self, other: Numeric.Input) -> TokenAmount:
         return TokenAmount(self.token, self.amount * Dec(other))
