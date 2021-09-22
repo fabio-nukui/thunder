@@ -5,6 +5,23 @@ from terra_sdk.core import Coin, Dec, Numeric
 from .client import TerraClient
 
 
+class NativeToken:
+    decimals = 6
+
+    def __init__(self, denom: str):
+        self.denom = denom
+
+    def __lt__(self, other) -> bool:
+        if isinstance(other, type(self)):
+            if self.denom == 'uluna':
+                return False
+            return self.denom < other.denom
+        return NotImplemented
+
+    def to_msg(self) -> dict:
+        return {'native_token': {'denom': self.denom}}
+
+
 class CW20Token:
     def __init__(self, contract_addr: str, symbol: str, decimals: int):
         self.contract_addr = contract_addr
@@ -19,21 +36,20 @@ class CW20Token:
             return False
         return self.contract_addr == other.contract_addr
 
+    def __lt__(self, other) -> bool:
+        if isinstance(other, type(self)):
+            return self.contract_addr < other.contract_addr
+        if isinstance(other, NativeToken):
+            return True
+        return NotImplemented
+
     @classmethod
     def from_contract(cls, contract_addr: str, client: TerraClient) -> CW20Token:
-        msg = client.lcd.wasm.contract_query(contract_addr, {'token_info': {}})
+        msg = client.contract_query(contract_addr, {'token_info': {}})
         return cls(contract_addr, msg['symbol'], msg['decimals'])
 
     def to_msg(self) -> dict:
         return {'token': {'contract_addr': self.contract_addr}}
-
-
-class NativeToken:
-    def __init__(self, denom: str):
-        self.denom = denom
-
-    def to_msg(self) -> dict:
-        return {'native_token': {'denom': self.denom}}
 
 
 class TokenAmount:

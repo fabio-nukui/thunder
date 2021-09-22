@@ -84,7 +84,8 @@ RUN conda install --quiet --yes \
         'isort' \
         'line_profiler' \
         'mypy' \
-        'pytest' && \
+        'pytest' \
+        'types-cachetools' && \
     conda clean --all -f -y  && \
     fix-permissions $HOME $CONDA_DIR
 
