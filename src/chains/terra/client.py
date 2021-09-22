@@ -7,7 +7,7 @@ import auth_secrets
 import configs
 from utils.cache import CacheGroup, ttl_cache
 
-TERRA_CONTRACT_QUERY_CACHE_SIZE = 1000
+TERRA_CONTRACT_QUERY_CACHE_SIZE = 10_000
 TERRA_GAS_PRICE_CACHE_TTL = 3600
 
 
@@ -39,7 +39,7 @@ class TerraClient:
             f'account={self.key.acc_address})'
         )
 
-    @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=configs.TERRA_CACHE_TTL)
+    @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=TERRA_GAS_PRICE_CACHE_TTL)
     def get_gas_prices(self) -> Coins:
         res = httpx.get(f'{self.fcd_uri}/v1/txs/gas_prices')
         res.raise_for_status()

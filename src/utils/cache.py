@@ -57,7 +57,7 @@ class _HashedTupleJSON(_HashedTuple):
 _kwmark = (_HashedTupleJSON,)
 
 
-def hashkey_json(*args, **kwargs):
+def _hashkey_json(*args, **kwargs):
     if kwargs:
         return _HashedTupleJSON(args + sum(sorted(kwargs.items()), _kwmark))
     else:
@@ -124,11 +124,11 @@ def ttl_cache(
         func = group
         cache = _get_ttl_cache()
 
-        return cached(cache, key=hashkey_json)(func)
+        return cached(cache, key=_hashkey_json)(func)
     else:
         ttl = CACHE_GROUPS_TTL[group] if ttl is None else ttl
         cache = _get_ttl_cache(group, maxsize, ttl)
-        return cached(cache, key=hashkey_json)
+        return cached(cache, key=_hashkey_json)
 
 
 def clear_caches(
