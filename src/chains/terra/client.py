@@ -35,7 +35,7 @@ class TerraClient:
 
     def __repr__(self) -> str:
         return (
-            f'{self.__class__.__name__}(lcd_uri={self.lcd_uri},chain_id={self.chain_id},'
+            f'{self.__class__.__name__}(lcd_uri={self.lcd_uri}, chain_id={self.chain_id}, '
             f'account={self.key.acc_address})'
         )
 
