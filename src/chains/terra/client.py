@@ -25,16 +25,13 @@ class TerraClient:
         self.fcd_uri = fcd_uri
         self.chain_id = chain_id
 
-        gas_prices = self.get_gas_prices() if gas_prices is None else gas_prices
-        lcd = LCDClient(lcd_uri, chain_id, gas_prices, gas_adjustment)
-
         secret = auth_secrets.hd_wallet()
         key = MnemonicKey(secret['mnemonic'], secret['account'], hd_wallet_index)
-        wallet = lcd.wallet(key)
+        self.key = key  # Set key before get_gas_prices() to avoid error with cache debugging
 
-        self.lcd = lcd
-        self.key = key
-        self.wallet = wallet
+        gas_prices = self.get_gas_prices() if gas_prices is None else gas_prices
+        self.lcd = LCDClient(lcd_uri, chain_id, gas_prices, gas_adjustment)
+        self.wallet = self.lcd.wallet(key)
 
     def __repr__(self) -> str:
         return (

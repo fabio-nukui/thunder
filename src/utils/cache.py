@@ -128,7 +128,6 @@ def ttl_cache(
     else:
         ttl = CACHE_GROUPS_TTL[group] if ttl is None else ttl
         cache = _get_ttl_cache(group, maxsize, ttl)
-        print(cache)
         return cached(cache, key=hashkey_json)
 
 
