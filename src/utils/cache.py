@@ -13,7 +13,7 @@ import configs
 
 log = logging.getLogger(__name__)
 
-_caches: dict[CacheGroup, list[TTLCacheWithStats]] = defaultdict(list)
+_caches: dict[CacheGroup, list[TTLCache | TTLCacheStats]] = defaultdict(list)
 
 
 class CacheGroup(Enum):
@@ -64,43 +64,40 @@ def hashkey_json(*args, **kwargs):
         return _HashedTupleJSON(args)
 
 
-class TTLCacheWithStats(TTLCache):
+class TTLCacheStats(TTLCache):
     def __init__(self, *args, **kwargs):
+        """Time-to-live cache that saves statistics on cache hit/miss"""
         super().__init__(*args, **kwargs)
-        self.stats = configs.CACHE_STATS
 
-        if self.stats:
-            self._n_hits = 0
-            self._n_sets = 0
-            self._n_hits_total = 0
-            self._n_sets_total = 0
+        self._n_hit = 0
+        self._n_miss = 0
+        self._n_hit_total = 0
+        self._n_miss_total = 0
 
     def clear(self):
         super().clear()
-        if self.stats:
-            self._n_hits = 0
-            self._n_sets = 0
+        self._n_hit = 0
+        self._n_miss = 0
 
     def __getitem__(self, key):
         hit = super().__getitem__(key)
-        if self.stats:
-            self._n_hits += 1
-            self._n_hits_total += 1
-            log.debug(f'Cache hit: {key}, {hit}')
+        self._n_hit += 1
+        self._n_hit_total += 1
+        log.debug(f'Cache hit: {key}, {hit}')
+
         return hit
 
     def __setitem__(self, k, v):
-        if self.stats:
-            self._n_sets += 1
-            self._n_sets_total += 1
-            log.debug(f'Cache set: {k}, {v}')
-        return super().__setitem__(k, v)
+        super().__setitem__(k, v)
+        self._n_miss += 1
+        self._n_miss_total += 1
+        log.debug(f'Cache set: {k}, {v}')
 
     def setdefault(self, k, v):
-        if self.stats:
-            self._n_sets += 1
-            self._n_sets_total += 1
-            log.debug(f'Cache set: {k}, {v}')
+        self._n_miss += 1
+        self._n_miss_total += 1
+        log.debug(f'Cache set: {k}, {v}')
+
         return super().setdefault(k, v)
 
 
@@ -108,9 +105,9 @@ def _get_ttl_cache(
     group: CacheGroup = CacheGroup.DEFAULT,
     maxsize: int = 1,
     ttl: float = None,
-) -> TTLCacheWithStats:
+) -> TTLCache | TTLCacheStats:
     ttl = CACHE_GROUPS_TTL[group] if ttl is None else ttl
-    cache = TTLCacheWithStats(maxsize, ttl)
+    cache = TTLCacheStats(maxsize, ttl) if configs.CACHE_STATS else TTLCache(maxsize, ttl)
 
     _caches[group].append(cache)
     return cache
@@ -155,8 +152,8 @@ def get_stats():
         raise Exception('Stats only available if configs.CACHE_STATS=True')
     all_caches = [cache for list_caches in _caches.values() for cache in list_caches]
     return {
-        'n_hits': sum(cache._n_hits for cache in all_caches),
-        'n_sets': sum(cache._n_sets for cache in all_caches),
-        'n_hits_total': sum(cache._n_hits_total for cache in all_caches),
-        'n_sets_total': sum(cache._n_hits_total for cache in all_caches),
+        'n_hit': sum(cache._n_hit for cache in all_caches),
+        'n_miss': sum(cache._n_miss for cache in all_caches),
+        'n_hit_total': sum(cache._n_hit_total for cache in all_caches),
+        'n_miss_total': sum(cache._n_hit_total for cache in all_caches),
     }

@@ -21,15 +21,15 @@ TERRA_GAS_ADJUSTMENT = float(os.getenv('TERRA_GAS_ADJUSTMENT', '1.45'))
 # Ethereum
 ETHEREUM_CHAIN_ID = int(os.getenv('ETHEREUM_CHAIN_ID', '1'))
 ETHEREUM_RPC_URI = os.getenv('ETHEREUM_RPC_URI', 'http://localhost:8545')
-ETHEREUM_CACHE_TTL = float(os.getenv('ETHEREUM_CACHE_TTL', 5.0))
+ETHEREUM_CACHE_TTL = float(os.getenv('ETHEREUM_CACHE_TTL', 3.5))
 ETHEREUM_POLL_INTERVAL = float(os.getenv('ETHEREUM_POLL_INTERVAL', 0.1))
 ETHEREUM_WEB3_MIDDEWARES = os.getenv('ETHEREUM_WEB3_MIDDEWARES', '').split(',')
 
 # Binance Smart Chain
 BSC_CHAIN_ID = int(os.getenv('BSC_CHAIN_ID', '56'))
 BSC_RPC_URI = os.getenv('BSC_RPC_URI', 'http://localhost:8547')
-BSC_CACHE_TTL = float(os.getenv('BSC_CACHE_TTL', 3.0))
-BSC_POLL_INTERVAL = float(os.getenv('BSC_POLL_INTERVAL', 0.1))
+BSC_CACHE_TTL = float(os.getenv('BSC_CACHE_TTL', 2.9))
+BSC_POLL_INTERVAL = float(os.getenv('BSC_POLL_INTERVAL', 0.01))
 BSC_WEB3_MIDDEWARES = os.getenv('BSC_WEB3_MIDDEWARES', 'geth_poa_middleware').split(',')
 
 # Arbitrage params
