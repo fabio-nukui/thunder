@@ -1,5 +1,5 @@
-from . import binance
+from .binance import BinanceClient
 
 __all__ = [
-    'binance',
+    'BinanceClient',
 ]
