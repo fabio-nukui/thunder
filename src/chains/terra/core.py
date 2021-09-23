@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from decimal import Decimal
 
 from terra_sdk.core import Coin, Dec, Numeric
@@ -11,7 +12,7 @@ class DecimalizeMixin:
     decimals: int
 
     def decimalize(self, amount: Numeric.Input) -> Dec:
-        return amount / (Dec.one() * 10 ** self.decimals)
+        return Dec.with_prec(amount, self.decimals)
 
 
 class NativeToken(DecimalizeMixin):
@@ -65,9 +66,11 @@ class TokenAmount:
     ):
         if decimalize:
             amount = token.decimalize(amount)
+        else:
+            amount = Dec.with_prec(math.ceil(Dec(amount) * 10 ** token.decimals), token.decimals)
 
         self.token = token
-        self.amount = Dec(amount)
+        self.amount = amount
 
     @classmethod
     def from_coin(cls, coin: Coin) -> TokenAmount:
