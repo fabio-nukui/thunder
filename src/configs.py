@@ -4,8 +4,8 @@ import os
 LOG_AWS = os.getenv('LOG_AWS') == 'True'
 
 # Secrets
-SECRET_NAME_MNEMONIC = os.environ['SECRET_NAME_MNEMONIC']
-SECRET_NAME_BINANCE_KEY = os.environ['SECRET_NAME_BINANCE_KEY']
+SECRET_HD_WALLET = os.environ['SECRET_HD_WALLET']
+SECRET_BINANCE_KEY = os.environ['SECRET_BINANCE_KEY']
 
 # Cache
 DEFAULT_CACHE_TTL = float(os.getenv('DEFAULT_CACHE_TTL', 5.0))
