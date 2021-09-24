@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from terra_sdk.core import Dec
+from decimal import Decimal
 
 from chains.terra.client import TerraClient
 from exceptions import InsufficientLiquidity
 
-from .core import CW20Token, NativeToken, TokenAmount
+from .core import CW20Token, NativeToken, TerraToken, TerraTokenAmount
 
-FEE = Dec('0.003')
+FEE = Decimal('0.003')
 
 
 class TerraswapLiquidityPair:
@@ -19,12 +19,12 @@ class TerraswapLiquidityPair:
         self.tokens = self._token_from_data(data[0]['info']), self._token_from_data(data[1]['info'])
 
         self._reserves = (
-            TokenAmount(self.tokens[0], data[0]['amount'], decimalize=True),
-            TokenAmount(self.tokens[1], data[1]['amount'], decimalize=True)
+            TerraTokenAmount(self.tokens[0], data[0]['amount'], decimalize=True),
+            TerraTokenAmount(self.tokens[1], data[1]['amount'], decimalize=True)
         )
 
     @property
-    def reserves(self) -> tuple[TokenAmount, TokenAmount]:
+    def reserves(self) -> tuple[TerraTokenAmount, TerraTokenAmount]:
         self._update_reserves()
         return self._reserves
 
@@ -32,7 +32,7 @@ class TerraswapLiquidityPair:
         response = self.client.contract_query(self.contract_addr, {'pool': {}})
         return response['assets']
 
-    def _token_from_data(self, asset_info: dict) -> NativeToken | CW20Token:
+    def _token_from_data(self, asset_info: dict) -> TerraToken:
         if 'native_token' in asset_info:
             return NativeToken(asset_info['native_token']['denom'])
         if 'token' in asset_info:
@@ -49,9 +49,9 @@ class TerraswapLiquidityPair:
 
     def _get_in_out_reserves(
         self,
-        amount_in: TokenAmount = None,
-        amount_out: TokenAmount = None
-    ) -> tuple[TokenAmount, TokenAmount]:
+        amount_in: TerraTokenAmount = None,
+        amount_out: TerraTokenAmount = None
+    ) -> tuple[TerraTokenAmount, TerraTokenAmount]:
         """Given an amount in and/or an amount out, checks for insuficient liquidity and return
         the reserves pair in order reserve_in, reserve_out"""
         assert amount_in is None or amount_in.token in self.tokens, 'amount_in not in pair'
@@ -74,7 +74,7 @@ class TerraswapLiquidityPair:
             raise InsufficientLiquidity
         return reserve_in, reserve_out
 
-    def get_amount_out(self, amount_in: TokenAmount) -> TokenAmount:
+    def get_amount_out(self, amount_in: TerraTokenAmount) -> TerraTokenAmount:
         reserve_in, reserve_out = self._get_in_out_reserves(amount_in=amount_in)
 
         numerator = reserve_out.amount * amount_in.amount
@@ -82,4 +82,4 @@ class TerraswapLiquidityPair:
 
         amount_out = numerator / denominator * (1 - FEE)
 
-        return TokenAmount(reserve_out.token, amount_out)
+        return TerraTokenAmount(reserve_out.token, amount_out)
