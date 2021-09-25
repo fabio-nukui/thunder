@@ -1,1 +1,1 @@
-make isort lint mypy
+make isort lint types

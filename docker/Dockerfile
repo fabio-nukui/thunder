@@ -83,11 +83,14 @@ RUN conda install --quiet --yes \
         'ipython' \
         'isort' \
         'line_profiler' \
-        'mypy' \
+        'nodejs' \
         'pytest' \
         'types-cachetools' && \
     conda clean --all -f -y  && \
     fix-permissions $HOME $CONDA_DIR
+
+RUN npm install -g pyright && \
+    npm cache clean --force
 
 ############################################ LAB ###################################################
 FROM dev as lab
@@ -100,7 +103,6 @@ RUN conda install --quiet --yes \
         'jupyterlab' \
         'jupyterlab_execute_time' \
         'matplotlib' \
-        'nodejs' \
         'numexpr' \
         'pandas' \
         'plotly' \

@@ -1,0 +1,6 @@
+{
+  "include": ["src", "tests", "app.py"],
+  "pythonVersion": "3.9",
+  "pythonPlatform": "Linux",
+  "exclude": ["**/node_modules", "**/__pycache__", ".git"]
+}

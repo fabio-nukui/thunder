@@ -88,7 +88,7 @@ class BinanceClient:
         self._pairs: dict[str, TradingPair] = {}
 
         self.dcm.start()
-        atexit.register(self.dcm.stop)
+        atexit.register(self.dcm.stop)  # type: ignore
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}'

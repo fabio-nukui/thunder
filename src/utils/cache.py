@@ -149,7 +149,11 @@ def clear_caches(
 def get_stats():
     if not configs.CACHE_STATS:
         raise Exception('Stats only available if configs.CACHE_STATS=True')
-    all_caches = [cache for list_caches in _caches.values() for cache in list_caches]
+    all_caches = [
+        cache
+        for list_caches in _caches.values() for cache in list_caches
+        if isinstance(cache, TTLCacheStats)
+    ]
     return {
         'n_hit': sum(cache._n_hit for cache in all_caches),
         'n_miss': sum(cache._n_miss for cache in all_caches),
