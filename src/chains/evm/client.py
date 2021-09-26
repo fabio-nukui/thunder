@@ -1,20 +1,19 @@
+from __future__ import annotations
+
 import logging
+from typing import Literal
 
 import web3.middleware
 from web3 import Account, HTTPProvider, IPCProvider, Web3, WebsocketProvider
 
 import configs
 
+from .constants import BNB_COIN_TYPE, BSC_CHAIN_ID, ETH_COIN_TYPE, ETHEREUM_CHAIN_ID
+
 log = logging.getLogger(__name__)
 
 Account.enable_unaudited_hdwallet_features()
 
-
-ETHEREUM_CHAIN_ID = 1
-ETH_COIN_TYPE = 60
-
-BSC_CHAIN_ID = 56
-BNB_COIN_TYPE = 714
 
 DEFAULT_CONN_TIMEOUT = 3
 
@@ -29,11 +28,13 @@ class EVMClient:
         middlewares: list[str] = None,
         hd_wallet_index: int = 0,
         timeout: int = DEFAULT_CONN_TIMEOUT,
+        block: int | Literal['latest'] = 'latest',
     ):
         self.endpoint_uri = endpoint_uri
         self.chain_id = chain_id
         self.middlewares = middlewares
         self.timeout = timeout
+        self.block = block
 
         self.w3 = get_w3(endpoint_uri, middlewares, timeout)
 

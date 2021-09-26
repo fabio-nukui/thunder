@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from decimal import Decimal, getcontext
-from typing import Union
+from typing import Optional, Union
 
 DecInput = Union[str, int, float, Decimal]
 DEFAULT_DECIMALS = 18
 
 getcontext().prec = 78  # To allow for calculations with up to 256 bits precision
+
+_MAX_DECIMALS_REPR = 8
 
 
 class Token:
@@ -34,20 +36,44 @@ class Token:
 
 
 class TokenAmount:
-    amount: Decimal
-
-    def __init__(self, token: Token, amount: DecInput = Decimal('NaN'), decimalize: bool = False):
+    def __init__(
+        self,
+        token: Token,
+        amount: DecInput = Decimal('NaN'),
+        raw_amount: Optional[int | str] = None,
+    ):
         self.token = token
         self.symbol = self.token.symbol
         self.decimals = self.token.decimals
 
-        self.update_amount(amount, decimalize)
+        self._amount: Decimal = Decimal('NaN')
+
+        amount = Decimal(amount)
+        if not amount.is_nan():
+            self.amount = amount
+        elif raw_amount is not None:
+            self.raw_amount = raw_amount
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}({self.token}:{self.amount:,.{self.decimals}f})'
+        decimals = min(_MAX_DECIMALS_REPR, self.decimals)
+        return f'{self.__class__.__name__}({self.token}: {self.amount:,.{decimals}f})'
 
-    def update_amount(self, amount: DecInput, decimalize: bool = False):
-        self.amount = self.token.decimalize(amount) if decimalize else self.token.round(amount)
+    @property
+    def amount(self) -> Decimal:
+        return self._amount
+
+    @amount.setter
+    def amount(self, value: DecInput):  # type: ignore
+        self._amount = self.token.round(value)
+
+    @property
+    def raw_amount(self) -> int:
+        assert not self.is_empty()
+        return int(self.amount * 10 ** self.decimals)
+
+    @raw_amount.setter
+    def raw_amount(self, value: int | str):  # type: ignore
+        self._amount = self.token.decimalize(value)
 
     def is_empty(self) -> bool:
         return self.amount.is_nan()

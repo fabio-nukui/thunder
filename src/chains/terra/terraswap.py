@@ -19,8 +19,8 @@ class TerraswapLiquidityPair:
         self.tokens = self._token_from_data(data[0]['info']), self._token_from_data(data[1]['info'])
 
         self._reserves = (
-            TerraTokenAmount(self.tokens[0], data[0]['amount'], decimalize=True),
-            TerraTokenAmount(self.tokens[1], data[1]['amount'], decimalize=True)
+            TerraTokenAmount(self.tokens[0], raw_amount=data[0]['amount']),
+            TerraTokenAmount(self.tokens[1], raw_amount=data[1]['amount'])
         )
 
     @property
@@ -42,7 +42,7 @@ class TerraswapLiquidityPair:
     def _update_reserves(self):
         data = self._get_assets_data()
         for reserve, asset_data in zip(self._reserves, data):
-            reserve.update_amount(asset_data['amount'], decimalize=True)
+            reserve.raw_amount = asset_data['amount']
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}({self.tokens[0].symbol}-{self.tokens[1].symbol})'
