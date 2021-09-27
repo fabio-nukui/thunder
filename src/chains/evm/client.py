@@ -8,14 +8,16 @@ from web3 import Account, HTTPProvider, IPCProvider, Web3, WebsocketProvider
 
 import configs
 
-from .constants import BNB_COIN_TYPE, BSC_CHAIN_ID, ETH_COIN_TYPE, ETHEREUM_CHAIN_ID
-
 log = logging.getLogger(__name__)
 
 Account.enable_unaudited_hdwallet_features()
 
 
 DEFAULT_CONN_TIMEOUT = 3
+
+# BIP-44 coin types (https://github.com/satoshilabs/slips/blob/master/slip-0044.md)
+ETH_COIN_TYPE = 60
+BNB_COIN_TYPE = 714
 
 
 class EVMClient:
@@ -61,7 +63,7 @@ class EthereumClient(EVMClient):
         super().__init__(
             hd_wallet=hd_wallet,
             endpoint_uri=endpoint_uri,
-            chain_id=ETHEREUM_CHAIN_ID,
+            chain_id=configs.ETHEREUM_CHAIN_ID,
             coin_type=ETH_COIN_TYPE,
             middlewares=configs.ETHEREUM_WEB3_MIDDEWARES,
             hd_wallet_index=hd_wallet_index,
@@ -80,7 +82,7 @@ class BSCClient(EVMClient):
         super().__init__(
             hd_wallet=hd_wallet,
             endpoint_uri=endpoint_uri,
-            chain_id=BSC_CHAIN_ID,
+            chain_id=configs.BSC_CHAIN_ID,
             coin_type=BNB_COIN_TYPE,
             middlewares=configs.BSC_WEB3_MIDDEWARES,
             hd_wallet_index=hd_wallet_index,

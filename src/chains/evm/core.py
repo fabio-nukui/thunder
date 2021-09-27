@@ -5,15 +5,15 @@ from typing import Union
 
 from web3 import Web3
 
+import configs
 from common import Token, TokenAmount
 
 from .client import EVMClient
-from .constants import BSC_CHAIN_ID, ETHEREUM_CHAIN_ID
 
 ERC20_ABI = json.load(open('resources/contracts/evm/abis/ERC20.json'))
 _NATIVE_TOKENS = {
-    ETHEREUM_CHAIN_ID: {'symbol': 'ETH', 'decimals': '18'},
-    BSC_CHAIN_ID: {'symbol': 'BNB', 'decimals': '18'},
+    configs.ETHEREUM_CHAIN_ID: {'symbol': 'ETH', 'decimals': '18'},
+    configs.BSC_CHAIN_ID: {'symbol': 'BNB', 'decimals': '18'},
 }
 
 
