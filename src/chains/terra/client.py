@@ -1,9 +1,9 @@
-import httpx
 from terra_sdk.client.lcd import LCDClient
 from terra_sdk.core import Coins
 from terra_sdk.key.mnemonic import MnemonicKey
 
 import configs
+import utils
 from utils.cache import CacheGroup, ttl_cache
 
 TERRA_CONTRACT_QUERY_CACHE_SIZE = 10_000
@@ -40,8 +40,7 @@ class TerraClient:
 
     @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=TERRA_GAS_PRICE_CACHE_TTL)
     def get_gas_prices(self) -> Coins:
-        res = httpx.get(f'{self.fcd_uri}/v1/txs/gas_prices')
-        res.raise_for_status()
+        res = utils.http.get(f'{self.fcd_uri}/v1/txs/gas_prices')
         return Coins(res.json())
 
     @ttl_cache(CacheGroup.TERRA, TERRA_CONTRACT_QUERY_CACHE_SIZE)
