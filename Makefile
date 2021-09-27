@@ -64,6 +64,19 @@ else
 	docker start -i $(DEV_CONTAINER_NAME)
 endif
 
+start-dev-local: ## Start docker container for development, passing local AWS credentials
+ifeq ($(shell docker ps -a --format "{{.Names}}" | grep ^$(DEV_CONTAINER_NAME)$$),)
+	docker run -it \
+		--net=host \
+		-v $(PWD):/home/$(CONTAINER_USER)/work \
+		-v $(HOME)/.aws/credentials:/home/$(CONTAINER_USER)/.aws/credentials \
+		--name $(DEV_CONTAINER_NAME) \
+		--env-file $(ENV_FILE) \
+		$(DEV_IMAGE_NAME)
+else
+	docker start -i $(DEV_CONTAINER_NAME)
+endif
+
 build-lab: ## Build docker lab image
 	echo $(GIT_BRANCH) > docker/git_commit
 	docker build --target lab -t $(LAB_IMAGE_NAME) -f docker/Dockerfile .
