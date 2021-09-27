@@ -12,12 +12,26 @@ from .client import EVMClient
 
 ERC20_ABI = json.load(open('resources/contracts/evm/abis/ERC20.json'))
 _NATIVE_TOKENS = {
-    configs.ETHEREUM_CHAIN_ID: {'symbol': 'ETH', 'decimals': '18'},
-    configs.BSC_CHAIN_ID: {'symbol': 'BNB', 'decimals': '18'},
+    configs.ETHEREUM_CHAIN_ID: {'symbol': 'ETH', 'decimals': 18},
+    configs.BSC_CHAIN_ID: {'symbol': 'BNB', 'decimals': 18},
 }
 
 
 class NativeToken(Token):
+    __instances: dict[int, NativeToken] = {}
+
+    def __new__(
+        cls,
+        chain_id: int,
+        symbol: str = None,
+        decimals: int = None,
+    ) -> NativeToken:
+        if chain_id in cls.__instances:
+            return cls.__instances[chain_id]
+        self = super().__new__(cls)
+        self.__init__(chain_id, symbol, decimals)
+        return self
+
     def __init__(
         self,
         chain_id: int,
@@ -26,7 +40,7 @@ class NativeToken(Token):
     ):
         self.chain_id = chain_id
         self.symbol = _NATIVE_TOKENS[chain_id]['symbol'] if symbol is None else symbol
-        self.decimals = int(_NATIVE_TOKENS[chain_id]['decimals']) if decimals is None else decimals
+        self.decimals = _NATIVE_TOKENS[chain_id]['decimals'] if decimals is None else decimals
 
 
 class ERC20Token(Token):
