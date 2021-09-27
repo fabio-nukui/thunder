@@ -25,6 +25,7 @@ env/
 .local
 .python_history
 /docker/git_commit
+/manual_tests
 
 # jupyter notebooks
 *.ipynb
