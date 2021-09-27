@@ -7,7 +7,7 @@ import configs
 import utils
 from utils.cache import CacheGroup, ttl_cache
 
-from .core import BaseTerraClient
+from .core import BaseTerraClient, TerraTokenAmount
 
 TERRA_CONTRACT_QUERY_CACHE_SIZE = 10_000
 TERRA_GAS_PRICE_CACHE_TTL = 3600
@@ -51,3 +51,12 @@ class TerraClient(BaseTerraClient):
     @ttl_cache(CacheGroup.TERRA, TERRA_CONTRACT_QUERY_CACHE_SIZE)
     def contract_query(self, contract_addr: str, query_msg: dict) -> dict:
         return self.lcd.wasm.contract_query(contract_addr, query_msg)
+
+    def get_bank(self, denoms: list[str] = None, address: str = None) -> list[TerraTokenAmount]:
+        address = self.address if address is None else address
+        coins_balance = self.lcd.bank.balance(address)
+        return [
+            TerraTokenAmount.from_coin(c)
+            for c in coins_balance
+            if denoms is None or c.denom in denoms
+        ]
