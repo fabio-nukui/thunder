@@ -17,6 +17,7 @@ _caches: dict[CacheGroup, list[TTLCache | TTLCacheStats]] = defaultdict(list)
 
 
 class CacheGroup(Enum):
+    ALL = 'all'
     DEFAULT = 'default'
     BSC = 'bsc'
     ETHEREUM = 'ethereum'
@@ -29,6 +30,8 @@ CACHE_GROUPS_TTL = {
     CacheGroup.ETHEREUM: configs.ETHEREUM_CACHE_TTL,
     CacheGroup.TERRA: configs.TERRA_CACHE_TTL,
 }
+
+CACHE_GROUPS_TTL[CacheGroup.ALL] = min(CACHE_GROUPS_TTL.values())
 
 
 class _HashedTupleJSON(_HashedTuple):
@@ -101,11 +104,7 @@ class TTLCacheStats(TTLCache):
         return super().setdefault(k, v)
 
 
-def _get_ttl_cache(
-    group: CacheGroup = CacheGroup.DEFAULT,
-    maxsize: int = 1,
-    ttl: float = None,
-) -> TTLCache | TTLCacheStats:
+def _get_ttl_cache(group: CacheGroup, maxsize: int, ttl: float = None) -> TTLCache | TTLCacheStats:
     ttl = CACHE_GROUPS_TTL[group] if ttl is None else ttl
     cache = TTLCacheStats(maxsize, ttl) if configs.CACHE_STATS else TTLCache(maxsize, ttl)
 
@@ -122,28 +121,27 @@ def ttl_cache(
     if callable(group):
         # ttl_cache was applied directly
         func = group
-        cache = _get_ttl_cache()
-
+        cache = _get_ttl_cache(CacheGroup.DEFAULT, maxsize, ttl)
         return cached(cache, key=_hashkey_json)(func)
-    else:
-        ttl = CACHE_GROUPS_TTL[group] if ttl is None else ttl
+    if isinstance(group, CacheGroup):
         cache = _get_ttl_cache(group, maxsize, ttl)
         return cached(cache, key=_hashkey_json)
+    raise TypeError('Expected first argument to be a CacheGroup or a callable')
 
 
 def clear_caches(
     group: CacheGroup = CacheGroup.DEFAULT,
-    ttl_treshold: int | float = configs.DEFAULT_CACHE_TTL,
+    ttl_treshold: Optional[int | float] = None,
     clear_all: bool = False,
 ):
-    if clear_all:
-        for list_caches in _caches.values():
-            for cache in list_caches:
-                cache.clear()
+    ttl_treshold = CACHE_GROUPS_TTL[group] if ttl_treshold is None else ttl_treshold
+    if group == CacheGroup.ALL:
+        caches_clear = [cache for list_caches in _caches.values() for cache in list_caches]
     else:
-        for cache in _caches[group]:
-            if cache._TTLCache__ttl <= ttl_treshold:  # type: ignore
-                cache.clear()
+        caches_clear = _caches[group]
+    for cache in caches_clear:
+        if cache._TTLCache__ttl <= ttl_treshold or clear_all:  # type: ignore
+            cache.clear()
 
 
 def get_stats():
