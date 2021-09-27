@@ -24,6 +24,9 @@ class OneInchExchange:
         self.api_url = f'{ONE_INCH_API_URL.format(chain_id=self.client.chain_id)}'
         self.router_address = self._get_router_address()
 
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}({self.client.__class__.__name__})'
+
     def _get_router_address(self) -> str:
         url = f'{self.api_url}/approve/spender'
         res = utils.http.get(url, timeout=TIMEOUT_REQUESTS)
