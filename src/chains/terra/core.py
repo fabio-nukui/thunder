@@ -12,7 +12,7 @@ from terra_sdk.key.mnemonic import MnemonicKey
 from common import Token, TokenAmount
 
 
-class NativeToken(Token):
+class TerraNativeToken(Token):
     decimals = 6
 
     def __init__(self, denom: str):
@@ -39,7 +39,7 @@ class CW20Token(Token):
         return cls(contract_addr, msg['symbol'], msg['decimals'])
 
 
-TerraToken = Union[NativeToken, CW20Token]
+TerraToken = Union[TerraNativeToken, CW20Token]
 
 
 class TerraTokenAmount(TokenAmount):
@@ -47,7 +47,7 @@ class TerraTokenAmount(TokenAmount):
 
     @classmethod
     def from_coin(cls, coin: Coin) -> TerraTokenAmount:
-        token = NativeToken(coin.denom)
+        token = TerraNativeToken(coin.denom)
         amount = Decimal(str(coin.amount))
         return cls(token, amount)
 

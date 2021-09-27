@@ -5,11 +5,11 @@ from web3 import Web3
 import utils
 
 from .client import EVMClient
-from .core import EVMToken, EVMTokenAmount, NativeToken
+from .core import EVMNativeToken, EVMToken, EVMTokenAmount
 
 log = logging.getLogger(__name__)
 
-ADDR_NATIVE_TOKEN = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE'
+NATIVE_ADDRESS = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE'
 ONE_INCH_API_URL = 'https://api.1inch.exchange/v3.0/{chain_id}'
 TIMEOUT_REQUESTS = 10.0
 
@@ -39,8 +39,8 @@ class OneInchExchange:
         gas_price: int = None,
     ) -> EVMTokenAmount:
         token_in = amount_in.token
-        address_from = ADDR_NATIVE_TOKEN if isinstance(token_in, NativeToken) else token_in.address
-        address_to = ADDR_NATIVE_TOKEN if isinstance(token_out, NativeToken) else token_out.address
+        address_from = NATIVE_ADDRESS if isinstance(token_in, EVMNativeToken) else token_in.address
+        address_to = NATIVE_ADDRESS if isinstance(token_out, EVMNativeToken) else token_out.address
 
         gas_price = self.client.get_gas_price() if gas_price is None else gas_price
         query_params = {
@@ -62,8 +62,8 @@ class OneInchExchange:
         infinite_approval: bool = True,
     ) -> str:
         token_in = amount_in.token
-        address_from = ADDR_NATIVE_TOKEN if isinstance(token_in, NativeToken) else token_in.address
-        address_to = ADDR_NATIVE_TOKEN if isinstance(token_out, NativeToken) else token_out.address
+        address_from = NATIVE_ADDRESS if isinstance(token_in, EVMNativeToken) else token_in.address
+        address_to = NATIVE_ADDRESS if isinstance(token_out, EVMNativeToken) else token_out.address
 
         amount_in.ensure_allowance(self.client, self.router_address, infinite_approval)
 

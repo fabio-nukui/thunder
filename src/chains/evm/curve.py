@@ -9,7 +9,7 @@ from web3.main import Web3
 from utils.cache import CacheGroup, ttl_cache
 
 from .client import EVMClient
-from .core import ERC20Token, EVMToken, EVMTokenAmount, NativeToken
+from .core import ERC20Token, EVMNativeToken, EVMToken, EVMTokenAmount
 
 LENDING_PRECISION: int = 10 ** 18
 PRECISION: int = 10 ** 18
@@ -69,7 +69,7 @@ class CurvePool:
             except (BadFunctionCallOutput, ContractLogicError):
                 return tuple(tokens)
             if token_address == NATIVE_TOKEN_ADDRESS:
-                tokens.append(NativeToken(self.chain_id))
+                tokens.append(EVMNativeToken(self.chain_id))
             else:
                 tokens.append(ERC20Token(token_address, client=self.client))
             i += 1

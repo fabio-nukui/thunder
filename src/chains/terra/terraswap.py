@@ -5,7 +5,7 @@ from decimal import Decimal
 from chains.terra.client import TerraClient
 from exceptions import InsufficientLiquidity
 
-from .core import CW20Token, NativeToken, TerraToken, TerraTokenAmount
+from .core import CW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
 
 FEE = Decimal('0.003')
 
@@ -34,7 +34,7 @@ class TerraswapLiquidityPair:
 
     def _token_from_data(self, asset_info: dict) -> TerraToken:
         if 'native_token' in asset_info:
-            return NativeToken(asset_info['native_token']['denom'])
+            return TerraNativeToken(asset_info['native_token']['denom'])
         if 'token' in asset_info:
             return CW20Token.from_contract(asset_info['token']['contract_addr'], self.client)
         raise TypeError(f'Unexpected data format: {asset_info}')

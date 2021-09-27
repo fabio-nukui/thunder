@@ -26,15 +26,15 @@ INF_APPROVAL_AMOUNT = 0xff000000000000000000000000000000000000000000000000000000
 DEFAULT_MAX_GAS = 1_000_000
 
 
-class NativeToken(Token):
-    __instances: dict[int, NativeToken] = {}
+class EVMNativeToken(Token):
+    __instances: dict[int, EVMNativeToken] = {}
 
     def __new__(
         cls,
         chain_id: int,
         symbol: str = None,
         decimals: int = None,
-    ) -> NativeToken:
+    ) -> EVMNativeToken:
         if chain_id in cls.__instances:
             return cls.__instances[chain_id]
         self = super().__new__(cls)
@@ -131,14 +131,14 @@ class ERC20Token(Token):
         return NotImplemented
 
 
-EVMToken = Union[NativeToken, ERC20Token]
+EVMToken = Union[EVMNativeToken, ERC20Token]
 
 
 class EVMTokenAmount(TokenAmount):
     token: EVMToken
 
     def ensure_allowance(self, client: BaseEVMClient, spender: str, infinite_approval: bool = True):
-        if isinstance(self.token, NativeToken):
+        if isinstance(self.token, EVMNativeToken):
             return
         allowance = self.token.get_allowance(client.address, spender)
         if allowance < self.raw_amount:

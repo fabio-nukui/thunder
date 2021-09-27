@@ -1,6 +1,6 @@
 from . import curve, lido, one_inch
 from .client import BSCClient, EthereumClient
-from .core import ERC20Token, EVMToken, EVMTokenAmount, NativeToken
+from .core import ERC20Token, EVMNativeToken, EVMToken, EVMTokenAmount
 from .one_inch import OneInchExchange
 
 __all__ = [
@@ -10,8 +10,8 @@ __all__ = [
     'EthereumClient',
     'BSCClient',
     'ERC20Token',
+    'EVMNativeToken',
     'EVMToken',
     'EVMTokenAmount',
-    'NativeToken',
     'OneInchExchange',
 ]
