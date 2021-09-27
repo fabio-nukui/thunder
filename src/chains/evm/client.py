@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import logging
+from copy import copy
 from typing import Literal
 
 import web3.middleware
+from eth_account.datastructures import SignedTransaction
 from eth_account.signers.local import LocalAccount
 from web3 import Account, HTTPProvider, IPCProvider, Web3, WebsocketProvider
+from web3.contract import ContractFunction
 
 import auth_secrets
 import configs
@@ -20,6 +23,9 @@ DEFAULT_CONN_TIMEOUT = 3
 # BIP-44 coin types (https://github.com/satoshilabs/slips/blob/master/slip-0044.md)
 ETH_COIN_TYPE = 60
 BNB_COIN_TYPE = 714
+
+MAX_BLOCKS_WAIT_RECEIPT = 10
+DEFAULT_MAX_GAS = 1_000_000
 
 
 class EVMClient:
@@ -53,6 +59,40 @@ class EVMClient:
     def __repr__(self) -> str:
         return \
             f'{self.__class__.__name__}(endpoint_uri={self.endpoint_uri}, address={self.address})'
+
+    def get_gas_price(self) -> int:
+        return self.w3.eth.gas_price
+
+    def sign_and_send_tx(self, tx: dict) -> str:
+        tx = copy(tx)
+        tx.setdefault('gas', DEFAULT_MAX_GAS)
+
+        # Avoid dict's setdefault() or get() to avoid calling expensive functions
+        if 'nonce' not in tx:
+            tx['nonce'] = self.w3.eth.get_transaction_count(self.address)
+        tx['gasPrice'] = tx['gasPrice'] if 'gasPrice' in tx else self.get_gas_price()
+
+        signed_tx: SignedTransaction = self.account.sign_transaction(tx)
+        tx_hash = signed_tx.hash.hex()
+
+        log.debug(f'Sending transaction {tx_hash}: {tx}')
+        return self.w3.eth.send_raw_transaction(signed_tx.rawTransaction).hex()
+
+    def sign_and_send_contract_tx(
+        self,
+        contract_call: ContractFunction,
+        value_: int = 0,
+        gas_price_: int = None,
+        max_gas_: int = DEFAULT_MAX_GAS,
+    ) -> str:
+        tx = contract_call.buildTransaction({
+            'from': self.address,
+            'value': value_,
+            'chainId': self.chain_id,
+            'gas': max_gas_,
+            'gasPrice': self.get_gas_price() if gas_price_ is None else gas_price_,
+        })
+        return self.sign_and_send_tx(tx)
 
 
 class EthereumClient(EVMClient):

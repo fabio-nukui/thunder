@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Union
 
 from web3 import Web3
@@ -10,11 +11,16 @@ from common import Token, TokenAmount
 
 from .client import EVMClient
 
+log = logging.getLogger(__name__)
+
 ERC20_ABI = json.load(open('resources/contracts/evm/abis/ERC20.json'))
 _NATIVE_TOKENS = {
     configs.ETHEREUM_CHAIN_ID: {'symbol': 'ETH', 'decimals': 18},
     configs.BSC_CHAIN_ID: {'symbol': 'BNB', 'decimals': 18},
 }
+
+# Almost same as max uint256, but uses less gas
+INF_APPROVAL_AMOUNT = 0xff00000000000000000000000000000000000000000000000000000000000000
 
 
 class NativeToken(Token):
@@ -79,6 +85,33 @@ class ERC20Token(Token):
     def __repr__(self):
         return f'{self.__class__.__name__}(symbol={self.symbol}, address={self.address})'
 
+    def get_allowance(self, owner: str, spender: str) -> TokenAmount:
+        assert self.contract is not None and self.client is not None
+        allowance: int = (
+            self.contract.functions
+            .allowance(owner, spender)
+            .call(block_identifier=self.client.block)
+        )
+        return TokenAmount(self, raw_amount=allowance)
+
+    def set_allowance(
+        self,
+        client: EVMClient,
+        spender: str,
+        amount: int | TokenAmount = None,
+    ) -> str:
+        if amount is None:
+            amount = INF_APPROVAL_AMOUNT
+        elif isinstance(amount, TokenAmount):
+            assert self == amount.token
+            amount = amount.raw_amount
+
+        assert self.contract is not None
+        contract_call = self.contract.functions.approve(spender, amount)
+        tx_hash = client.sign_and_send_contract_tx(contract_call)
+        log.debug(f'Set allowance for {spender} to {amount} ({tx_hash})')
+        return tx_hash
+
     def _id(self) -> tuple:
         return (self.chain_id, self.address)
 
@@ -100,3 +133,11 @@ EVMToken = Union[NativeToken, ERC20Token]
 
 class EVMTokenAmount(TokenAmount):
     token: EVMToken
+
+    def ensure_allowance(self, client: EVMClient, spender: str, infinite_approval: bool = True):
+        if isinstance(self.token, NativeToken):
+            return
+        allowance = self.token.get_allowance(client.address, spender)
+        if allowance < self.raw_amount:
+            approval_amount = None if infinite_approval else self
+            self.token.set_allowance(client, spender, approval_amount)
