@@ -2,6 +2,7 @@ from terra_sdk.client.lcd import LCDClient
 from terra_sdk.core import Coins
 from terra_sdk.key.mnemonic import MnemonicKey
 
+import auth_secrets
 import configs
 import utils
 from utils.cache import CacheGroup, ttl_cache
@@ -13,7 +14,7 @@ TERRA_GAS_PRICE_CACHE_TTL = 3600
 class TerraClient:
     def __init__(
         self,
-        hd_wallet: dict,
+        hd_wallet: dict = None,
         lcd_uri: str = configs.TERRA_LCD_URI,
         fcd_uri: str = configs.TERRA_FCD_URI,
         chain_id: str = configs.TERRA_CHAIN_ID,
@@ -25,6 +26,7 @@ class TerraClient:
         self.fcd_uri = fcd_uri
         self.chain_id = chain_id
 
+        hd_wallet = auth_secrets.hd_wallet() if hd_wallet is None else hd_wallet
         key = MnemonicKey(hd_wallet['mnemonic'], hd_wallet['account'], hd_wallet_index)
         self.key = key  # Set key before get_gas_prices() to avoid error with cache debugging
 

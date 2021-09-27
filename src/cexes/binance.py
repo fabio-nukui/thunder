@@ -7,6 +7,7 @@ from decimal import Decimal
 import binance
 from binance.depthcache import DepthCache
 
+import auth_secrets
 from common.token import Token, TokenAmount
 from exceptions import InsufficientLiquidity
 
@@ -82,7 +83,12 @@ class TradingPair:
 
 
 class BinanceClient:
-    def __init__(self, api_key: str, api_secret: str):
+    def __init__(self, api_key: str = None, api_secret: str = None):
+        if api_key is None or api_secret is None:
+            binance_secret = auth_secrets.binance_api()
+            api_key = binance_secret['api_key']
+            api_secret = binance_secret['api_secret']
+
         self.client = binance.Client(api_key, api_secret)
         self.dcm = binance.ThreadedDepthCacheManager(api_key, api_secret)
         self._pairs: dict[str, TradingPair] = {}

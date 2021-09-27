@@ -7,6 +7,7 @@ import web3.middleware
 from eth_account.signers.local import LocalAccount
 from web3 import Account, HTTPProvider, IPCProvider, Web3, WebsocketProvider
 
+import auth_secrets
 import configs
 
 log = logging.getLogger(__name__)
@@ -24,11 +25,11 @@ BNB_COIN_TYPE = 714
 class EVMClient:
     def __init__(
         self,
-        hd_wallet: dict,
         endpoint_uri: str,
         chain_id: int,
         coin_type: int,
         middlewares: list[str] = None,
+        hd_wallet: dict = None,
         hd_wallet_index: int = 0,
         timeout: int = DEFAULT_CONN_TIMEOUT,
         block: int | Literal['latest'] = 'latest',
@@ -41,6 +42,8 @@ class EVMClient:
 
         self.w3 = get_w3(endpoint_uri, middlewares, timeout)
 
+        hd_wallet = auth_secrets.hd_wallet() if hd_wallet is None else hd_wallet
+
         self.account: LocalAccount = Account.from_mnemonic(
             hd_wallet['mnemonic'],
             account_path=f"m/44'/{coin_type}'/{hd_wallet['account']}'/0/{hd_wallet_index}",
@@ -48,26 +51,24 @@ class EVMClient:
         self.address: str = self.account.address
 
     def __repr__(self) -> str:
-        return (
-            f'{self.__class__.__name__}(endpoint_uri={self.endpoint_uri},'
-            f'address={self.account.address})'
-        )
+        return \
+            f'{self.__class__.__name__}(endpoint_uri={self.endpoint_uri}, address={self.address})'
 
 
 class EthereumClient(EVMClient):
     def __init__(
         self,
-        hd_wallet: dict,
+        hd_wallet: dict = None,
         endpoint_uri: str = configs.ETHEREUM_RPC_URI,
         hd_wallet_index: int = 0,
         timeout: int = DEFAULT_CONN_TIMEOUT,
     ):
         super().__init__(
-            hd_wallet=hd_wallet,
             endpoint_uri=endpoint_uri,
             chain_id=configs.ETHEREUM_CHAIN_ID,
             coin_type=ETH_COIN_TYPE,
             middlewares=configs.ETHEREUM_WEB3_MIDDEWARES,
+            hd_wallet=hd_wallet,
             hd_wallet_index=hd_wallet_index,
             timeout=timeout,
         )
@@ -76,17 +77,17 @@ class EthereumClient(EVMClient):
 class BSCClient(EVMClient):
     def __init__(
         self,
-        hd_wallet: dict,
+        hd_wallet: dict = None,
         endpoint_uri: str = configs.BSC_RPC_URI,
         hd_wallet_index: int = 0,
         timeout: int = DEFAULT_CONN_TIMEOUT,
     ):
         super().__init__(
-            hd_wallet=hd_wallet,
             endpoint_uri=endpoint_uri,
             chain_id=configs.BSC_CHAIN_ID,
             coin_type=BNB_COIN_TYPE,
             middlewares=configs.BSC_WEB3_MIDDEWARES,
+            hd_wallet=hd_wallet,
             hd_wallet_index=hd_wallet_index,
             timeout=timeout,
         )
