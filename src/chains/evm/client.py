@@ -67,7 +67,7 @@ class EVMClient:
         tx = copy(tx)
         tx.setdefault('gas', DEFAULT_MAX_GAS)
 
-        # Avoid dict's setdefault() or get() to avoid calling expensive functions
+        # Avoid dict's setdefault() or get() to avoid side effects / calling expensive functions
         if 'nonce' not in tx:
             tx['nonce'] = self.w3.eth.get_transaction_count(self.address)
         tx['gasPrice'] = tx['gasPrice'] if 'gasPrice' in tx else self.get_gas_price()
@@ -82,15 +82,15 @@ class EVMClient:
         self,
         contract_call: ContractFunction,
         value_: int = 0,
-        gas_price_: int = None,
-        max_gas_: int = DEFAULT_MAX_GAS,
+        gas_price: int = None,
+        max_gas: int = DEFAULT_MAX_GAS,
     ) -> str:
         tx = contract_call.buildTransaction({
             'from': self.address,
             'value': value_,
             'chainId': self.chain_id,
-            'gas': max_gas_,
-            'gasPrice': self.get_gas_price() if gas_price_ is None else gas_price_,
+            'gas': max_gas,
+            'gasPrice': self.get_gas_price() if gas_price is None else gas_price,
         })
         return self.sign_and_send_tx(tx)
 
