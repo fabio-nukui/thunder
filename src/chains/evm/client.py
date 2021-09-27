@@ -4,6 +4,7 @@ import logging
 from typing import Literal
 
 import web3.middleware
+from eth_account.signers.local import LocalAccount
 from web3 import Account, HTTPProvider, IPCProvider, Web3, WebsocketProvider
 
 import configs
@@ -40,10 +41,11 @@ class EVMClient:
 
         self.w3 = get_w3(endpoint_uri, middlewares, timeout)
 
-        self.account = Account.from_mnemonic(
+        self.account: LocalAccount = Account.from_mnemonic(
             hd_wallet['mnemonic'],
             account_path=f"m/44'/{coin_type}'/{hd_wallet['account']}'/0/{hd_wallet_index}",
         )
+        self.address: str = self.account.address
 
     def __repr__(self) -> str:
         return (
