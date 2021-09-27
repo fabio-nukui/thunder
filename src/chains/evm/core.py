@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Union
+from abc import ABC, abstractmethod
+from typing import Literal, Union
 
+from eth_account.signers.local import LocalAccount
 from web3 import Web3
+from web3.contract import ContractFunction
 
 import configs
 from common import Token, TokenAmount
-
-from .client import EVMClient
 
 log = logging.getLogger(__name__)
 
@@ -21,6 +22,8 @@ _NATIVE_TOKENS = {
 
 # Almost same as max uint256, but uses less gas
 INF_APPROVAL_AMOUNT = 0xff00000000000000000000000000000000000000000000000000000000000000
+
+DEFAULT_MAX_GAS = 1_000_000
 
 
 class NativeToken(Token):
@@ -54,7 +57,7 @@ class ERC20Token(Token):
         self,
         address: str,
         abi: dict = ERC20_ABI,
-        client: EVMClient = None,
+        client: BaseEVMClient = None,
         chain_id: int = None,
         symbol: str = None,
         decimals: int = None,
@@ -96,7 +99,7 @@ class ERC20Token(Token):
 
     def set_allowance(
         self,
-        client: EVMClient,
+        client: BaseEVMClient,
         spender: str,
         amount: int | TokenAmount = None,
     ) -> str:
@@ -134,10 +137,37 @@ EVMToken = Union[NativeToken, ERC20Token]
 class EVMTokenAmount(TokenAmount):
     token: EVMToken
 
-    def ensure_allowance(self, client: EVMClient, spender: str, infinite_approval: bool = True):
+    def ensure_allowance(self, client: BaseEVMClient, spender: str, infinite_approval: bool = True):
         if isinstance(self.token, NativeToken):
             return
         allowance = self.token.get_allowance(client.address, spender)
         if allowance < self.raw_amount:
             approval_amount = None if infinite_approval else self
             self.token.set_allowance(client, spender, approval_amount)
+
+
+class BaseEVMClient(ABC):
+    endpoint_uri: str
+    chain_id: int
+    block: int | Literal['latest']
+    w3: Web3
+    account: LocalAccount
+    address: str
+
+    @abstractmethod
+    def get_gas_price(self) -> int:
+        ...
+
+    @abstractmethod
+    def sign_and_send_tx(self, tx: dict) -> str:
+        ...
+
+    @abstractmethod
+    def sign_and_send_contract_tx(
+        self,
+        contract_call: ContractFunction,
+        value: int = 0,
+        gas_price: int = None,
+        max_gas: int = DEFAULT_MAX_GAS,
+    ) -> str:
+        ...

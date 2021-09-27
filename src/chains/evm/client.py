@@ -13,6 +13,8 @@ from web3.contract import ContractFunction
 import auth_secrets
 import configs
 
+from .core import DEFAULT_MAX_GAS, BaseEVMClient
+
 log = logging.getLogger(__name__)
 
 Account.enable_unaudited_hdwallet_features()
@@ -25,10 +27,9 @@ ETH_COIN_TYPE = 60
 BNB_COIN_TYPE = 714
 
 MAX_BLOCKS_WAIT_RECEIPT = 10
-DEFAULT_MAX_GAS = 1_000_000
 
 
-class EVMClient:
+class EVMClient(BaseEVMClient):
     def __init__(
         self,
         endpoint_uri: str,
@@ -81,13 +82,13 @@ class EVMClient:
     def sign_and_send_contract_tx(
         self,
         contract_call: ContractFunction,
-        value_: int = 0,
+        value: int = 0,
         gas_price: int = None,
         max_gas: int = DEFAULT_MAX_GAS,
     ) -> str:
         tx = contract_call.buildTransaction({
             'from': self.address,
-            'value': value_,
+            'value': value,
             'chainId': self.chain_id,
             'gas': max_gas,
             'gasPrice': self.get_gas_price() if gas_price is None else gas_price,

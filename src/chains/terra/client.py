@@ -7,11 +7,13 @@ import configs
 import utils
 from utils.cache import CacheGroup, ttl_cache
 
+from .core import BaseTerraClient
+
 TERRA_CONTRACT_QUERY_CACHE_SIZE = 10_000
 TERRA_GAS_PRICE_CACHE_TTL = 3600
 
 
-class TerraClient:
+class TerraClient(BaseTerraClient):
     def __init__(
         self,
         hd_wallet: dict = None,
@@ -33,6 +35,7 @@ class TerraClient:
         gas_prices = self.get_gas_prices() if gas_prices is None else gas_prices
         self.lcd = LCDClient(lcd_uri, chain_id, gas_prices, gas_adjustment)
         self.wallet = self.lcd.wallet(key)
+        self.address = self.wallet.key.acc_address
 
     def __repr__(self) -> str:
         return (

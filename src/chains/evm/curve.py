@@ -8,7 +8,8 @@ from web3.main import Web3
 
 from utils.cache import CacheGroup, ttl_cache
 
-from .core import ERC20Token, EVMClient, EVMToken, EVMTokenAmount, NativeToken
+from .client import EVMClient
+from .core import ERC20Token, EVMToken, EVMTokenAmount, NativeToken
 
 LENDING_PRECISION: int = 10 ** 18
 PRECISION: int = 10 ** 18
