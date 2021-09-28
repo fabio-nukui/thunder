@@ -35,7 +35,7 @@ RUN conda install --quiet --yes \
     fix-permissions $HOME $CONDA_DIR
 
 RUN pip install --no-cache-dir \
-        'python-binance==1.0.14' \
+        'python-binance==1.0.15' \
         'terra-sdk==0.14.0' && \
     fix-permissions $HOME $CONDA_DIR
 
