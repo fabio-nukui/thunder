@@ -1,3 +1,4 @@
+import startup
 from cexes.binance import BinanceClient
 from chains.evm import BSCClient, EthereumClient
 from chains.terra import TerraClient
@@ -13,4 +14,5 @@ def main():
 
 
 if __name__ == '__main__':
+    startup.setup()
     main()
