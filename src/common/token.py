@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal, getcontext
-from typing import Optional, Union
+from typing import Optional, TypeVar, Union
 
 DecInput = Union[str, int, float, Decimal]
 DEFAULT_DECIMALS = 18
@@ -38,6 +38,9 @@ class Token:
 
     def round(self, value: DecInput) -> Decimal:
         return round(Decimal(value), self.decimals)
+
+
+_TokenAmountT = TypeVar('_TokenAmountT', bound='TokenAmount')
 
 
 class TokenAmount:
@@ -90,37 +93,47 @@ class TokenAmount:
         return Decimal(value)
 
     def __eq__(self, other) -> bool:
+        if isinstance(other, type(self)):
+            return self.amount == other.amount
         return self.amount == self._to_decimal(other)
 
     def __lt__(self, other) -> bool:
+        if isinstance(other, type(self)):
+            return self.amount < other.amount
         return self.amount < self._to_decimal(other)
 
     def __le__(self, other) -> bool:
+        if isinstance(other, type(self)):
+            return self.amount <= other.amount
         return self.amount <= self._to_decimal(other)
 
     def __gt__(self, other) -> bool:
+        if isinstance(other, type(self)):
+            return self.amount > other.amount
         return self.amount > self._to_decimal(other)
 
     def __ge__(self, other) -> bool:
+        if isinstance(other, type(self)):
+            return self.amount >= other.amount
         return self.amount >= self._to_decimal(other)
 
-    def __add__(self, other: TokenAmount | DecInput) -> TokenAmount:
-        return TokenAmount(self.token, self.amount + self._to_decimal(other))
+    def __add__(self: _TokenAmountT, other: TokenAmount | DecInput) -> _TokenAmountT:
+        return self.__class__(self.token, self.amount + self._to_decimal(other))
 
-    def __sub__(self, other: TokenAmount | DecInput) -> TokenAmount:
-        return TokenAmount(self.token, self.amount - self._to_decimal(other))
+    def __sub__(self: _TokenAmountT, other: TokenAmount | DecInput) -> _TokenAmountT:
+        return self.__class__(self.token, self.amount - self._to_decimal(other))
 
-    def __mul__(self, other: DecInput) -> TokenAmount:
-        return TokenAmount(self.token, self.amount * Decimal(other))
+    def __mul__(self: _TokenAmountT, other: DecInput) -> _TokenAmountT:
+        return self.__class__(self.token, self.amount * Decimal(other))
 
-    def __truediv__(self, other: DecInput) -> TokenAmount:
-        return TokenAmount(self.token, self.amount / Decimal(other))
+    def __truediv__(self: _TokenAmountT, other: DecInput) -> _TokenAmountT:
+        return self.__class__(self.token, self.amount / Decimal(other))
 
-    def __neg__(self) -> TokenAmount:
-        return TokenAmount(self.token, -self.amount)
+    def __neg__(self: _TokenAmountT) -> _TokenAmountT:
+        return self.__class__(self.token, -self.amount)
 
-    def __abs__(self) -> TokenAmount:
-        return TokenAmount(self.token, abs(self.amount))
+    def __abs__(self: _TokenAmountT) -> _TokenAmountT:
+        return self.__class__(self.token, abs(self.amount))
 
-    def __pos__(self) -> TokenAmount:
-        return TokenAmount(self.token, +self.amount)
+    def __pos__(self: _TokenAmountT) -> _TokenAmountT:
+        return self.__class__(self.token, +self.amount)
