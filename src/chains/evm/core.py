@@ -92,24 +92,24 @@ class ERC20Token(Token):
     def __repr__(self):
         return f'{self.__class__.__name__}(symbol={self.symbol}, address={self.address})'
 
-    def get_allowance(self, owner: str, spender: str) -> TokenAmount:
+    def get_allowance(self, owner: str, spender: str) -> EVMTokenAmount:
         assert self.contract is not None and self.client is not None
         allowance: int = (
             self.contract.functions
             .allowance(owner, spender)
             .call(block_identifier=self.client.block)
         )
-        return TokenAmount(self, raw_amount=allowance)
+        return EVMTokenAmount(self, raw_amount=allowance)
 
     def set_allowance(
         self,
         client: BaseEVMClient,
         spender: str,
-        amount: int | TokenAmount = None,
+        amount: int | EVMTokenAmount = None,
     ) -> str:
         if amount is None:
             amount = INF_APPROVAL_AMOUNT
-        elif isinstance(amount, TokenAmount):
+        elif isinstance(amount, EVMTokenAmount):
             assert self == amount.token
             amount = amount.raw_amount
 
