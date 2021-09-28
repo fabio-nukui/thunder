@@ -1,3 +1,6 @@
+import logging
+from decimal import Decimal
+
 from terra_sdk.client.lcd import LCDClient
 from terra_sdk.core import Coins
 from terra_sdk.key.mnemonic import MnemonicKey
@@ -7,10 +10,14 @@ import configs
 import utils
 from utils.cache import CacheGroup, ttl_cache
 
-from .core import BaseTerraClient, TerraTokenAmount
+from .core import BaseTerraClient, TerraNativeToken, TerraToken, TerraTokenAmount
+
+log = logging.getLogger(__name__)
 
 TERRA_CONTRACT_QUERY_CACHE_SIZE = 10_000
 TERRA_GAS_PRICE_CACHE_TTL = 3600
+TERRA_TAX_CACHE_TTL = 7200
+DEFAULT_FEE_DENOM = 'uusd'
 
 
 class TerraClient(BaseTerraClient):
@@ -20,6 +27,7 @@ class TerraClient(BaseTerraClient):
         lcd_uri: str = configs.TERRA_LCD_URI,
         fcd_uri: str = configs.TERRA_FCD_URI,
         chain_id: str = configs.TERRA_CHAIN_ID,
+        fee_denom: str = DEFAULT_FEE_DENOM,
         gas_prices: Coins.Input = None,
         gas_adjustment: float = configs.TERRA_GAS_ADJUSTMENT,
         hd_wallet_index: int = 0,
@@ -27,6 +35,7 @@ class TerraClient(BaseTerraClient):
         self.lcd_uri = lcd_uri
         self.fcd_uri = fcd_uri
         self.chain_id = chain_id
+        self.fee_denom = fee_denom
 
         hd_wallet = auth_secrets.hd_wallet() if hd_wallet is None else hd_wallet
         key = MnemonicKey(hd_wallet['mnemonic'], hd_wallet['account'], hd_wallet_index)
@@ -48,6 +57,30 @@ class TerraClient(BaseTerraClient):
         res = utils.http.get(f'{self.fcd_uri}/v1/txs/gas_prices')
         return Coins(res.json())
 
+    @property
+    @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=TERRA_TAX_CACHE_TTL)
+    def tax_rate(self) -> Decimal:
+        res = utils.http.get(f'{self.fcd_uri}/treasury/tax_rate')
+        return Decimal(res.json()['result'])
+
+    @property
+    @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=TERRA_TAX_CACHE_TTL)
+    def tax_caps(self) -> dict[TerraToken, TerraTokenAmount]:
+        res = utils.http.get(f'{self.fcd_uri}/treasury/tax_caps')
+        caps = {}
+        for cap in res.json()['result']:
+            token = TerraNativeToken(cap['denom'])
+            caps[token] = TerraTokenAmount(token, raw_amount=cap['tax_cap'])
+        return caps
+
+    def calculate_tax(self, amount: TerraTokenAmount) -> TerraTokenAmount:
+        if amount.token not in self.tax_caps:
+            return TerraTokenAmount(amount.token, 0)
+        return min(amount * self.tax_rate, self.tax_caps[amount.token])
+
+    def deduct_tax(self, amount: TerraTokenAmount) -> TerraTokenAmount:
+        return amount - self.calculate_tax(amount)
+
     @ttl_cache(CacheGroup.TERRA, TERRA_CONTRACT_QUERY_CACHE_SIZE)
     def contract_query(self, contract_addr: str, query_msg: dict) -> dict:
         return self.lcd.wasm.contract_query(contract_addr, query_msg)
@@ -60,3 +93,11 @@ class TerraClient(BaseTerraClient):
             for c in coins_balance
             if denoms is None or c.denom in denoms
         ]
+
+    def execute_tx(self, msgs: list[dict]) -> str:
+        log.debug(f'Sending tx: {msgs}')
+        signed_tx = self.wallet.create_and_sign_tx(msgs, fee_denoms=[self.fee_denom])
+        res = self.lcd.tx.broadcast(signed_tx)
+        log.debug(f'Tx executed: {res.raw_log}')
+
+        return res.txhash

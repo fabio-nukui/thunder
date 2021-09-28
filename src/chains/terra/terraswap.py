@@ -1,13 +1,32 @@
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
+
+from terra_sdk.core.wasm import MsgExecuteContract
 
 from chains.terra.client import TerraClient
 from exceptions import InsufficientLiquidity
 
 from .core import CW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
+from .utils import encode_msg
+
+log = logging.getLogger(__name__)
 
 FEE = Decimal('0.003')
+
+
+def _token_to_data(token: TerraToken) -> dict:
+    if isinstance(token, TerraNativeToken):
+        return {'native_token': {'denom': token.denom}}
+    return {'token': {'contract_addr': token.contract_addr}}
+
+
+def _token_amount_to_data(token_amount: TerraTokenAmount) -> dict:
+    return {
+        'info': _token_to_data(token_amount.token),
+        'amount': str(token_amount.raw_amount)
+    }
 
 
 class TerraswapLiquidityPair:
@@ -82,4 +101,50 @@ class TerraswapLiquidityPair:
 
         amount_out = numerator / denominator * (1 - FEE)
 
-        return TerraTokenAmount(reserve_out.token, amount_out)
+        return self.client.deduct_tax(TerraTokenAmount(reserve_out.token, amount_out))
+
+    def build_swap_msg(
+        self,
+        sender: str,
+        amount_in: TerraTokenAmount,
+        min_out: TerraTokenAmount,
+    ) -> MsgExecuteContract:
+        belief_price = (amount_in.raw_amount - 1) / min_out.raw_amount
+        swap_msg = {
+            'belief_price': f'{belief_price:.18f}',
+            'max_spread': '0.0'
+        }
+        if isinstance(token_in := amount_in.token, CW20Token):
+            execute_msg = {
+                'send': {
+                    'contract': self.contract_addr,
+                    'amount': str(amount_in.raw_amount),
+                    'msg': encode_msg({'swap': swap_msg})
+                }
+            }
+            contract = token_in.contract_addr
+        else:
+            execute_msg = {
+                'swap': {
+                    'offer_asset': _token_amount_to_data(amount_in),
+                    **swap_msg
+                }
+            }
+            contract = self.contract_addr
+        coins = [amount_in.to_coin()] if isinstance(amount_in.token, TerraNativeToken) else []
+
+        return MsgExecuteContract(
+            sender=sender,
+            contract=contract,
+            execute_msg=execute_msg,
+            coins=coins
+        )
+
+    def swap(
+        self,
+        client: TerraClient,
+        amount_in: TerraTokenAmount,
+        min_out: TerraTokenAmount,
+    ) -> str:
+        msg = self.build_swap_msg(client.address, amount_in, min_out)
+        return client.execute_tx([msg])

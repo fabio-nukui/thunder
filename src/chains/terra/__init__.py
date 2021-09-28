@@ -1,6 +1,7 @@
 from . import terraswap
 from .client import TerraClient
 from .core import CW20Token, TerraNativeToken, TerraTokenAmount
+from .terraswap import TerraswapLiquidityPair
 
 __all__ = [
     'terraswap',
@@ -8,4 +9,5 @@ __all__ = [
     'CW20Token',
     'TerraNativeToken',
     'TerraTokenAmount',
+    'TerraswapLiquidityPair',
 ]
