@@ -23,10 +23,15 @@ class Token:
 
     @property
     def _id(self) -> tuple:
-        return (self.symbol, self.decimals)
+        raise NotImplementedError
+
+    def __hash__(self) -> int:
+        return hash(self._id)
 
     def __eq__(self, other) -> bool:
-        return isinstance(other, type(self)) and self._id == other._id
+        if isinstance(other, type(self)):
+            return self._id == other._id
+        return NotImplemented
 
     def decimalize(self, value: DecInput) -> Decimal:
         return Decimal(value) / 10 ** self.decimals

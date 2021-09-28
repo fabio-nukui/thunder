@@ -51,6 +51,10 @@ class EVMNativeToken(Token):
         self.symbol = _NATIVE_TOKENS[chain_id]['symbol'] if symbol is None else symbol
         self.decimals = _NATIVE_TOKENS[chain_id]['decimals'] if decimals is None else decimals
 
+    @property
+    def _id(self) -> tuple:
+        return (self.chain_id, )
+
 
 class ERC20Token(Token):
     def __init__(
@@ -117,9 +121,6 @@ class ERC20Token(Token):
 
     def _id(self) -> tuple:
         return (self.chain_id, self.address)
-
-    def __hash__(self):
-        return int(self.address, 16) + self.chain_id
 
     def __lt__(self, other):
         """Use same logic as Uniswap:

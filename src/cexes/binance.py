@@ -22,6 +22,10 @@ class BinanceToken(Token):
         self.symbol = symbol
         self.decimals = decimals
 
+    @property
+    def _id(self) -> tuple:
+        return (self.symbol, self.decimals)
+
 
 class BinanceTokenAmount(TokenAmount):
     token: BinanceToken
