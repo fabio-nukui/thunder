@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Union
+from typing import Type, TypeVar, Union
 
 from terra_sdk.client.lcd.lcdclient import LCDClient
 from terra_sdk.client.lcd.wallet import Wallet
@@ -17,7 +17,7 @@ class TerraNativeToken(Token):
 
     def __init__(self, denom: str):
         self.denom = denom
-        self.symbol = 'LUNA' if denom[1:] == 'luna' else denom[1:-1].upper() + 'T'
+        self.symbol = 'LUNA' if denom == 'uluna' else denom[1:-1].upper() + 'T'
 
     @property
     def _id(self) -> tuple:
@@ -30,17 +30,25 @@ class TerraNativeToken(Token):
         return balances[0]
 
 
+_CW20TokenT = TypeVar('_CW20TokenT', bound='CW20Token')
+
+
 class CW20Token(Token):
     def __init__(self, contract_addr: str, symbol: str, decimals: int):
         self.contract_addr = contract_addr
         self.symbol = symbol
         self.decimals = decimals
 
+    @property
     def _id(self) -> tuple:
         return (self.contract_addr, )
 
     @classmethod
-    def from_contract(cls, contract_addr: str, client: BaseTerraClient) -> CW20Token:
+    def from_contract(
+        cls: Type[_CW20TokenT],
+        contract_addr: str,
+        client: BaseTerraClient,
+    ) -> _CW20TokenT:
         res = client.contract_query(contract_addr, {'token_info': {}})
         return cls(contract_addr, res['symbol'], res['decimals'])
 
@@ -113,6 +121,7 @@ class BaseTerraClient(ABC):
     lcd: LCDClient
     wallet: Wallet
     address: str
+    code_ids: dict[str, int]
 
     @abstractmethod
     def contract_query(self, contract_addr: str, query_msg: dict) -> dict:

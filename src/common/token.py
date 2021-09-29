@@ -16,14 +16,18 @@ class Token:
     decimals: int = DEFAULT_DECIMALS
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}({self.symbol})'
+        return f'{self.__class__.__name__}({self.repr_symbol})'
 
     def __str__(self) -> str:
-        return self.symbol
+        return self.repr_symbol
 
     @property
     def _id(self) -> tuple:
         raise NotImplementedError
+
+    @property
+    def repr_symbol(self):
+        return self.symbol
 
     def __hash__(self) -> int:
         return hash(self._id)

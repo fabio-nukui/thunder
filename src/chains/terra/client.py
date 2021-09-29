@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from decimal import Decimal
 from typing import Literal
@@ -22,6 +23,11 @@ TERRA_CONTRACT_QUERY_CACHE_SIZE = 10_000
 TERRA_GAS_PRICE_CACHE_TTL = 3600
 TERRA_TAX_CACHE_TTL = 7200
 DEFAULT_FEE_DENOM = 'uusd'
+TERRA_CODE_IDS = 'resources/contracts/terra/{chain_id}/code_ids.json'
+
+
+def _get_code_ids(chain_id: str) -> dict[str, int]:
+    return json.load(open(TERRA_CODE_IDS.format(chain_id=chain_id)))
 
 
 class TerraClient(BaseTerraClient):
@@ -49,6 +55,7 @@ class TerraClient(BaseTerraClient):
         self.lcd = LCDClient(lcd_uri, chain_id, gas_prices, gas_adjustment)
         self.wallet = self.lcd.wallet(key)
         self.address = self.wallet.key.acc_address
+        self.code_ids = _get_code_ids(self.chain_id)
 
     def __repr__(self) -> str:
         return (
@@ -105,6 +112,10 @@ class TerraClient(BaseTerraClient):
     @ttl_cache(CacheGroup.TERRA, TERRA_CONTRACT_QUERY_CACHE_SIZE)
     def contract_query(self, contract_addr: str, query_msg: dict) -> dict:
         return self.lcd.wasm.contract_query(contract_addr, query_msg)
+
+    @ttl_cache(CacheGroup.TERRA, TERRA_CONTRACT_QUERY_CACHE_SIZE)
+    def contract_info(self, contract_addr: str) -> dict:
+        return self.lcd.wasm.contract_info(contract_addr)
 
     def get_bank(self, denoms: list[str] = None, address: str = None) -> list[TerraTokenAmount]:
         address = self.address if address is None else address

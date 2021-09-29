@@ -119,6 +119,7 @@ class ERC20Token(Token):
         log.debug(f'Set allowance for {spender} to {amount} ({tx_hash})')
         return tx_hash
 
+    @property
     def _id(self) -> tuple:
         return (self.chain_id, self.address)
 
