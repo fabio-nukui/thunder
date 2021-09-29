@@ -48,8 +48,9 @@ class TerraswapLiquidityPair:
 
         pair_data = self.client.contract_query(self.contract_addr, {'pair': {}})
         self.tokens = self._pair_tokens_from_data(pair_data['asset_infos'])
-        self._reserves = TerraTokenAmount(self.tokens[0]), TerraTokenAmount(self.tokens[1])
         self.lp_token = TerraswapLPToken.from_pool(pair_data['liquidity_token'], self)
+
+        self._reserves = TerraTokenAmount(self.tokens[0]), TerraTokenAmount(self.tokens[1])
 
     def __repr__(self) -> str:
         return \
@@ -110,7 +111,7 @@ class TerraswapLiquidityPair:
             raise InsufficientLiquidity
         return reserve_in, reserve_out
 
-    def get_amount_out(
+    def get_swap_amount_out(
         self,
         amount_in: TerraTokenAmount,
         deduct_tax: bool = True,
@@ -170,6 +171,15 @@ class TerraswapLiquidityPair:
     ) -> str:
         msg = self.build_swap_msg(client.address, amount_in, min_out)
         return client.execute_tx([msg])
+
+    def get_remove_liquidity_amounts(
+        self,
+        amount: TerraTokenAmount,
+    ) -> tuple[TerraTokenAmount, TerraTokenAmount]:
+        assert amount.token == self.lp_token
+        total_supply = self.lp_token.get_supply(self.client)
+        share = amount / total_supply
+        return self.reserves[0] * share, self.reserves[1] * share
 
 
 class TerraswapLPToken(CW20Token):

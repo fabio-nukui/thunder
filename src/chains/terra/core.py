@@ -57,6 +57,10 @@ class CW20Token(Token):
         res = client.contract_query(self.contract_addr, {'balance': {'address': address}})
         return TerraTokenAmount(self, raw_amount=res['balance'])
 
+    def get_supply(self, client: BaseTerraClient) -> TerraTokenAmount:
+        res = client.contract_query(self.contract_addr, {'token_info': {}})
+        return TerraTokenAmount(self, raw_amount=res['total_supply'])
+
     def get_allowance(
         self,
         client: BaseTerraClient,
