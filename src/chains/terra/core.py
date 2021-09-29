@@ -106,10 +106,10 @@ class TerraTokenAmount(TokenAmount):
         assert isinstance(self.token, TerraNativeToken)
         return Coin(self.token.denom, self.raw_amount)
 
-    def has_allowance(self, client: BaseTerraClient, spender: str) -> bool:
+    def has_allowance(self, client: BaseTerraClient, spender: str, owner: str = None) -> bool:
         if isinstance(self.token, TerraNativeToken):
             return True
-        allowance = self.token.get_allowance(client, spender)
+        allowance = self.token.get_allowance(client, spender, owner)
         return allowance >= self
 
     def build_msg_increase_allowance(self, spender: str, owner: str) -> MsgExecuteContract:

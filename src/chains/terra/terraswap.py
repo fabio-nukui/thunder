@@ -14,6 +14,7 @@ log = logging.getLogger(__name__)
 
 FEE = Decimal('0.003')
 TERRASWAP_CODE_ID_KEY = 'terraswap_pair'
+DEFAULT_ADD_LIQUIDITY_SLIPPAGE_TOLERANCE = Decimal(0.001)
 
 
 class NotTerraswapPair(Exception):
@@ -199,6 +200,65 @@ class TerraswapLiquidityPair:
             contract=self.lp_token,
             execute_msg=execute_msg,
         )
+
+    def _check_amounts_add_liquidity(
+        self,
+        amounts: tuple[TerraTokenAmount, TerraTokenAmount],
+        slippage_tolerance: Decimal = DEFAULT_ADD_LIQUIDITY_SLIPPAGE_TOLERANCE,
+    ) -> tuple[TerraTokenAmount, TerraTokenAmount]:
+        if amounts[1].token == self.tokens[0] and amounts[0].token == self.tokens[1]:
+            amounts = amounts[1], amounts[0]
+        else:
+            assert amounts[0].token == self.tokens[0] and amounts[1].token == self.tokens[1], \
+                'Tokens in amounts do not match reserves'
+        amounts_ratio = Decimal(amounts[0].raw_amount / amounts[1].raw_amount)
+        current_ratio = Decimal(self.reserves[0].raw_amount / self.reserves[1].raw_amount)
+        assert abs(amounts_ratio / current_ratio - 1) < slippage_tolerance
+        return amounts
+
+    def get_add_liquidity_amount(
+        self,
+        amounts: tuple[TerraTokenAmount, TerraTokenAmount],
+        slippage_tolerance: Decimal = DEFAULT_ADD_LIQUIDITY_SLIPPAGE_TOLERANCE,
+    ) -> TerraTokenAmount:
+        amounts = self._check_amounts_add_liquidity(amounts, slippage_tolerance)
+        add_ratio = min(amounts[0] / self.reserves[0], amounts[1] / self.reserves[1])
+        return self.lp_token.get_supply(self.client) * add_ratio
+
+    def build_add_liquity_msgs(
+        self,
+        sender: str,
+        amounts: tuple[TerraTokenAmount, TerraTokenAmount],
+        slippage_tolerance: Decimal = DEFAULT_ADD_LIQUIDITY_SLIPPAGE_TOLERANCE,
+    ) -> list[MsgExecuteContract]:
+        amounts = self._check_amounts_add_liquidity(amounts, slippage_tolerance)
+        msgs = []
+        for amount in amounts:
+            if not amount.has_allowance(self.client, self.contract_addr, sender):
+                msgs.append(amount.build_msg_increase_allowance(self.contract_addr, sender))
+        execute_msg = {
+            'provide_liquidity': {
+                'assets': [
+                    _token_amount_to_data(amounts[0]),
+                    _token_amount_to_data(amounts[1]),
+                ],
+                'slippage_tolerance': slippage_tolerance,
+            }
+        }
+        coins = [
+            amount.to_coin()
+            for amount in amounts
+            if isinstance(amount.token, TerraNativeToken)
+        ]
+        msgs.append(
+            MsgExecuteContract(
+                sender=sender,
+                contract=self.contract_addr,
+                execute_msg=execute_msg,
+                coins=coins
+            )
+        )
+        return msgs
 
 
 class TerraswapLPToken(CW20Token):
