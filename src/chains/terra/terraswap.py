@@ -93,15 +93,20 @@ class TerraswapLiquidityPair:
             raise InsufficientLiquidity
         return reserve_in, reserve_out
 
-    def get_amount_out(self, amount_in: TerraTokenAmount) -> TerraTokenAmount:
+    def get_amount_out(
+        self,
+        amount_in: TerraTokenAmount,
+        deduct_tax: bool = True,
+    ) -> TerraTokenAmount:
         reserve_in, reserve_out = self._get_in_out_reserves(amount_in=amount_in)
 
         numerator = reserve_out.amount * amount_in.amount
         denominator = reserve_in.amount + amount_in.amount
 
         amount_out = numerator / denominator * (1 - FEE)
+        result = TerraTokenAmount(reserve_out.token, amount_out)
 
-        return self.client.deduct_tax(TerraTokenAmount(reserve_out.token, amount_out))
+        return self.client.deduct_tax(result) if deduct_tax else result
 
     def build_swap_msg(
         self,
@@ -109,7 +114,7 @@ class TerraswapLiquidityPair:
         amount_in: TerraTokenAmount,
         min_out: TerraTokenAmount,
     ) -> MsgExecuteContract:
-        belief_price = (amount_in.raw_amount - 1) / min_out.raw_amount
+        belief_price = amount_in.raw_amount / (min_out.raw_amount - 1)
         swap_msg = {
             'belief_price': f'{belief_price:.18f}',
             'max_spread': '0.0'

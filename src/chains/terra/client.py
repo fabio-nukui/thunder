@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 import logging
 from decimal import Decimal
+from typing import Literal
 
 from terra_sdk.client.lcd import LCDClient
 from terra_sdk.core import Coins
+from terra_sdk.core.auth import StdTx
 from terra_sdk.key.mnemonic import MnemonicKey
 
 import auth_secrets
@@ -73,13 +77,30 @@ class TerraClient(BaseTerraClient):
             caps[token] = TerraTokenAmount(token, raw_amount=cap['tax_cap'])
         return caps
 
-    def calculate_tax(self, amount: TerraTokenAmount) -> TerraTokenAmount:
+    def calculate_tax(
+        self,
+        amount: TerraTokenAmount,
+        payer: Literal['sender'] | Literal['receiver'],
+    ) -> TerraTokenAmount:
         if amount.token not in self.tax_caps:
             return TerraTokenAmount(amount.token, 0)
-        return min(amount * self.tax_rate, self.tax_caps[amount.token])
+        effective_rate = self.tax_rate if payer == 'sender' else self.tax_rate / (1 + self.tax_rate)
+        return min(amount * effective_rate, self.tax_caps[amount.token])
 
-    def deduct_tax(self, amount: TerraTokenAmount) -> TerraTokenAmount:
-        return amount - self.calculate_tax(amount)
+    def deduct_tax(
+        self,
+        amount: TerraTokenAmount,
+        payer: Literal['sender'] | Literal['receiver'] = 'receiver',
+    ) -> TerraTokenAmount:
+        return amount - self.calculate_tax(amount, payer)
+
+    def estimate_gas_fee(self, tx: StdTx, gas_adjustment: float = None) -> TerraTokenAmount:
+        gas_fee = self.lcd.tx.estimate_fee(
+            tx,
+            gas_adjustment=gas_adjustment,
+            fee_denoms=[self.fee_denom],
+        )
+        return TerraTokenAmount.from_coin(gas_fee.amount.to_list()[0])
 
     @ttl_cache(CacheGroup.TERRA, TERRA_CONTRACT_QUERY_CACHE_SIZE)
     def contract_query(self, contract_addr: str, query_msg: dict) -> dict:
