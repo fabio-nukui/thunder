@@ -9,7 +9,6 @@ from chains.terra.client import TerraClient
 from exceptions import InsufficientLiquidity
 
 from .core import CW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
-from .utils import encode_msg
 
 log = logging.getLogger(__name__)
 
@@ -138,23 +137,24 @@ class TerraswapLiquidityPair:
             'max_spread': '0.0'
         }
         if isinstance(token_in := amount_in.token, CW20Token):
+            contract = token_in.contract_addr
             execute_msg = {
                 'send': {
                     'contract': self.contract_addr,
                     'amount': str(amount_in.raw_amount),
-                    'msg': encode_msg({'swap': swap_msg})
+                    'msg': TerraClient.encode_msg({'swap': swap_msg})
                 }
             }
-            contract = token_in.contract_addr
+            coins = []
         else:
+            contract = self.contract_addr
             execute_msg = {
                 'swap': {
                     'offer_asset': _token_amount_to_data(amount_in),
                     **swap_msg
                 }
             }
-            contract = self.contract_addr
-        coins = [amount_in.to_coin()] if isinstance(amount_in.token, TerraNativeToken) else []
+            coins = [amount_in.to_coin()]
 
         return MsgExecuteContract(
             sender=sender,
@@ -180,6 +180,25 @@ class TerraswapLiquidityPair:
         total_supply = self.lp_token.get_supply(self.client)
         share = amount / total_supply
         return self.reserves[0] * share, self.reserves[1] * share
+
+    def build_remove_liquidity_msg(
+        self,
+        sender: str,
+        amount: TerraTokenAmount,
+    ) -> MsgExecuteContract:
+        assert amount.token == self.lp_token
+        execute_msg = {
+            'send': {
+                'amount': str(amount.raw_amount),
+                'contract': self.contract_addr,
+                'msg': TerraClient.encode_msg({'withdraw_liquidity': {}})
+            }
+        }
+        return MsgExecuteContract(
+            sender=sender,
+            contract=self.lp_token,
+            execute_msg=execute_msg,
+        )
 
 
 class TerraswapLPToken(CW20Token):
