@@ -72,15 +72,15 @@ class TerraClient(BaseTerraClient):
     @property
     @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=TERRA_TAX_CACHE_TTL)
     def tax_rate(self) -> Decimal:
-        res = utils.http.get(f'{self.fcd_uri}/treasury/tax_rate')
-        return Decimal(res.json()['result'])
+        res = utils.http.get(f'{self.fcd_uri}/terra/treasury/v1beta1/tax_rate')
+        return Decimal(res.json()['tax_rate'])
 
     @property
     @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=TERRA_TAX_CACHE_TTL)
     def tax_caps(self) -> dict[TerraToken, TerraTokenAmount]:
-        res = utils.http.get(f'{self.fcd_uri}/treasury/tax_caps')
+        res = utils.http.get(f'{self.fcd_uri}/terra/treasury/v1beta1/tax_caps')
         caps = {}
-        for cap in res.json()['result']:
+        for cap in res.json()['tax_caps']:
             token = TerraNativeToken(cap['denom'])
             caps[token] = TerraTokenAmount(token, raw_amount=cap['tax_cap'])
         return caps

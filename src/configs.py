@@ -11,7 +11,7 @@ SECRET_BINANCE_KEY = os.environ['SECRET_BINANCE_KEY']
 DEFAULT_CACHE_TTL = float(os.getenv('DEFAULT_CACHE_TTL', '5.0'))
 
 # Terra
-TERRA_CHAIN_ID = os.getenv('TERRA_CHAIN_ID', 'columbus-4')
+TERRA_CHAIN_ID = os.getenv('TERRA_CHAIN_ID', 'columbus-5')
 TERRA_LCD_URI = os.getenv('TERRA_LCD_URI', 'https://lcd.terra.dev')
 TERRA_FCD_URI = os.getenv('TERRA_FCD_URI', 'https://fcd.terra.dev')
 TERRA_CACHE_TTL = float(os.getenv('TERRA_CACHE_TTL', '5.0'))
