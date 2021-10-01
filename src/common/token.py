@@ -70,6 +70,12 @@ class TokenAmount:
         decimals = min(_MAX_DECIMALS_REPR, self.decimals)
         return f'{self.__class__.__name__}({self.token}: {self.amount:,.{decimals}f})'
 
+    def to_data(self) -> dict:
+        return {
+            'symbol': self.symbol,
+            'amount': str(self.amount),
+        }
+
     @property
     def amount(self) -> Decimal:
         return self._amount
@@ -132,8 +138,8 @@ class TokenAmount:
     def __truediv__(self, other):
         result = self.amount / self._to_decimal(other)
         if isinstance(other, type(self)):
-            return self.__class__(self.token, result)
-        return result
+            return result
+        return self.__class__(self.token, result)
 
     def __neg__(self: _TokenAmountT) -> _TokenAmountT:
         return self.__class__(self.token, -self.amount)

@@ -13,11 +13,13 @@ from common import Token, TokenAmount
 
 
 class TerraNativeToken(Token):
-    decimals = 6
-
     def __init__(self, denom: str):
         self.denom = denom
         self.symbol = 'LUNA' if denom == 'uluna' else denom[1:-1].upper() + 'T'
+        if denom[0] == 'u':
+            self.decimals = 6
+        else:
+            raise NotImplementedError('TerraNativeToken only implemented for micro (µ) demons')
 
     @property
     def _id(self) -> tuple:
@@ -29,6 +31,9 @@ class TerraNativeToken(Token):
             return TerraTokenAmount(self, 0)
         return balances[0]
 
+
+UST = TerraNativeToken('uusd')
+LUNA = TerraNativeToken('uluna')
 
 _CW20TokenT = TypeVar('_CW20TokenT', bound='CW20Token')
 
