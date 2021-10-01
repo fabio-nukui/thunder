@@ -281,7 +281,7 @@ class TerraswapLiquidityPair:
             amount_keep, amount_swap = amounts['amounts_out']
         else:
             amount_swap, amount_keep = amounts['amounts_out']
-        with self.simulate_reserve_change(amounts['pools_change']):
+        with self.simulate_reserve_change(amounts['pool_change']):
             amount_out, msgs_swap = self.op_swap(sender, amount_swap, max_slippage)
         return amount_keep + amount_out, [msg_remove_liquidity] + msgs_swap
 
