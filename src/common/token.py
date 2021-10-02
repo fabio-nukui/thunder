@@ -5,6 +5,7 @@ from typing import Optional, TypeVar, Union, overload
 
 DecInput = Union[str, int, float, Decimal]
 DEFAULT_DECIMALS = 18
+ROUNDING_SAFETY_MARGIN = 2
 
 getcontext().prec = 78  # To allow for calculations with up to 256 bits precision
 
@@ -52,19 +53,20 @@ class TokenAmount:
         self,
         token: Token,
         amount: DecInput = Decimal('NaN'),
-        raw_amount: Optional[int | str] = None,
+        int_amount: Optional[int | str] = None,
     ):
         self.token = token
         self.symbol = self.token.symbol
         self.decimals = self.token.decimals
+        self.dx = Decimal(str(10 ** -self.decimals))
 
         self._amount: Decimal = Decimal('NaN')
 
         amount = Decimal(amount)
         if not amount.is_nan():
             self.amount = amount
-        elif raw_amount is not None:
-            self.raw_amount = raw_amount
+        elif int_amount is not None:
+            self.int_amount = int_amount
 
     def __repr__(self) -> str:
         decimals = min(_MAX_DECIMALS_REPR, self.decimals)
@@ -82,16 +84,26 @@ class TokenAmount:
 
     @amount.setter
     def amount(self, value: DecInput):  # type: ignore
-        self._amount = self.token.round(value)
+        self._amount = Decimal(value)
 
     @property
-    def raw_amount(self) -> int:
+    def round_amount(self) -> Decimal:
+        return self.token.round(self._amount)
+
+    @property
+    def int_amount(self) -> int:
         assert not self.is_empty()
         return int(self.amount * 10 ** self.decimals)
 
-    @raw_amount.setter
-    def raw_amount(self, value: int | str):  # type: ignore
+    @int_amount.setter
+    def int_amount(self, value: int | str):  # type: ignore
         self._amount = self.token.decimalize(value)
+
+    def safe_down(self: _TokenAmountT) -> _TokenAmountT:
+        return self - self.dx * ROUNDING_SAFETY_MARGIN
+
+    def safe_up(self: _TokenAmountT) -> _TokenAmountT:
+        return self - self.dx * ROUNDING_SAFETY_MARGIN
 
     def is_empty(self) -> bool:
         return self.amount.is_nan()

@@ -60,11 +60,11 @@ class CW20Token(Token):
     def get_balance(self, client: BaseTerraClient, address: str = None) -> TerraTokenAmount:
         address = client.address if address is None else address
         res = client.contract_query(self.contract_addr, {'balance': {'address': address}})
-        return TerraTokenAmount(self, raw_amount=res['balance'])
+        return TerraTokenAmount(self, int_amount=res['balance'])
 
     def get_supply(self, client: BaseTerraClient) -> TerraTokenAmount:
         res = client.contract_query(self.contract_addr, {'token_info': {}})
-        return TerraTokenAmount(self, raw_amount=res['total_supply'])
+        return TerraTokenAmount(self, int_amount=res['total_supply'])
 
     def get_allowance(
         self,
@@ -75,7 +75,7 @@ class CW20Token(Token):
         owner = client.address if owner is None else owner
         query = {'allowance': {'owner': owner, 'spender': spender}}
         res = client.contract_query(self.contract_addr, query)
-        return TerraTokenAmount(self, raw_amount=res['allowance'])
+        return TerraTokenAmount(self, int_amount=res['allowance'])
 
     def build_msg_increase_allowance(
         self,
@@ -105,11 +105,11 @@ class TerraTokenAmount(TokenAmount):
     @classmethod
     def from_coin(cls, coin: Coin) -> TerraTokenAmount:
         token = TerraNativeToken(coin.denom)
-        return cls(token, raw_amount=coin.amount)
+        return cls(token, int_amount=coin.amount)
 
     def to_coin(self) -> Coin:
         assert isinstance(self.token, TerraNativeToken)
-        return Coin(self.token.denom, self.raw_amount)
+        return Coin(self.token.denom, self.int_amount)
 
     def has_allowance(self, client: BaseTerraClient, spender: str, owner: str = None) -> bool:
         if isinstance(self.token, TerraNativeToken):
@@ -119,7 +119,7 @@ class TerraTokenAmount(TokenAmount):
 
     def build_msg_increase_allowance(self, spender: str, owner: str) -> MsgExecuteContract:
         assert isinstance(self.token, CW20Token)
-        return self.token.build_msg_increase_allowance(spender, owner, self.raw_amount)
+        return self.token.build_msg_increase_allowance(spender, owner, self.int_amount)
 
 
 class BaseTerraClient(ABC):

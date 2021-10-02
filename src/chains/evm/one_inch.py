@@ -46,12 +46,12 @@ class OneInchExchange:
         query_params = {
             'fromTokenAddress': address_from,
             'toTokenAddress': address_to,
-            'amount': amount_in.raw_amount,
+            'amount': amount_in.int_amount,
             'gasPrice': gas_price,
         }
         res = utils.http.get(f'{self.api_url}/quote', params=query_params, timeout=TIMEOUT_REQUESTS)
-        raw_amount = res.json()['toTokenAmount']
-        return EVMTokenAmount(token_out, raw_amount=raw_amount)
+        int_amount = res.json()['toTokenAmount']
+        return EVMTokenAmount(token_out, int_amount=int_amount)
 
     def swap(
         self,
@@ -71,7 +71,7 @@ class OneInchExchange:
         query_params = {
             'fromTokenAddress': address_from,
             'toTokenAddress': address_to,
-            'amount': amount_in.raw_amount,
+            'amount': amount_in.int_amount,
             'fromAddress': self.client.address,
             'slippage': max_slippage,
             'gasPrice': gas_price,

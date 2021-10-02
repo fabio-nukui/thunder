@@ -90,7 +90,7 @@ class TerraClient(BaseTerraClient):
         caps = {}
         for cap in res.json()['tax_caps']:
             token = TerraNativeToken(cap['denom'])
-            caps[token] = TerraTokenAmount(token, raw_amount=cap['tax_cap'])
+            caps[token] = TerraTokenAmount(token, int_amount=cap['tax_cap'])
         return caps
 
     def calculate_tax(

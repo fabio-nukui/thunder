@@ -34,7 +34,7 @@ def _token_to_data(token: TerraToken) -> dict:
 def _token_amount_to_data(token_amount: TerraTokenAmount) -> dict:
     return {
         'info': _token_to_data(token_amount.token),
-        'amount': str(token_amount.raw_amount)
+        'amount': str(token_amount.int_amount)
     }
 
 
@@ -104,7 +104,7 @@ class TerraswapLiquidityPair:
     def _update_reserves(self):
         data = self.client.contract_query(self.contract_addr, {'pool': {}})['assets']
         for reserve, asset_data in zip(self._reserves, data):
-            reserve.raw_amount = asset_data['amount']
+            reserve.int_amount = asset_data['amount']
 
     def get_price(self, token_quote: TerraNativeToken) -> Decimal:
         if token_quote in self.tokens:
@@ -151,25 +151,35 @@ class TerraswapLiquidityPair:
             raise InsufficientLiquidity
         return reserve_in, reserve_out
 
-    def get_swap_amounts(self, amount_in: TerraTokenAmount) -> dict[str, TerraTokenAmount]:
+    def get_swap_amounts(
+        self,
+        amount_in: TerraTokenAmount,
+        safety_round: bool = True,
+    ) -> dict[str, AmountTuple]:
         reserve_in, reserve_out = self._get_in_out_reserves(amount_in=amount_in)
 
         numerator = reserve_out.amount * amount_in.amount
         denominator = reserve_in.amount + amount_in.amount
         amount_out = TerraTokenAmount(reserve_out.token, numerator / denominator)
+        if safety_round:
+            amount_out = amount_out.safe_down()
 
         amount_out = amount_out - (fee := amount_out * FEE)
         amount_out = amount_out - (tax := self.client.calculate_tax(amount_out))
 
         return {
-            'amount_out': amount_out,
-            'fee': fee,
-            'tax': tax,
-            'pool_change': -amount_out + fee,
+            'amounts_out': (amount_in * 0, amount_out),
+            'fees': (amount_in * 0, fee),
+            'taxes': (amount_in * 0, tax),
+            'pool_change': (amount_in, -amount_out - tax),
         }
 
-    def get_swap_amount_out(self, amount_in: TerraTokenAmount) -> TerraTokenAmount:
-        return self.get_swap_amounts(amount_in)['amount_out']
+    def get_swap_amount_out(
+        self,
+        amount_in: TerraTokenAmount,
+        safety_round: bool = True,
+    ) -> TerraTokenAmount:
+        return self.get_swap_amounts(amount_in, safety_round)['amounts_out'][1]
 
     def build_swap_msg(
         self,
@@ -177,7 +187,7 @@ class TerraswapLiquidityPair:
         amount_in: TerraTokenAmount,
         min_out: TerraTokenAmount,
     ) -> MsgExecuteContract:
-        belief_price = amount_in.raw_amount / (min_out.raw_amount - 1)
+        belief_price = amount_in.amount / (min_out.amount - 1)
         swap_msg = {
             'belief_price': f'{belief_price:.18f}',
             'max_spread': '0.0'
@@ -187,7 +197,7 @@ class TerraswapLiquidityPair:
             execute_msg = {
                 'send': {
                     'contract': self.contract_addr,
-                    'amount': str(amount_in.raw_amount),
+                    'amount': str(amount_in.int_amount),
                     'msg': TerraClient.encode_msg({'swap': swap_msg})
                 }
             }
@@ -214,19 +224,26 @@ class TerraswapLiquidityPair:
         sender: str,
         amount_in: TerraTokenAmount,
         max_slippage: Decimal,
+        safety_round: bool = True,
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
-        amount_out = self.get_swap_amount_out(amount_in)
+        amount_out = self.get_swap_amount_out(amount_in, safety_round)
         min_amount_out = amount_out * (1 - max_slippage)
         msg = self.build_swap_msg(sender, amount_in, min_amount_out)
 
         return amount_out, [msg]
 
-    def get_remove_liquidity_amounts(self, amount_burn: TerraTokenAmount) -> dict[str, AmountTuple]:
+    def get_remove_liquidity_amounts(
+        self,
+        amount_burn: TerraTokenAmount,
+        safety_round: bool = True,
+    ) -> dict[str, AmountTuple]:
         assert amount_burn.token == self.lp_token
 
         total_supply = self.lp_token.get_supply(self.client)
         share = amount_burn / total_supply
         amounts = self.reserves[0] * share, self.reserves[1] * share
+        if safety_round:
+            amounts = amounts[0].safe_down(), amounts[1].safe_down()
 
         taxes = self.client.calculate_tax(amounts[0]), self.client.calculate_tax(amounts[1])
         amounts_out = amounts[0] - taxes[0], amounts[1] - taxes[1]
@@ -236,8 +253,12 @@ class TerraswapLiquidityPair:
             'pool_change': (-amounts[0], -amounts[1]),
         }
 
-    def get_remove_liquidity_amounts_out(self, amount_burn: TerraTokenAmount) -> AmountTuple:
-        return self.get_remove_liquidity_amounts(amount_burn)['amounts_out']
+    def get_remove_liquidity_amounts_out(
+        self,
+        amount_burn: TerraTokenAmount,
+        safety_round: bool = True,
+    ) -> AmountTuple:
+        return self.get_remove_liquidity_amounts(amount_burn, safety_round)['amounts_out']
 
     def build_remove_liquidity_msg(
         self,
@@ -247,14 +268,14 @@ class TerraswapLiquidityPair:
         assert amount_burn.token == self.lp_token
         execute_msg = {
             'send': {
-                'amount': str(amount_burn.raw_amount),
+                'amount': str(amount_burn.int_amount),
                 'contract': self.contract_addr,
                 'msg': TerraClient.encode_msg({'withdraw_liquidity': {}})
             }
         }
         return MsgExecuteContract(
             sender=sender,
-            contract=self.lp_token,
+            contract=self.lp_token.contract_addr,
             execute_msg=execute_msg,
         )
 
@@ -262,8 +283,9 @@ class TerraswapLiquidityPair:
         self,
         sender: str,
         amount_burn: TerraTokenAmount,
+        safety_round: bool = True,
     ) -> tuple[AmountTuple, list[MsgExecuteContract]]:
-        amounts = self.get_remove_liquidity_amounts_out(amount_burn)
+        amounts = self.get_remove_liquidity_amounts_out(amount_burn, safety_round)
         msg_remove_liquidity = self.build_remove_liquidity_msg(sender, amount_burn)
         return amounts, [msg_remove_liquidity]
 
@@ -273,16 +295,17 @@ class TerraswapLiquidityPair:
         amount_burn: TerraTokenAmount,
         token_out: TerraToken,
         max_slippage: Decimal,
+        safety_round: bool = True,
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
         assert token_out in self.tokens
-        amounts = self.get_remove_liquidity_amounts(amount_burn)
+        amounts = self.get_remove_liquidity_amounts(amount_burn, safety_round=True)
         msg_remove_liquidity = self.build_remove_liquidity_msg(sender, amount_burn)
         if token_out == self.tokens[0]:
             amount_keep, amount_swap = amounts['amounts_out']
         else:
             amount_swap, amount_keep = amounts['amounts_out']
         with self.simulate_reserve_change(amounts['pool_change']):
-            amount_out, msgs_swap = self.op_swap(sender, amount_swap, max_slippage)
+            amount_out, msgs_swap = self.op_swap(sender, amount_swap, max_slippage, safety_round)
         return amount_keep + amount_out, [msg_remove_liquidity] + msgs_swap
 
     def _check_amounts_add_liquidity(
@@ -291,8 +314,8 @@ class TerraswapLiquidityPair:
         slippage_tolerance: Decimal = DEFAULT_ADD_LIQUIDITY_SLIPPAGE_TOLERANCE,
     ) -> AmountTuple:
         amounts_in = self._fix_amounts_order(amounts_in)
-        amounts_ratio = Decimal(amounts_in[0].raw_amount / amounts_in[1].raw_amount)
-        current_ratio = Decimal(self.reserves[0].raw_amount / self.reserves[1].raw_amount)
+        amounts_ratio = amounts_in[0].amount / amounts_in[1].amount
+        current_ratio = self.reserves[0].amount / self.reserves[1].amount
         assert abs(amounts_ratio / current_ratio - 1) < slippage_tolerance
         return amounts_in
 
@@ -300,10 +323,12 @@ class TerraswapLiquidityPair:
         self,
         amounts_in: AmountTuple,
         slippage_tolerance: Decimal = DEFAULT_ADD_LIQUIDITY_SLIPPAGE_TOLERANCE,
+        safety_round: bool = True,
     ) -> TerraTokenAmount:
         amounts_in = self._check_amounts_add_liquidity(amounts_in, slippage_tolerance)
         add_ratio = min(amounts_in[0] / self.reserves[0], amounts_in[1] / self.reserves[1])
-        return self.lp_token.get_supply(self.client) * add_ratio
+        amount = self.lp_token.get_supply(self.client) * add_ratio
+        return amount.safe_down() if safety_round else amount
 
     def build_add_liquity_msgs(
         self,
@@ -322,7 +347,7 @@ class TerraswapLiquidityPair:
                     _token_amount_to_data(amounts_in[0]),
                     _token_amount_to_data(amounts_in[1]),
                 ],
-                'slippage_tolerance': slippage_tolerance,
+                # 'slippage_tolerance': str(round(slippage_tolerance, 18)),
             }
         }
         coins = [
@@ -345,18 +370,45 @@ class TerraswapLiquidityPair:
         sender: str,
         amounts_in: AmountTuple,
         slippage_tolerance: Decimal = DEFAULT_ADD_LIQUIDITY_SLIPPAGE_TOLERANCE,
+        safety_round: bool = True,
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
-        amount_out = self.get_add_liquidity_amount_out(amounts_in, slippage_tolerance)
+        amount_out = self.get_add_liquidity_amount_out(amounts_in, slippage_tolerance, safety_round)
         msgs = self.build_add_liquity_msgs(sender, amounts_in, slippage_tolerance)
         return amount_out, msgs
 
     def op_add_single_side(
         self,
         sender: str,
-        amounts_in: AmountTuple,
+        amount_in: TerraTokenAmount,
         slippage_tolerance: Decimal = DEFAULT_ADD_LIQUIDITY_SLIPPAGE_TOLERANCE,
+        safety_round: bool = True,
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
-        raise NotImplementedError
+        reserve_in, reserve_out = self._get_in_out_reserves(amount_in)
+
+        # Calculate optimum ratio to swap before adding liquidity, excluding tax influence
+        aux = FEE * (reserve_in.amount + amount_in.amount) - 2 * reserve_in.amount
+        numerator = (aux ** 2 + 4 * reserve_in.amount * amount_in.amount) ** (Decimal(0.5)) + aux
+        denominator = 2 * amount_in.amount
+        ratio_swap = numerator / denominator
+
+        amount_in_swap = amount_in * ratio_swap
+        amounts_swap = self.get_swap_amounts(amount_in_swap, safety_round=True)
+
+        if (tax := amounts_swap['taxes'][1]) > 0:
+            amount_in_swap += reserve_in * (tax / 2 / reserve_out)
+            amounts_swap = self.get_swap_amounts(amount_in_swap)
+
+        min_amount_out = amounts_swap['amounts_out'][1] * (1 - slippage_tolerance)
+        msg_swap = self.build_swap_msg(sender, amount_in_swap, min_amount_out)
+        amount_in_keep = amount_in - amount_in_swap
+        with self.simulate_reserve_change(amounts_swap['pool_change']):
+            amount_out, msgs_add_liquidity = self.op_add_liquidity(
+                sender,
+                (amount_in_keep, amounts_swap['amounts_out'][1]),
+                slippage_tolerance,
+                safety_round,
+            )
+        return amount_out, [msg_swap] + msgs_add_liquidity
 
 
 class TerraswapLPToken(CW20Token):

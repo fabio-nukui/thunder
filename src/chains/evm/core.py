@@ -99,7 +99,7 @@ class ERC20Token(Token):
             .allowance(owner, spender)
             .call(block_identifier=self.client.block)
         )
-        return EVMTokenAmount(self, raw_amount=allowance)
+        return EVMTokenAmount(self, int_amount=allowance)
 
     def set_allowance(
         self,
@@ -111,7 +111,7 @@ class ERC20Token(Token):
             amount = INF_APPROVAL_AMOUNT
         elif isinstance(amount, EVMTokenAmount):
             assert self == amount.token
-            amount = amount.raw_amount
+            amount = amount.int_amount
 
         assert self.contract is not None
         contract_call = self.contract.functions.approve(spender, amount)
@@ -143,7 +143,7 @@ class EVMTokenAmount(TokenAmount):
         if isinstance(self.token, EVMNativeToken):
             return
         allowance = self.token.get_allowance(client.address, spender)
-        if allowance < self.raw_amount:
+        if allowance < self.int_amount:
             approval_amount = None if infinite_approval else self
             self.token.set_allowance(client, spender, approval_amount)
 
