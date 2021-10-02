@@ -8,11 +8,74 @@ DEFAULT_MAX_ITER = 100
 BISSECTION_SEARCH_EXPANSION = 2
 
 
-def bissection_optimizer(
+def optimize(
     func: Callable[[Decimal], Decimal],
     x0: Decimal,
     dx: Decimal,
-    tol: Decimal = Decimal(10 ** 18),
+    tol: Decimal = Decimal(0.01),
+    max_iter: int = DEFAULT_MAX_ITER,
+    use_fallback: bool = True,
+) -> tuple[Decimal, Decimal]:
+    """Maximizes function using Newton's method and finite differences, where variables are in int.
+
+    Args:
+        x0 (Decimal): Initial guess
+        dx (Decimal): Interval to calculate derivatives
+        tol (Decimal): Absolute tolerance between iterations to stop optimization
+
+    Returns:
+        tuple[Decimal, Decimal]: Result in x and func(x)
+    """
+    try:
+        return optimize_newton(func, x0, dx, tol, max_iter)
+    except Exception as e:
+        if not use_fallback:
+            raise e
+        return optimize_bissection(func, x0, dx, tol, max_iter)
+
+
+def optimize_newton(
+    func: Callable[[Decimal], Decimal],
+    x0: Decimal,
+    dx: Decimal,
+    tol: Decimal = Decimal(0.01),
+    max_iter: int = DEFAULT_MAX_ITER,
+    positive_only: bool = True,
+) -> tuple[Decimal, Decimal]:
+    """Optimizes function using Newton's method and finite differences, where variables are in int.
+    Guaranteed to converge for convex functions
+
+    Args:
+        func (Callable): Function to be maximized
+        x0 (Decimal): Initial guess
+        dx (Decimal): Interval to calculate derivatives
+        tol (Decimal): Absolute tolerance between iterations to stop optimization
+        max_iter (int): Maximum number of iterations
+
+    Returns:
+        tuple[Decimal, Decimal]: Result in x and func(x)
+    """
+    x_i = x_i_next = x0
+    for i in range(max_iter):
+        f_x_i = func(x_i)
+        f_x_ip = func(x_i + dx)
+        f_x_im = func(x_i - dx)
+        first_derivative = (f_x_ip - f_x_im) / (2 * dx)
+        second_derivative = (f_x_ip - 2 * f_x_i + f_x_im) / (dx ** 2)
+        x_i_next = x_i - first_derivative / second_derivative
+        if x_i_next < 0 and x_i < 0 and positive_only:
+            raise Exception(f'Negative result when {positive_only=}')
+        if abs(x_i_next - x_i) < tol:
+            break
+        x_i = x_i_next
+    return x_i_next, func(x_i_next)
+
+
+def optimize_bissection(
+    func: Callable[[Decimal], Decimal],
+    x0: Decimal,
+    dx: Decimal,
+    tol: Decimal = Decimal(0.01),
     max_iter: int = DEFAULT_MAX_ITER,
 ) -> tuple[Decimal, Decimal]:
     """Optimizes function by searching for point where derivative is zero using bissection search.
@@ -50,6 +113,8 @@ def bissection_search(
     y_left: Decimal = None,
     y_right: Decimal = None,
 ) -> Decimal:
+    x = (x_left + x_right) / 2
+    log.debug(f'{x=:.6f}')
     i += 1
     if x_right - x_left < tol or i >= max_iter:
         return (x_left + x_right) / 2
@@ -58,7 +123,7 @@ def bissection_search(
     if y_right > 0:
         x_right *= BISSECTION_SEARCH_EXPANSION
         return bissection_search(func, x_left, x_right, tol, max_iter, i, y_left)
-    x_mid = (x_left + x_right) // 2
+    x_mid = (x_left + x_right) / 2
     y_mid = func(x_mid)
     if y_mid > 0:
         x_left = x_mid
