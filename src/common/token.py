@@ -103,7 +103,7 @@ class TokenAmount:
         return self - self.dx * ROUNDING_SAFETY_MARGIN
 
     def safe_up(self: _TokenAmountT) -> _TokenAmountT:
-        return self - self.dx * ROUNDING_SAFETY_MARGIN
+        return self + self.dx * ROUNDING_SAFETY_MARGIN
 
     def is_empty(self) -> bool:
         return self.amount.is_nan()
