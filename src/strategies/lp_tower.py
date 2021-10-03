@@ -186,11 +186,13 @@ class LPTowerStrategy:
                 log.info(self.execution_data.to_json())
                 self.execution_data = ExecutionData()
         try:
+            log.debug('Generating execution configuration')
             self.execution_data.execution_config = config = self._get_execution_config(mempool)
         except UnprofitableArbitrage as e:
             log.info(e)
             return
         try:
+            log.debug('Broadcasting transaction')
             self.execution_data.broadcast_tx_data = self._broadcast_tx(config, block)
         except BlockchainNewState as e:
             log.info(e)

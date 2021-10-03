@@ -110,7 +110,7 @@ class TokenAmount:
 
     def _to_decimal(self, value) -> Decimal:
         if isinstance(value, type(self)):
-            assert self.token == value.token
+            assert self.token == value.token, 'Operation only allowed for identical tokens'
             return value.amount
         try:
             return Decimal(value)
