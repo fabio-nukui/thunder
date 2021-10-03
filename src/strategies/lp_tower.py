@@ -4,13 +4,16 @@ import json
 import logging
 import time
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from functools import partial
 from typing import Optional
 
 from terra_sdk.core.auth import StdFee
+from terra_sdk.core.auth.data.tx import TxLog
 from terra_sdk.core.wasm import MsgExecuteContract
+from terra_sdk.exceptions import LCDResponseError
 
 import utils
 from chains.terra import (LUNA, UST, TerraClient, TerraswapLiquidityPair, TerraToken,
@@ -27,6 +30,8 @@ MIN_NET_PROFIT_MARGIN = 0.005
 MIN_PROFIT_UST = TerraTokenAmount(UST, 1)
 MIN_START_AMOUNT = TerraTokenAmount(UST, 10)
 OPTIMIZATION_TOLERANCE = TerraTokenAmount(UST, '0.01')
+MIN_CONFIRMATIONS = 1
+MAX_BLOCKS_WAIT_RECEIPT = 10
 
 MAX_SLIPPAGE = Decimal('0.001')
 
@@ -80,7 +85,7 @@ class ArbParams:
             'msgs': [msg.to_data() for msg in self.msgs],
             'est_final_amount': self.est_final_amount.to_data(),
             'est_fee': self.est_fee.to_data(),
-            'est_net_profit_ust': UST.round(self.est_net_profit_ust),
+            'est_net_profit_ust': float(self.est_net_profit_ust),
         }
 
 
@@ -99,28 +104,28 @@ class ArbTx:
 @dataclass
 class ArbResult:
     tx_status: TxStatus
+    tx_err_log: Optional[str] = None
+    gas_use: Optional[int] = None
+    gas_cost: Optional[TerraTokenAmount] = None
 
-    block_send_delay: Optional[int] = None
+    tx_inclusion_delay: Optional[int] = None
     timestamp_received: Optional[float] = None
     block_received: Optional[float] = None
 
     final_amount: Optional[TerraTokenAmount] = None
-    gas_use: Optional[int] = None
-    gas_cost: Optional[TerraTokenAmount] = None
-    tax: Optional[TerraTokenAmount] = None
-    net_profit: Optional[TerraTokenAmount] = None
+    net_profit_ust: Optional[Decimal] = None
 
     def to_data(self) -> dict:
         return {
             'tx_status': self.tx_status,
-            'block_send_delay': self.block_send_delay,
+            'tx_err_log': self.tx_err_log,
+            'gas_use': self.gas_use,
+            'gas_cost': None if self.gas_cost is None else self.gas_cost.to_data(),
+            'tx_inclusion_delay': self.tx_inclusion_delay,
             'timestamp_received': self.timestamp_received,
             'block_received': self.block_received,
-            'final_amount': self.final_amount.to_data() if self.final_amount is not None else None,
-            'gas_use': self.gas_use,
-            'gas_cost': self.gas_cost.to_data() if self.gas_cost is not None else None,
-            'tax': self.tax.to_data() if self.tax is not None else None,
-            'net_profit': self.net_profit.to_data() if self.net_profit is not None else None,
+            'final_amount': None if self.final_amount is None else self.final_amount.to_data(),
+            'net_profit': None if self.net_profit_ust is None else str(self.net_profit_ust),
         }
 
 
@@ -198,7 +203,47 @@ class LPTowerStrategy:
             log.info(self.arbitrage_data.to_json())
 
     def _confirm_tx(self, block: int) -> ArbResult:
-        raise NotImplementedError
+        assert self.arbitrage_data.params is not None
+        assert self.arbitrage_data.tx is not None
+        tx_inclusion_delay = block - self.arbitrage_data.params.block_found
+        try:
+            info = self.client.lcd.tx.tx_info(self.arbitrage_data.tx.tx_hash)
+        except LCDResponseError as e:
+            if e.response.status == 404:
+                if tx_inclusion_delay >= MAX_BLOCKS_WAIT_RECEIPT:
+                    return ArbResult(TxStatus.not_found)
+                raise IsBusy
+            raise e
+        if block - info.height < MIN_CONFIRMATIONS:
+            raise IsBusy
+        gas_cost = TerraTokenAmount.from_coin(*info.tx.fee.amount)
+        if info.logs is None:
+            status = TxStatus.failed
+            tx_err_log = info.rawlog
+            final_amount = None
+            net_profit_ust = -gas_cost.amount
+        else:
+            status = TxStatus.succeeded
+            tx_err_log = None
+            final_amount, net_profit_ust = self._extract_returns_from_logs(info.logs)
+        return ArbResult(
+            tx_status=status,
+            tx_err_log=tx_err_log,
+            gas_use=info.gas_used,
+            gas_cost=gas_cost,
+            tx_inclusion_delay=tx_inclusion_delay,
+            timestamp_received=datetime.fromisoformat(info.timestamp[:-1]).timestamp(),
+            block_received=info.height,
+            final_amount=final_amount,
+            net_profit_ust=net_profit_ust,
+        )
+
+    def _extract_returns_from_logs(
+        self,
+        logs: list[TxLog],
+    ) -> tuple[TerraTokenAmount, Decimal]:
+        log.debug([lg.to_data() for lg in logs])
+        return TerraTokenAmount(self.pool_0.lp_token), Decimal('NaN')  # TODO: implement
 
     def _get_arbitrage_params(self, block: int, mempool: dict = None) -> ArbParams:
         if mempool:
@@ -216,7 +261,7 @@ class LPTowerStrategy:
         )
         final_amount, msgs = self._get_amount_out_and_msgs(initial_amount, direction)
         fee = self.client.estimate_fee(msgs)
-        gas_cost = TerraTokenAmount.from_coin(*fee.amount.to_list())
+        gas_cost = TerraTokenAmount.from_coin(*fee.amount)
         net_profit_ust = (final_amount - initial_amount).amount * lp_ust_price - gas_cost.amount
         if net_profit_ust < MIN_PROFIT_UST:
             raise UnprofitableArbitrage(
