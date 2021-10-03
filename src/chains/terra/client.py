@@ -175,7 +175,8 @@ class TerraClient(BaseTerraClient):
 
     @staticmethod
     def encode_msg(msg: dict) -> str:
-        return base64.b64encode(json.dumps(msg).encode('utf-8')).decode('ascii')
+        bytes_json = json.dumps(msg, separators=(',', ':')).encode('utf-8')
+        return base64.b64encode(bytes_json).decode('ascii')
 
     def get_latest_block(self) -> int:
         return int(self.lcd.tendermint.block_info()['block']['header']['height'])

@@ -81,12 +81,12 @@ class CW20Token(Token):
         self,
         spender: str,
         owner: str,
-        amount: int,
+        amount: int | str,
     ) -> MsgExecuteContract:
         execute_msg = {
             'increase_allowance': {
                 'spender': spender,
-                'amount': amount,
+                'amount': str(amount),
             }
         }
         return MsgExecuteContract(

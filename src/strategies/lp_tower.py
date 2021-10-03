@@ -22,11 +22,12 @@ log = logging.getLogger(__name__)
 ADDR_BLUNA_LUNA_POOL = 'terra1jxazgm67et0ce260kvrpfv50acuushpjsz2y0p'
 ADDR_UST_LUNA_POOL = 'terra1tndcaqxkpc5ce9qee5ggqf430mr2z3pefe5wj6'
 ADDR_BLUNA_LUNA_UST_TOWER_POOL = 'terra1wrwf3um5vm30vpwnlpvjzgwpf5fjknt68nah05'
-MIN_PROFIT = TerraTokenAmount(UST, 1)
+MIN_NET_PROFIT_MARGIN = 0.005
+MIN_PROFIT_UST = TerraTokenAmount(UST, 1)
 MIN_START_AMOUNT = TerraTokenAmount(UST, 10)
 OPTIMIZATION_TOLERANCE = TerraTokenAmount(UST, '0.01')
 
-MAX_SLIPPAGE = Decimal(0.001)
+MAX_SLIPPAGE = Decimal('0.001')
 
 
 class Direction(str, Enum):
@@ -264,7 +265,7 @@ class LPTowerStrategy:
             self.pool_0.lp_token, MIN_START_AMOUNT.amount / lp_ust_price)
         profit = self._get_gross_profit(initial_lp_amount, direction)
         if profit.amount * lp_ust_price < 0:
-            raise UnprofitableArbitrage
+            raise UnprofitableArbitrage('No profitability')
         func = partial(self._get_gross_profit_dec, direction=direction)
         lp_amount, _ = utils.optimization.optimize(
             func,
@@ -276,7 +277,12 @@ class LPTowerStrategy:
         initial_amount = min(initial_amount, pool_0_lp_balance)
         final_amount, msgs = self._get_amount_out_and_msgs(initial_amount, direction)
         gas_use, gas_cost = self.client.estimate_fee(msgs)
-        gross_profit_ust = (final_amount - initial_amount).amount * lp_ust_price
+        net_profit_ust = (final_amount - initial_amount).amount * lp_ust_price - gas_cost.amount
+        if net_profit_ust < MIN_PROFIT_UST:
+            raise UnprofitableArbitrage(f'Low profitability: USD {net_profit_ust:.2f}')
+        margin = net_profit_ust / (initial_amount.amount * lp_ust_price)
+        if margin < MIN_NET_PROFIT_MARGIN:
+            raise UnprofitableArbitrage(f'Low profitability margin: USD {margin:.3%}')
 
         return {
             'initial_amount': initial_amount,
@@ -284,7 +290,7 @@ class LPTowerStrategy:
             'est_final_amount': final_amount,
             'est_gas_use': gas_use,
             'est_gas_cost': gas_cost,
-            'est_net_profit_ust': gross_profit_ust - gas_cost.amount,
+            'est_net_profit_ust': net_profit_ust,
         }
 
     def _get_gross_profit(
