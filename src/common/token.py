@@ -141,6 +141,9 @@ class TokenAmount:
     def __mul__(self: _TokenAmountT, other: DecInput) -> _TokenAmountT:
         return self.__class__(self.token, self.amount * Decimal(other))
 
+    def __rmul__(self: _TokenAmountT, other: DecInput) -> _TokenAmountT:
+        return self.__mul__(other)
+
     @overload
     def __truediv__(self: _TokenAmountT, other: DecInput) -> _TokenAmountT: ...  # noqa: E704
 
