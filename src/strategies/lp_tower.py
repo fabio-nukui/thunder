@@ -190,7 +190,7 @@ class LPTowerStrategy:
         try:
             self.arbitrage_data.params = params = self._get_arbitrage_params(block, mempool)
         except UnprofitableArbitrage as e:
-            log.info(e)
+            log.debug(e)
             return
         log.debug('Broadcasting transaction')
         try:

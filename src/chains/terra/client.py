@@ -186,9 +186,9 @@ class TerraClient(BaseTerraClient):
             new_block = self.get_latest_block()
             block_diff = new_block - self.block
             if block_diff > 0:
-                log.debug(f'New block: {new_block}')
+                self.block = new_block
+                log.debug(f'New block: {self.block}')
                 if block_diff > 1:
                     log.warning(f'More than one block passed since last iteration ({block_diff})')
-                self.block = new_block
                 yield self.block
             time.sleep(configs.TERRA_POLL_INTERVAL)
