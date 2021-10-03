@@ -3,22 +3,32 @@ import code
 import sys
 import traceback
 from contextlib import contextmanager
+from types import TracebackType
 
 
-def _get_last_frame(tb):
-    return _get_last_frame(tb.tb_next) if tb.tb_next else tb
+def _tb_stack_list(tb: TracebackType) -> list[TracebackType]:
+    frames = [tb]
+    while tb.tb_next:
+        tb = tb.tb_next
+        frames.append(tb)
+    return frames
 
 
-def _interact_last_frame():
+def _interact_frame(n: int):
     traceback.print_exc()
     *_, tb = sys.exc_info()
-    frame = _get_last_frame(tb).tb_frame  # type: ignore
+    assert tb is not None, 'No traceback found'
+    tb_list = _tb_stack_list(tb)
+    frame = tb_list[n].tb_frame
     code.interact(local={**frame.f_globals, **frame.f_locals})
 
 
 @contextmanager
-def bp():
+def bp(n: int = -1):
     """Breakpoints code execution on exceptions.
+    Args:
+        n (int, optional): Frame to interact with, defaults to last frame (-1)
+
     Usage:
     >>> with bp():
     >>>    ...
@@ -26,4 +36,4 @@ def bp():
     try:
         yield
     except Exception:
-        _interact_last_frame()
+        _interact_frame(n)
