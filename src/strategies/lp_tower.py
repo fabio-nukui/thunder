@@ -36,7 +36,7 @@ class Direction(str, Enum):
     swap_first = 'swap_first'
 
 
-class ExecutionState(Enum):
+class ExecutionState(str, Enum):
     start = 'start'
     ready_to_broadcast = 'ready_to_broadcast'
     waiting_confirmation = 'waiting_confirmation'
@@ -50,7 +50,7 @@ class TxStatus(str, Enum):
 
 
 @dataclass
-class ExecutionConfig:
+class ArbParams:
     timestamp_found: float
     block_found: int
 
@@ -85,7 +85,7 @@ class ExecutionConfig:
 
 
 @dataclass
-class BroadcastTxData:
+class ArbTx:
     timestamp_sent: float
     tx_hash: str
 
@@ -97,7 +97,7 @@ class BroadcastTxData:
 
 
 @dataclass
-class ExecutionResult:
+class ArbResult:
     tx_status: TxStatus
 
     block_send_delay: Optional[int] = None
@@ -125,32 +125,26 @@ class ExecutionResult:
 
 
 @dataclass
-class ExecutionData:
-    execution_config: Optional[ExecutionConfig] = None
-    broadcast_tx_data: Optional[BroadcastTxData] = None
-    execution_result: Optional[ExecutionResult] = None
+class ArbitrageData:
+    params: Optional[ArbParams] = None
+    tx: Optional[ArbTx] = None
+    result: Optional[ArbResult] = None
 
     @property
     def status(self) -> ExecutionState:
-        if self.execution_config is None:
+        if self.params is None:
             return ExecutionState.start
-        if self.broadcast_tx_data is None:
+        if self.tx is None:
             return ExecutionState.ready_to_broadcast
-        if self.execution_result is None:
+        if self.result is None:
             return ExecutionState.waiting_confirmation
         return ExecutionState.finished
 
     def to_data(self) -> dict:
         return {
-            'execution_config': (
-                None if self.execution_config is None else self.execution_config.to_data()
-            ),
-            'broadcast_tx_data': (
-                None if self.broadcast_tx_data is None else self.broadcast_tx_data.to_data()
-            ),
-            'execution_result': (
-                None if self.execution_result is None else self.execution_result.to_data()
-            ),
+            'params': None if self.params is None else self.params.to_data(),
+            'tx': None if self.tx is None else self.tx.to_data(),
+            'result': None if self.result is None else self.result.to_data(),
         }
 
     def to_json(self) -> str:
@@ -168,56 +162,71 @@ class LPTowerStrategy:
         self.pool_0 = pool_0
         self.pool_1 = pool_1
         self.pool_tower = TerraswapLiquidityPair(ADDR_BLUNA_LUNA_UST_TOWER_POOL, client)
-        self.execution_data = ExecutionData()
+        self.arbitrage_data = ArbitrageData()
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}(client={self.client}, pool_tower={self.pool_tower})'
+        return (
+            f'{self.__class__.__name__}(client={self.client}, '
+            f'pool_tower={self.pool_tower}, status={self.arbitrage_data.status})'
+        )
 
     def run(self, block: int, mempool: dict = None):
-        if self.execution_data.status == ExecutionState.waiting_confirmation:
+        if self.arbitrage_data.status == ExecutionState.waiting_confirmation:
+            log.debug('Looking for tx confirmation(s)')
             try:
-                self.execution_data.execution_result = self._confirm_tx(block)
+                self.arbitrage_data.result = self._confirm_tx(block)
             except IsBusy:
                 return
             else:
                 log.info('Arbitrage executed:')
-                log.info(self.execution_data.to_json())
-                self.execution_data = ExecutionData()
+                log.info(self.arbitrage_data.to_json())
+                self.arbitrage_data = ArbitrageData()
+        log.debug('Generating execution configuration')
         try:
-            log.debug('Generating execution configuration')
-            config = self._get_execution_config(block, mempool)
-            self.execution_data.execution_config = config
+            self.arbitrage_data.params = params = self._get_arbitrage_params(block, mempool)
         except UnprofitableArbitrage as e:
             log.info(e)
             return
+        log.debug('Broadcasting transaction')
         try:
-            log.debug('Broadcasting transaction')
-            self.execution_data.broadcast_tx_data = self._broadcast_tx(config, block)
+            self.arbitrage_data.tx = self._broadcast_tx(params, block)
         except BlockchainNewState as e:
-            log.info(e)
+            log.warning(e)
             return
         else:
             log.info('Arbitrage broadcasted:')
-            log.info(self.execution_data.to_json())
+            log.info(self.arbitrage_data.to_json())
 
-    def _confirm_tx(self, block: int) -> ExecutionResult:
+    def _confirm_tx(self, block: int) -> ArbResult:
         raise NotImplementedError
 
-    def _get_execution_config(self, block: int, mempool: dict = None) -> ExecutionConfig:
+    def _get_arbitrage_params(self, block: int, mempool: dict = None) -> ArbParams:
         if mempool:
             raise NotImplementedError
-        pool_0_lp_balance = self.pool_0.lp_token.get_balance(self.client)
         prices = self._get_prices()
         balance_ratio, direction = self._get_pool_balance_ratio(
             prices[self.pool_0.lp_token],
             prices[self.pool_1.lp_token],
         )
-        try:
-            arbitrage_params = self._get_arbitrage_params(pool_0_lp_balance, prices, direction)
-        except UnprofitableArbitrage as e:
-            e.args = (*e.args, f'{balance_ratio=:0.3%}')
-            raise e
-        return ExecutionConfig(
+
+        lp_ust_price = prices[self.pool_0.lp_token] * self.client.get_exchange_rate(LUNA, UST)
+        pool_0_lp_balance = self.pool_0.lp_token.get_balance(self.client)
+        initial_amount = self._get_optimal_argitrage_amount(
+            lp_ust_price, direction, pool_0_lp_balance, balance_ratio
+        )
+        final_amount, msgs = self._get_amount_out_and_msgs(initial_amount, direction)
+        fee = self.client.estimate_fee(msgs)
+        gas_cost = TerraTokenAmount.from_coin(*fee.amount.to_list())
+        net_profit_ust = (final_amount - initial_amount).amount * lp_ust_price - gas_cost.amount
+        if net_profit_ust < MIN_PROFIT_UST:
+            raise UnprofitableArbitrage(
+                f'Low profitability: USD {net_profit_ust:.2f}, {balance_ratio=:0.3%}')
+        margin = net_profit_ust / (initial_amount.amount * lp_ust_price)
+        if margin < MIN_NET_PROFIT_MARGIN:
+            raise UnprofitableArbitrage(
+                f'Low profitability margin: USD {margin:.3%}, {balance_ratio=:0.3%}')
+
+        return ArbParams(
             timestamp_found=time.time(),
             block_found=block,
             prices=prices,
@@ -225,11 +234,11 @@ class LPTowerStrategy:
             lp_tower_reserves=self.pool_tower.reserves,
             pool_0_lp_balance=pool_0_lp_balance,
             direction=direction,
-            initial_amount=arbitrage_params['initial_amount'],
-            msgs=arbitrage_params['msgs'],
-            est_final_amount=arbitrage_params['est_final_amount'],
-            est_fee=arbitrage_params['est_fee'],
-            est_net_profit_ust=arbitrage_params['est_net_profit_ust'],
+            initial_amount=initial_amount,
+            msgs=msgs,
+            est_final_amount=final_amount,
+            est_fee=fee,
+            est_net_profit_ust=net_profit_ust,
         )
 
     def _get_prices(self) -> dict[TerraToken, Decimal]:
@@ -254,18 +263,18 @@ class LPTowerStrategy:
             return balance_ratio, Direction.remove_liquidity_first
         return balance_ratio, Direction.swap_first
 
-    def _get_arbitrage_params(
+    def _get_optimal_argitrage_amount(
         self,
-        pool_0_lp_balance: TerraTokenAmount,
-        prices: dict[TerraToken, Decimal],
+        lp_ust_price: Decimal,
         direction: Direction,
-    ) -> dict:
-        lp_ust_price = prices[self.pool_0.lp_token] * self.client.get_exchange_rate(LUNA, UST)
+        pool_0_lp_balance: TerraTokenAmount,
+        balance_ratio: Decimal,
+    ) -> TerraTokenAmount:
         initial_lp_amount = TerraTokenAmount(
             self.pool_0.lp_token, MIN_START_AMOUNT.amount / lp_ust_price)
         profit = self._get_gross_profit(initial_lp_amount, direction)
         if profit.amount * lp_ust_price < 0:
-            raise UnprofitableArbitrage('No profitability')
+            raise UnprofitableArbitrage(f'No profitability, {balance_ratio=:0.3%}')
         func = partial(self._get_gross_profit_dec, direction=direction)
         lp_amount, _ = utils.optimization.optimize(
             func,
@@ -273,25 +282,8 @@ class LPTowerStrategy:
             dx=initial_lp_amount.dx,
             tol=OPTIMIZATION_TOLERANCE.amount / lp_ust_price,
         )
-        initial_amount = TerraTokenAmount(self.pool_0.lp_token, lp_amount)
-        initial_amount = min(initial_amount, pool_0_lp_balance)
-        final_amount, msgs = self._get_amount_out_and_msgs(initial_amount, direction)
-        fee = self.client.estimate_fee(msgs)
-        gas_cost = TerraTokenAmount.from_coin(*fee.amount.to_list())
-        net_profit_ust = (final_amount - initial_amount).amount * lp_ust_price - gas_cost.amount
-        if net_profit_ust < MIN_PROFIT_UST:
-            raise UnprofitableArbitrage(f'Low profitability: USD {net_profit_ust:.2f}')
-        margin = net_profit_ust / (initial_amount.amount * lp_ust_price)
-        if margin < MIN_NET_PROFIT_MARGIN:
-            raise UnprofitableArbitrage(f'Low profitability margin: USD {margin:.3%}')
-
-        return {
-            'initial_amount': initial_amount,
-            'msgs': msgs,
-            'est_final_amount': final_amount,
-            'est_fee': fee,
-            'est_net_profit_ust': net_profit_ust,
-        }
+        amount = TerraTokenAmount(self.pool_0.lp_token, lp_amount)
+        return min(amount, pool_0_lp_balance)
 
     def _get_gross_profit(
         self,
@@ -338,11 +330,11 @@ class LPTowerStrategy:
             msgs = msgs_tower_swap + msgs_remove_single_side + msgs_add_single_side
         return final_lp_amount, msgs
 
-    def _broadcast_tx(self, execution_config: ExecutionConfig, block: int) -> BroadcastTxData:
+    def _broadcast_tx(self, execution_config: ArbParams, block: int) -> ArbTx:
         tx_hash = self.client.execute_msgs(execution_config.msgs, fee=execution_config.est_fee)
         if (latest_block := self.client.get_latest_block()) != block:
             raise BlockchainNewState(f'{latest_block=} different from {block=}')
-        return BroadcastTxData(
+        return ArbTx(
             timestamp_sent=time.time(),
             tx_hash=tx_hash,
         )
