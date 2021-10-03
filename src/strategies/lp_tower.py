@@ -171,50 +171,75 @@ class LPTowerStrategy:
         self.pool_tower = TerraswapLiquidityPair(ADDR_BLUNA_LUNA_UST_TOWER_POOL, client)
         self.execution_data = ExecutionData()
 
-    def _get_amount_out_and_msgs(
-        self,
-        initial_lp_amount: TerraTokenAmount,
-        direction: Direction,
-    ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
-        if direction == Direction.remove_liquidity_first:
-            luna_amount, msgs_remove_single_side = self.pool_0.op_remove_single_side(
-                self.client.address, initial_lp_amount, LUNA, MAX_SLIPPAGE
-            )
-            lp_amount, msgs_add_single_side = self.pool_1.op_add_single_side(
-                self.client.address, luna_amount, MAX_SLIPPAGE
-            )
-            final_lp_amount, msgs_tower_swap = self.pool_tower.op_swap(
-                self.client.address, lp_amount, MAX_SLIPPAGE
-            )
-            msgs = msgs_remove_single_side + msgs_add_single_side + msgs_tower_swap
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}(client={self.client}, pool_tower={self.pool_tower})'
+
+    def run(self, block: int, mempool: dict = None):
+        if self.execution_data.status == ExecutionState.waiting_confirmation:
+            try:
+                self.execution_data.execution_result = self._confirm_tx(block)
+            except IsBusy:
+                return
+            else:
+                log.info('Arbitrage executed:')
+                log.info(self.execution_data.to_json())
+                self.execution_data = ExecutionData()
+        try:
+            self.execution_data.execution_config = config = self._get_execution_config(mempool)
+        except UnprofitableArbitrage as e:
+            log.info(e)
+            return
+        try:
+            self.execution_data.broadcast_tx_data = self._broadcast_tx(config, block)
+        except BlockchainNewState as e:
+            log.info(e)
+            return
         else:
-            lp_amount, msgs_tower_swap = self.pool_tower.op_swap(
-                self.client.address, initial_lp_amount, MAX_SLIPPAGE
-            )
-            luna_amount, msgs_remove_single_side = self.pool_1.op_remove_single_side(
-                self.client.address, lp_amount, LUNA, MAX_SLIPPAGE
-            )
-            final_lp_amount, msgs_add_single_side = self.pool_0.op_add_single_side(
-                self.client.address, luna_amount, MAX_SLIPPAGE
-            )
-            msgs = msgs_tower_swap + msgs_remove_single_side + msgs_add_single_side
-        return final_lp_amount, msgs
+            log.info('Arbitrage broadcasted:')
+            log.info(self.execution_data.to_json())
 
-    def _get_gross_profit(
-        self,
-        initial_lp_amount: TerraTokenAmount,
-        direction: Direction,
-    ) -> TerraTokenAmount:
-        amount_out = self._get_amount_out_and_msgs(initial_lp_amount, direction)[0]
-        return amount_out - initial_lp_amount
+    def _confirm_tx(self, block: int) -> ExecutionResult:
+        raise NotImplementedError
 
-    def _get_gross_profit_dec(
-        self,
-        amount: Decimal,
-        direction: Direction,
-    ) -> Decimal:
-        token_amount = TerraTokenAmount(self.pool_0.lp_token, amount)
-        return self._get_gross_profit(token_amount, direction).amount
+    def _get_execution_config(self, mempool: dict = None) -> ExecutionConfig:
+        if mempool:
+            raise NotImplementedError
+        pool_0_lp_balance = self.pool_0.lp_token.get_balance(self.client)
+        prices = self._get_prices()
+        balance_ratio, direction = self._get_pool_balance_ratio(
+            prices[self.pool_0.lp_token],
+            prices[self.pool_1.lp_token],
+        )
+        try:
+            arbitrage_params = self._get_arbitrage_params(pool_0_lp_balance, prices, direction)
+        except UnprofitableArbitrage as e:
+            e.args = (*e.args, f'Unprofitable arbitrage, {balance_ratio=:0.3%}')
+            raise e
+        return ExecutionConfig(
+            timestamp_found=time.time(),
+            block_found=self.client.block,
+            prices=prices,
+            prices_denom=LUNA,
+            lp_tower_reserves=self.pool_tower.reserves,
+            pool_0_lp_balance=pool_0_lp_balance,
+            direction=direction,
+            initial_amount=arbitrage_params['initial_amount'],
+            msgs=arbitrage_params['msgs'],
+            est_final_amount=arbitrage_params['est_final_amount'],
+            est_gas_use=arbitrage_params['est_gas_use'],
+            est_gas_cost=arbitrage_params['est_gas_cost'],
+            est_net_profit_ust=arbitrage_params['est_net_profit_ust'],
+        )
+
+    def _get_prices(self) -> dict[TerraToken, Decimal]:
+        bluna_price = self.pool_0.reserves[1].amount / self.pool_0.reserves[0].amount
+        ust_price = self.pool_1.reserves[1].amount / self.pool_1.reserves[0].amount
+        return {
+            self.pool_0.lp_token: self.pool_0.get_price(LUNA),
+            self.pool_1.lp_token: self.pool_1.get_price(LUNA),
+            self.pool_0.tokens[0]: bluna_price,
+            self.pool_1.tokens[0]: ust_price,
+        }
 
     def _get_pool_balance_ratio(
         self,
@@ -227,28 +252,6 @@ class LPTowerStrategy:
         if balance_ratio > 0:
             return balance_ratio, Direction.remove_liquidity_first
         return balance_ratio, Direction.swap_first
-
-    def _get_prices(self) -> dict[TerraToken, Decimal]:
-        bluna_price = self.pool_0.reserves[1].amount / self.pool_0.reserves[0].amount
-        ust_price = self.pool_1.reserves[1].amount / self.pool_1.reserves[0].amount
-        return {
-            self.pool_0.lp_token: self.pool_0.get_price(LUNA),
-            self.pool_1.lp_token: self.pool_1.get_price(LUNA),
-            self.pool_0.tokens[0]: bluna_price,
-            self.pool_1.tokens[0]: ust_price,
-        }
-
-    def execute(self, block: int, mempool: dict = None):
-        if self.execution_data.status == ExecutionState.waiting_confirmation:
-            # self._confirm_tx()
-            log.info('Arbitrage executed:')
-            # log.info(self.execution_data.to_json())
-        self.execution_data.execution_config = config = self._get_execution_config(mempool)
-        raise NotImplementedError
-        self.execution_data.broadcast_tx_data = self._broadcast_tx(config, block)
-
-        # log.info('Arbitrage broadcasted:')
-        # log.info(self.execution_data.to_json())
 
     def _get_arbitrage_params(
         self,
@@ -284,35 +287,53 @@ class LPTowerStrategy:
             'est_net_profit_ust': gross_profit_ust - gas_cost.amount,
         }
 
-    def _get_execution_config(self, mempool: dict = None) -> ExecutionConfig:
-        if mempool:
-            raise NotImplementedError
-        pool_0_lp_balance = self.pool_0.lp_token.get_balance(self.client)
-        prices = self._get_prices()
-        balance_ratio, direction = self._get_pool_balance_ratio(
-            prices[self.pool_0.lp_token],
-            prices[self.pool_1.lp_token],
-        )
-        try:
-            arbitrage_params = self._get_arbitrage_params(pool_0_lp_balance, prices, direction)
-        except UnprofitableArbitrage as e:
-            log.info(f'Unprofitable arbitrage, {balance_ratio=:0.3%}')
-            raise e
-        return ExecutionConfig(
-            timestamp_found=time.time(),
-            block_found=self.client.block,
-            prices=prices,
-            prices_denom=LUNA,
-            lp_tower_reserves=self.pool_tower.reserves,
-            pool_0_lp_balance=pool_0_lp_balance,
-            direction=direction,
-            initial_amount=arbitrage_params['initial_amount'],
-            msgs=arbitrage_params['msgs'],
-            est_final_amount=arbitrage_params['est_final_amount'],
-            est_gas_use=arbitrage_params['est_gas_use'],
-            est_gas_cost=arbitrage_params['est_gas_cost'],
-            est_net_profit_ust=arbitrage_params['est_net_profit_ust'],
-        )
+    def _get_gross_profit(
+        self,
+        initial_lp_amount: TerraTokenAmount,
+        direction: Direction,
+    ) -> TerraTokenAmount:
+        amount_out = self._get_amount_out_and_msgs(initial_lp_amount, direction)[0]
+        return amount_out - initial_lp_amount
+
+    def _get_gross_profit_dec(
+        self,
+        amount: Decimal,
+        direction: Direction,
+    ) -> Decimal:
+        token_amount = TerraTokenAmount(self.pool_0.lp_token, amount)
+        return self._get_gross_profit(token_amount, direction).amount
+
+    def _get_amount_out_and_msgs(
+        self,
+        initial_lp_amount: TerraTokenAmount,
+        direction: Direction,
+    ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
+        if direction == Direction.remove_liquidity_first:
+            luna_amount, msgs_remove_single_side = self.pool_0.op_remove_single_side(
+                self.client.address, initial_lp_amount, LUNA, MAX_SLIPPAGE
+            )
+            lp_amount, msgs_add_single_side = self.pool_1.op_add_single_side(
+                self.client.address, luna_amount, MAX_SLIPPAGE
+            )
+            final_lp_amount, msgs_tower_swap = self.pool_tower.op_swap(
+                self.client.address, lp_amount, MAX_SLIPPAGE
+            )
+            msgs = msgs_remove_single_side + msgs_add_single_side + msgs_tower_swap
+        else:
+            lp_amount, msgs_tower_swap = self.pool_tower.op_swap(
+                self.client.address, initial_lp_amount, MAX_SLIPPAGE
+            )
+            luna_amount, msgs_remove_single_side = self.pool_1.op_remove_single_side(
+                self.client.address, lp_amount, LUNA, MAX_SLIPPAGE
+            )
+            final_lp_amount, msgs_add_single_side = self.pool_0.op_add_single_side(
+                self.client.address, luna_amount, MAX_SLIPPAGE
+            )
+            msgs = msgs_tower_swap + msgs_remove_single_side + msgs_add_single_side
+        return final_lp_amount, msgs
+
+    def _broadcast_tx(self, execution_config: ExecutionConfig, block: int) -> BroadcastTxData:
+        raise NotImplementedError
 
 
 def run():
@@ -321,8 +342,5 @@ def run():
     pool_1 = TerraswapLiquidityPair(ADDR_UST_LUNA_POOL, client)
     strategy = LPTowerStrategy(client, pool_0, pool_1)
     for block in client.wait_next_block():
-        try:
-            strategy.execute(block)
-        except (UnprofitableArbitrage, IsBusy, BlockchainNewState):
-            pass
+        strategy.run(block)
         utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)
