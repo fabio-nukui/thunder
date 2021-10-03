@@ -375,9 +375,9 @@ class LPTowerStrategy:
         return final_lp_amount, msgs
 
     def _broadcast_tx(self, execution_config: ArbParams, block: int) -> ArbTx:
-        tx_hash = self.client.execute_msgs(execution_config.msgs, fee=execution_config.est_fee)
         if (latest_block := self.client.get_latest_block()) != block:
             raise BlockchainNewState(f'{latest_block=} different from {block=}')
+        tx_hash = self.client.execute_msgs(execution_config.msgs, fee=execution_config.est_fee)
         return ArbTx(
             timestamp_sent=time.time(),
             tx_hash=tx_hash,
