@@ -56,6 +56,7 @@ class EVMClient(BaseEVMClient):
             account_path=f"m/44'/{coin_type}'/{hd_wallet['account']}'/0/{hd_wallet_index}",
         )
         self.address: str = self.account.address
+        log.info(f'Initialized {self}')
 
     def __repr__(self) -> str:
         return \

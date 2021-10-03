@@ -66,6 +66,7 @@ class TerraClient(BaseTerraClient):
 
         self.code_ids = _get_code_ids(self.chain_id)
         self.block = self.get_latest_block()
+        log.info(f'Initialized {self} at block={self.block}')
 
     def __repr__(self) -> str:
         return (
