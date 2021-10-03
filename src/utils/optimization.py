@@ -31,6 +31,7 @@ def optimize(
     except Exception as e:
         if not use_fallback:
             raise e
+        log.debug('Error on newton optimization', exc_info=True)
         return optimize_bissection(func, x0, dx, tol, max_iter)
 
 
@@ -113,8 +114,6 @@ def bissection_search(
     y_left: Decimal = None,
     y_right: Decimal = None,
 ) -> Decimal:
-    x = (x_left + x_right) / 2
-    log.debug(f'{x=:.6f}')
     i += 1
     if x_right - x_left < tol or i >= max_iter:
         return (x_left + x_right) / 2
