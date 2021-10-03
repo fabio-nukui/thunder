@@ -16,9 +16,8 @@ def main():
         try:
             log.info(f'Starting strategy {configs.STRATEGY}')
             strategy.run()  # type: ignore
-        except Exception as e:
-            log.error('Error during strategy execution')
-            log.exception(e)
+        except Exception:
+            log.error('Error during strategy execution', exc_info=True)
             log.info('Restarting strategy')
 
 

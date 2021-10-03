@@ -154,9 +154,6 @@ class ArbitrageData:
             'result': None if self.result is None else self.result.to_data(),
         }
 
-    def to_json(self) -> str:
-        return json.dumps(self.to_data())
-
 
 class LPTowerStrategy:
     def __init__(
@@ -171,6 +168,7 @@ class LPTowerStrategy:
         self.pool_1 = pool_1
         self.pool_tower = pool_tower
         self.arbitrage_data = ArbitrageData()
+        log.info(f'Initialized {self} at block={self.client.block}')
 
     def __repr__(self) -> str:
         return (
@@ -186,8 +184,7 @@ class LPTowerStrategy:
             except IsBusy:
                 return
             else:
-                log.info('Arbitrage executed:')
-                log.info(self.arbitrage_data.to_json())
+                log.info({'message': 'Arbitrage executed', 'data': self.arbitrage_data.to_data()})
                 self.arbitrage_data = ArbitrageData()
         log.debug('Generating execution configuration')
         try:
@@ -202,8 +199,7 @@ class LPTowerStrategy:
             log.warning(e)
             return
         else:
-            log.info('Arbitrage broadcasted:')
-            log.info(self.arbitrage_data.to_json())
+            log.info({'message': 'Arbitrage broadcasted', 'data': self.arbitrage_data.to_data()})
 
     def _confirm_tx(self, block: int) -> ArbResult:
         assert self.arbitrage_data.params is not None
