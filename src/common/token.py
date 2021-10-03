@@ -5,7 +5,7 @@ from typing import Optional, TypeVar, Union, overload
 
 DecInput = Union[str, int, float, Decimal]
 DEFAULT_DECIMALS = 18
-ROUNDING_SAFETY_MARGIN = 2
+ROUNDING_SAFETY_MARGIN = 5
 
 getcontext().prec = 78  # To allow for calculations with up to 256 bits precision
 

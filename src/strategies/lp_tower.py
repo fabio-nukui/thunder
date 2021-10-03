@@ -9,6 +9,7 @@ from enum import Enum
 from functools import partial
 from typing import Optional
 
+from terra_sdk.core.auth import StdFee
 from terra_sdk.core.wasm import MsgExecuteContract
 
 import utils
@@ -63,8 +64,7 @@ class ExecutionConfig:
     initial_amount: TerraTokenAmount
     msgs: list[MsgExecuteContract]
     est_final_amount: TerraTokenAmount
-    est_gas_use: int
-    est_gas_cost: TerraTokenAmount
+    est_fee: StdFee
     est_net_profit_ust: Decimal
 
     def to_data(self) -> dict:
@@ -79,7 +79,7 @@ class ExecutionConfig:
             'initial_amount': self.initial_amount.to_data(),
             'msgs': [msg.to_data() for msg in self.msgs],
             'est_final_amount': self.est_final_amount.to_data(),
-            'est_gas_cost': self.est_gas_cost.to_data(),
+            'est_fee': self.est_fee.to_data(),
             'est_net_profit_ust': UST.round(self.est_net_profit_ust),
         }
 
@@ -87,13 +87,11 @@ class ExecutionConfig:
 @dataclass
 class BroadcastTxData:
     timestamp_sent: float
-    block_sent: int
     tx_hash: str
 
     def to_data(self) -> dict:
         return {
             'timestamp_sent': self.timestamp_sent,
-            'block_sent': self.block_sent,
             'tx_hash': self.tx_hash,
         }
 
@@ -230,8 +228,7 @@ class LPTowerStrategy:
             initial_amount=arbitrage_params['initial_amount'],
             msgs=arbitrage_params['msgs'],
             est_final_amount=arbitrage_params['est_final_amount'],
-            est_gas_use=arbitrage_params['est_gas_use'],
-            est_gas_cost=arbitrage_params['est_gas_cost'],
+            est_fee=arbitrage_params['est_fee'],
             est_net_profit_ust=arbitrage_params['est_net_profit_ust'],
         )
 
@@ -279,7 +276,8 @@ class LPTowerStrategy:
         initial_amount = TerraTokenAmount(self.pool_0.lp_token, lp_amount)
         initial_amount = min(initial_amount, pool_0_lp_balance)
         final_amount, msgs = self._get_amount_out_and_msgs(initial_amount, direction)
-        gas_use, gas_cost = self.client.estimate_fee(msgs)
+        fee = self.client.estimate_fee(msgs)
+        gas_cost = TerraTokenAmount.from_coin(*fee.amount.to_list())
         net_profit_ust = (final_amount - initial_amount).amount * lp_ust_price - gas_cost.amount
         if net_profit_ust < MIN_PROFIT_UST:
             raise UnprofitableArbitrage(f'Low profitability: USD {net_profit_ust:.2f}')
@@ -291,8 +289,7 @@ class LPTowerStrategy:
             'initial_amount': initial_amount,
             'msgs': msgs,
             'est_final_amount': final_amount,
-            'est_gas_use': gas_use,
-            'est_gas_cost': gas_cost,
+            'est_fee': fee,
             'est_net_profit_ust': net_profit_ust,
         }
 
@@ -342,7 +339,13 @@ class LPTowerStrategy:
         return final_lp_amount, msgs
 
     def _broadcast_tx(self, execution_config: ExecutionConfig, block: int) -> BroadcastTxData:
-        raise NotImplementedError
+        tx_hash = self.client.execute_msgs(execution_config.msgs, fee=execution_config.est_fee)
+        if (latest_block := self.client.get_latest_block()) != block:
+            raise BlockchainNewState(f'{latest_block=} different from {block=}')
+        return BroadcastTxData(
+            timestamp_sent=time.time(),
+            tx_hash=tx_hash,
+        )
 
 
 def run():

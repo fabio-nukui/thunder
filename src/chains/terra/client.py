@@ -10,6 +10,7 @@ from typing import Iterable
 
 from terra_sdk.client.lcd import LCDClient
 from terra_sdk.core import Coins
+from terra_sdk.core.auth import StdFee
 from terra_sdk.core.msg import Msg
 from terra_sdk.key.mnemonic import MnemonicKey
 
@@ -118,14 +119,13 @@ class TerraClient(BaseTerraClient):
         self,
         msgs: list[Msg],
         gas_adjustment: float = None,
-    ) -> tuple[int, TerraTokenAmount]:
-        fee = self.lcd.tx.estimate_fee(
+    ) -> StdFee:
+        return self.lcd.tx.estimate_fee(
             self.address,
             msgs,
             gas_adjustment=gas_adjustment,
             fee_denoms=[self.fee_denom],
         )
-        return fee.gas, TerraTokenAmount.from_coin(fee.amount.to_list()[0])
 
     @ttl_cache(CacheGroup.TERRA, TERRA_CONTRACT_QUERY_CACHE_SIZE)
     def contract_query(self, contract_addr: str, query_msg: dict) -> dict:
@@ -165,9 +165,9 @@ class TerraClient(BaseTerraClient):
             if denoms is None or c.denom in denoms
         ]
 
-    def execute_tx(self, msgs: list[Msg]) -> str:
+    def execute_msgs(self, msgs: list[Msg], **kwargs) -> str:
         log.debug(f'Sending tx: {msgs}')
-        signed_tx = self.wallet.create_and_sign_tx(msgs, fee_denoms=[self.fee_denom])
+        signed_tx = self.wallet.create_and_sign_tx(msgs, fee_denoms=[self.fee_denom], **kwargs)
         res = self.lcd.tx.broadcast(signed_tx)
         log.debug(f'Tx executed: {res.raw_log}')
 
