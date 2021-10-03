@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from contextlib import contextmanager
 from copy import copy
 from decimal import Decimal
@@ -347,7 +348,7 @@ class TerraswapLiquidityPair:
                     _token_amount_to_data(amounts_in[0]),
                     _token_amount_to_data(amounts_in[1]),
                 ],
-                # 'slippage_tolerance': str(round(slippage_tolerance, 18)),
+                'slippage_tolerance': str(round(slippage_tolerance, 18)),
             }
         }
         coins = [
@@ -387,7 +388,7 @@ class TerraswapLiquidityPair:
 
         # Calculate optimum ratio to swap before adding liquidity, excluding tax influence
         aux = FEE * (reserve_in.amount + amount_in.amount) - 2 * reserve_in.amount
-        numerator = (aux ** 2 + 4 * reserve_in.amount * amount_in.amount) ** (Decimal(0.5)) + aux
+        numerator = Decimal(math.sqrt(aux ** 2 + 4 * reserve_in.amount * amount_in.amount)) + aux
         denominator = 2 * amount_in.amount
         ratio_swap = numerator / denominator
 
@@ -395,7 +396,7 @@ class TerraswapLiquidityPair:
         amounts_swap = self.get_swap_amounts(amount_in_swap, safety_round=True)
 
         if (tax := amounts_swap['taxes'][1]) > 0:
-            amount_in_swap += reserve_in * (tax / 2 / reserve_out)
+            amount_in_swap += reserve_in * (tax / reserve_out / 2)
             amounts_swap = self.get_swap_amounts(amount_in_swap)
 
         min_amount_out = amounts_swap['amounts_out'][1] * (1 - slippage_tolerance)

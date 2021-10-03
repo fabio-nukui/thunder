@@ -187,7 +187,8 @@ class LPTowerStrategy:
                 self.execution_data = ExecutionData()
         try:
             log.debug('Generating execution configuration')
-            self.execution_data.execution_config = config = self._get_execution_config(mempool)
+            config = self._get_execution_config(block, mempool)
+            self.execution_data.execution_config = config
         except UnprofitableArbitrage as e:
             log.info(e)
             return
@@ -204,7 +205,7 @@ class LPTowerStrategy:
     def _confirm_tx(self, block: int) -> ExecutionResult:
         raise NotImplementedError
 
-    def _get_execution_config(self, mempool: dict = None) -> ExecutionConfig:
+    def _get_execution_config(self, block: int, mempool: dict = None) -> ExecutionConfig:
         if mempool:
             raise NotImplementedError
         pool_0_lp_balance = self.pool_0.lp_token.get_balance(self.client)
@@ -216,11 +217,11 @@ class LPTowerStrategy:
         try:
             arbitrage_params = self._get_arbitrage_params(pool_0_lp_balance, prices, direction)
         except UnprofitableArbitrage as e:
-            e.args = (*e.args, f'Unprofitable arbitrage, {balance_ratio=:0.3%}')
+            e.args = (*e.args, f'{balance_ratio=:0.3%}')
             raise e
         return ExecutionConfig(
             timestamp_found=time.time(),
-            block_found=self.client.block,
+            block_found=block,
             prices=prices,
             prices_denom=LUNA,
             lp_tower_reserves=self.pool_tower.reserves,
