@@ -23,17 +23,19 @@ from exceptions import BlockchainNewState, IsBusy, UnprofitableArbitrage
 
 log = logging.getLogger(__name__)
 
-ADDR_BLUNA_LUNA_POOL = 'terra1jxazgm67et0ce260kvrpfv50acuushpjsz2y0p'
-ADDR_UST_LUNA_POOL = 'terra1tndcaqxkpc5ce9qee5ggqf430mr2z3pefe5wj6'
-ADDR_BLUNA_LUNA_UST_TOWER_POOL = 'terra1wrwf3um5vm30vpwnlpvjzgwpf5fjknt68nah05'
 MIN_NET_PROFIT_MARGIN = 0.005
 MIN_PROFIT_UST = TerraTokenAmount(UST, 1)
 MIN_START_AMOUNT = TerraTokenAmount(UST, 10)
 OPTIMIZATION_TOLERANCE = TerraTokenAmount(UST, '0.01')
 MIN_CONFIRMATIONS = 1
 MAX_BLOCKS_WAIT_RECEIPT = 10
-
 MAX_SLIPPAGE = Decimal('0.001')
+
+TERRASWAP_ADDRESSES = 'resources/addresses/terra/{chain_id}/terraswap.json'
+
+
+def _get_pool_addresses(chain_id: str) -> dict[str, str]:
+    return json.load(open(TERRASWAP_ADDRESSES.format(chain_id=chain_id)))['pools']
 
 
 class Direction(str, Enum):
@@ -162,11 +164,12 @@ class LPTowerStrategy:
         client: TerraClient,
         pool_0: TerraswapLiquidityPair,
         pool_1: TerraswapLiquidityPair,
-    ) -> None:
+        pool_tower: TerraswapLiquidityPair,
+    ):
         self.client = client
         self.pool_0 = pool_0
         self.pool_1 = pool_1
-        self.pool_tower = TerraswapLiquidityPair(ADDR_BLUNA_LUNA_UST_TOWER_POOL, client)
+        self.pool_tower = pool_tower
         self.arbitrage_data = ArbitrageData()
 
     def __repr__(self) -> str:
@@ -387,9 +390,11 @@ class LPTowerStrategy:
 
 def run():
     client = TerraClient()
-    pool_0 = TerraswapLiquidityPair(ADDR_BLUNA_LUNA_POOL, client)
-    pool_1 = TerraswapLiquidityPair(ADDR_UST_LUNA_POOL, client)
-    strategy = LPTowerStrategy(client, pool_0, pool_1)
+    addresses = _get_pool_addresses(client.chain_id)
+    pool_0 = TerraswapLiquidityPair(addresses['bluna_luna'], client)
+    pool_1 = TerraswapLiquidityPair(addresses['ust_luna'], client)
+    pool_tower = TerraswapLiquidityPair(addresses['bluna_luna_ust_luna'], client)
+    strategy = LPTowerStrategy(client, pool_0, pool_1, pool_tower)
     for block in client.wait_next_block():
         strategy.run(block)
         utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)

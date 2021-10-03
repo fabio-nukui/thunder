@@ -1,3 +1,7 @@
 {
-  "pairs": ["terra1c0afrdc5253tkp5wt7rxhuj42xwyf2lcre0s7c"]
+  "pools": {
+    "bluna_luna": "terra1jxazgm67et0ce260kvrpfv50acuushpjsz2y0p",
+    "ust_luna": "terra1tndcaqxkpc5ce9qee5ggqf430mr2z3pefe5wj6",
+    "bluna_luna_ust_luna": "terra1wrwf3um5vm30vpwnlpvjzgwpf5fjknt68nah05"
+  }
 }

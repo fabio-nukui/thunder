@@ -1,5 +1,8 @@
 import os
 
+# Arbitrage params
+STRATEGY = os.getenv('STRATEGY', 'no_strategy')
+
 # Logs
 LOG_AWS = os.getenv('LOG_AWS') == 'True'
 
@@ -31,9 +34,6 @@ BSC_RPC_URI = os.getenv('BSC_RPC_URI', 'http://localhost:8547')
 BSC_CACHE_TTL = float(os.getenv('BSC_CACHE_TTL', '2.9'))
 BSC_POLL_INTERVAL = float(os.getenv('BSC_POLL_INTERVAL', '0.01'))
 BSC_WEB3_MIDDEWARES = os.getenv('BSC_WEB3_MIDDEWARES', 'geth_poa_middleware').split(',')
-
-# Arbitrage params
-STRATEGY = os.getenv('STRATEGY', 'no_strategy')
 
 # Debug / optimization
 CACHE_STATS = os.getenv('CACHE_STATS') == 'True'
