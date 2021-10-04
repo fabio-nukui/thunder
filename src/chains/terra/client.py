@@ -6,11 +6,14 @@ import logging
 import time
 from decimal import Decimal
 from enum import Enum
-from typing import Iterable
+from typing import Callable, Iterable, TypeVar
 
 from terra_sdk.client.lcd import LCDClient
 from terra_sdk.core import Coins
 from terra_sdk.core.auth import StdFee
+from terra_sdk.core.auth.data.tx import StdTx
+from terra_sdk.core.broadcast import (AsyncTxBroadcastResult, BlockTxBroadcastResult,
+                                      SyncTxBroadcastResult)
 from terra_sdk.core.msg import Msg
 from terra_sdk.key.mnemonic import MnemonicKey
 
@@ -37,6 +40,14 @@ def _get_code_ids(chain_id: str) -> dict[str, int]:
 class TaxPayer(str, Enum):
     account = 'account'
     contract = 'contract'
+
+
+_BroadcastResutT = TypeVar(
+    '_BroadcastResutT',
+    BlockTxBroadcastResult,
+    SyncTxBroadcastResult,
+    AsyncTxBroadcastResult,
+)
 
 
 class TerraClient(BaseTerraClient):
@@ -165,13 +176,27 @@ class TerraClient(BaseTerraClient):
             if denoms is None or c.denom in denoms
         ]
 
-    def execute_msgs(self, msgs: list[Msg], **kwargs) -> str:
+    def _execute_msgs(
+        self,
+        msgs: list,
+        broadcast_func: Callable[[StdTx], _BroadcastResutT],
+        **kwargs,
+    ) -> _BroadcastResutT:
         log.debug(f'Sending tx: {msgs}')
         signed_tx = self.wallet.create_and_sign_tx(msgs, fee_denoms=[self.fee_denom], **kwargs)
-        res = self.lcd.tx.broadcast(signed_tx)
-        log.debug(f'Tx executed: {res.raw_log}')
 
-        return res.txhash
+        res = broadcast_func(signed_tx)
+        log.debug(f'Tx executed: {res.txhash}')
+        return res
+
+    def execute_msgs_block(self, msgs: list[Msg], **kwargs) -> BlockTxBroadcastResult:
+        return self._execute_msgs(msgs, broadcast_func=self.lcd.tx.broadcast, **kwargs)
+
+    def execute_msgs_sync(self, msgs: list[Msg], **kwargs) -> SyncTxBroadcastResult:
+        return self._execute_msgs(msgs, broadcast_func=self.lcd.tx.broadcast_sync, **kwargs)
+
+    def execute_msgs_async(self, msgs: list[Msg], **kwargs) -> AsyncTxBroadcastResult:
+        return self._execute_msgs(msgs, broadcast_func=self.lcd.tx.broadcast_async, **kwargs)
 
     @staticmethod
     def encode_msg(msg: dict) -> str:
