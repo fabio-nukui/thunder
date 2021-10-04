@@ -305,7 +305,11 @@ class LPTowerStrategy:
             log.info(
                 {
                     'message': 'Error when estimating fee',
-                    'data': {'direction': direction, 'msgs': [msg.to_data() for msg in msgs]},
+                    'data': {
+                        'balance_ratio': f'{balance_ratio:.3%}',
+                        'direction': direction,
+                        'msgs': [msg.to_data() for msg in msgs],
+                    },
                 },
                 exc_info=True
             )
