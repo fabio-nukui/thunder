@@ -99,11 +99,11 @@ class TokenAmount:
     def int_amount(self, value: int | str):  # type: ignore
         self._amount = self.token.decimalize(value)
 
-    def safe_down(self: _TokenAmountT) -> _TokenAmountT:
-        return self - self.dx * ROUNDING_SAFETY_MARGIN
+    def safe_down(self: _TokenAmountT, n: int = ROUNDING_SAFETY_MARGIN) -> _TokenAmountT:
+        return self - self.dx * n
 
-    def safe_up(self: _TokenAmountT) -> _TokenAmountT:
-        return self + self.dx * ROUNDING_SAFETY_MARGIN
+    def safe_up(self: _TokenAmountT, n: int = ROUNDING_SAFETY_MARGIN) -> _TokenAmountT:
+        return self + self.dx * n
 
     def is_empty(self) -> bool:
         return self.amount.is_nan()
