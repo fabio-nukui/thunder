@@ -203,7 +203,7 @@ class TerraClient(BaseTerraClient):
         payload = {'tx': tx.to_data()['value'], 'mode': 'async'}
         res = utils.http.post(f'{self.lcd_uri}/txs', json=payload)
 
-        return AsyncTxBroadcastResult(txhash=res.json()['hash'], height=self.block)
+        return AsyncTxBroadcastResult(txhash=res.json()['txhash'], height=self.block)
 
     @staticmethod
     def encode_msg(msg: dict) -> str:
