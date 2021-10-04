@@ -300,8 +300,8 @@ class LPTowerStrategy:
         final_amount, msgs = self._get_amount_out_and_msgs(initial_amount, direction)
         try:
             fee = self.client.estimate_fee(msgs)
-        except LCDResponseError:
-            log.info(
+        except LCDResponseError as e:
+            log.debug(
                 'Error when estimating fee',
                 extra={
                     'data': {
@@ -312,7 +312,7 @@ class LPTowerStrategy:
                 },
                 exc_info=True,
             )
-            raise TxError(LCDResponseError)
+            raise TxError(e)
         gas_cost = TerraTokenAmount.from_coin(*fee.amount)
         net_profit_ust = (final_amount - initial_amount).amount * lp_ust_price - gas_cost.amount
         if net_profit_ust < MIN_PROFIT_UST:
