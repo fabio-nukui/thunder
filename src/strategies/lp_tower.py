@@ -367,7 +367,13 @@ class LPTowerStrategy:
             tol=OPTIMIZATION_TOLERANCE.amount / lp_ust_price,
         )
         amount = TerraTokenAmount(self.pool_0.lp_token, lp_amount)
-        return min(amount, pool_0_lp_balance)
+        if amount > pool_0_lp_balance:
+            log.warning(
+                'Not enough balance for full arbitrage: '
+                f'wanted {amount.amount:.6f}, have {pool_0_lp_balance.amount:.6f}'
+            )
+            return pool_0_lp_balance
+        return amount
 
     def _get_gross_profit(
         self,
