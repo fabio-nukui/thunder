@@ -208,7 +208,7 @@ class LPTowerStrategy:
             except IsBusy:
                 return
             else:
-                log.info({'message': 'Arbitrage executed', 'data': self.arbitrage_data.to_data()})
+                log.info('Arbitrage executed', extra={'data': self.arbitrage_data.to_data()})
                 self.arbitrage_data = ArbitrageData()
         log.debug('Generating execution configuration')
         try:
@@ -223,7 +223,7 @@ class LPTowerStrategy:
             log.warning(e)
             return
         else:
-            log.info({'message': 'Arbitrage broadcasted', 'data': self.arbitrage_data.to_data()})
+            log.info('Arbitrage broadcasted', extra={'data': self.arbitrage_data.to_data()})
 
     def _confirm_tx(self, block: int) -> ArbResult:
         assert self.arbitrage_data.params is not None
