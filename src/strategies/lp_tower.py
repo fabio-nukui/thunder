@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -10,8 +11,7 @@ from enum import Enum
 from functools import partial
 from typing import Optional
 
-from terra_sdk.core.auth import StdFee
-from terra_sdk.core.auth.data.tx import TxLog
+from terra_sdk.core.auth import StdFee, TxLog
 from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.exceptions import LCDResponseError
 
@@ -36,6 +36,30 @@ TERRASWAP_ADDRESSES = 'resources/addresses/terra/{chain_id}/terraswap.json'
 
 def _get_pool_addresses(chain_id: str) -> dict[str, str]:
     return json.load(open(TERRASWAP_ADDRESSES.format(chain_id=chain_id)))['pools']
+
+
+def _extract_log_events(logs: list[TxLog]) -> list[dict]:
+    parsed_logs = []
+    for tx_log in logs:
+        event_types = [e['type'] for e in tx_log.events]
+        assert len(event_types) == len(set(event_types)), 'Duplicated event types in events'
+        parsed_logs.append({e['type']: e['attributes'] for e in tx_log.events})
+    return parsed_logs
+
+
+def _parse_from_contract_events(events: list[dict]) -> list[dict[str, list[dict[str, str]]]]:
+    logs = []
+    for event in events:
+        from_contract_logs = event['from_contract']
+        event_logs = defaultdict(list)
+        for log_ in from_contract_logs:
+            if log_['key'] == 'contract_address':
+                contract_logs = {}
+                event_logs[log_['value']].append(contract_logs)
+            else:
+                contract_logs[log_['key']] = log_['value']
+        logs.append(dict(event_logs))
+    return logs
 
 
 class Direction(str, Enum):
@@ -213,6 +237,7 @@ class LPTowerStrategy:
                     return ArbResult(TxStatus.not_found)
                 raise IsBusy
             raise e
+        log.debug(info.to_data())
         if block - info.height < MIN_CONFIRMATIONS:
             raise IsBusy
         gas_cost = TerraTokenAmount.from_coin(*info.tx.fee.amount)
@@ -237,12 +262,27 @@ class LPTowerStrategy:
             net_profit_ust=net_profit_ust,
         )
 
-    def _extract_returns_from_logs(
-        self,
-        logs: list[TxLog],
-    ) -> tuple[TerraTokenAmount, Decimal]:
-        log.debug([lg.to_data() for lg in logs])
-        return TerraTokenAmount(self.pool_0.lp_token), Decimal('NaN')  # TODO: implement
+    def _extract_returns_from_logs(self, logs: list[TxLog]) -> tuple[TerraTokenAmount, Decimal]:
+        tx_events = _extract_log_events(logs)
+        logs_from_contract = _parse_from_contract_events(tx_events)
+        first_event = logs_from_contract[0][self.pool_0.lp_token.contract_addr][0]
+        last_event = logs_from_contract[-1][self.pool_0.lp_token.contract_addr][-1]
+        assert last_event['to'] == self.client.address
+
+        if first_event['action'] == 'send':  # swap first
+            assert last_event['action'] == 'mint'
+        elif first_event['action'] == 'burn':  # remove liquidity first
+            assert last_event['action'] == 'increase_balance'
+        else:
+            raise Exception('Error when decoding tx info')
+        first_amount = TerraTokenAmount(self.pool_0.lp_token, int_amount=first_event['amount'])
+        final_amount = TerraTokenAmount(self.pool_0.lp_token, int_amount=last_event['amount'])
+
+        pool_0_lp_price_luna = self._get_prices()[self.pool_0.lp_token]
+        pool_0_lp_price_ust = pool_0_lp_price_luna * self.client.get_exchange_rate(LUNA, UST)
+        increase_tokens = final_amount - first_amount
+
+        return final_amount, round(increase_tokens.amount * pool_0_lp_price_ust, 18)
 
     def _get_arbitrage_params(self, block: int, mempool: dict = None) -> ArbParams:
         if mempool:
