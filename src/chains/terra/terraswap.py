@@ -125,7 +125,7 @@ class TerraswapLiquidityPair:
                     break
             else:
                 raise NotImplementedError('not implemented for pools without a native token')
-            exchange_rate = self.client.get_exchange_rate(reference_token, token_quote)
+            exchange_rate = self.client.oracle.get_exchange_rate(reference_token, token_quote)
         for reserve in self.reserves:
             if reserve.token == reference_token:
                 amount_per_lp_token = reserve.amount / self.lp_token.get_supply(self.client).amount
@@ -166,7 +166,7 @@ class TerraswapLiquidityPair:
             amount_out = amount_out.safe_down()
 
         amount_out = amount_out - (fee := amount_out * FEE)
-        amount_out = amount_out - (tax := self.client.calculate_tax(amount_out))
+        amount_out = amount_out - (tax := self.client.treasury.calculate_tax(amount_out))
 
         return {
             'amounts_out': (amount_in * 0, amount_out),
@@ -279,7 +279,10 @@ class TerraswapLiquidityPair:
         if safety_round:
             amounts = amounts[0].safe_down(), amounts[1].safe_down()
 
-        taxes = self.client.calculate_tax(amounts[0]), self.client.calculate_tax(amounts[1])
+        taxes = (
+            self.client.treasury.calculate_tax(amounts[0]),
+            self.client.treasury.calculate_tax(amounts[1])
+        )
         amounts_out = amounts[0] - taxes[0], amounts[1] - taxes[1]
         return {
             'amounts_out': amounts_out,

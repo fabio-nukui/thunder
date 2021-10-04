@@ -278,7 +278,7 @@ class LPTowerStrategy:
         final_amount = TerraTokenAmount(self.pool_0.lp_token, int_amount=last_event['amount'])
 
         pool_0_lp_price_luna = self._get_prices()[self.pool_0.lp_token]
-        pool_0_lp_price_ust = pool_0_lp_price_luna * self.client.get_exchange_rate(LUNA, UST)
+        pool_0_lp_price_ust = pool_0_lp_price_luna * self.client.oracle.get_exchange_rate(LUNA, UST)
         increase_tokens = final_amount - first_amount
 
         return final_amount, round(increase_tokens.amount * pool_0_lp_price_ust, 18)
@@ -292,14 +292,15 @@ class LPTowerStrategy:
             prices[self.pool_1.lp_token],
         )
 
-        lp_ust_price = prices[self.pool_0.lp_token] * self.client.get_exchange_rate(LUNA, UST)
+        lp_ust_price = \
+            prices[self.pool_0.lp_token] * self.client.oracle.get_exchange_rate(LUNA, UST)
         pool_0_lp_balance = self.pool_0.lp_token.get_balance(self.client)
         initial_amount = self._get_optimal_argitrage_amount(
             lp_ust_price, direction, pool_0_lp_balance, balance_ratio
         )
         final_amount, msgs = self._get_amount_out_and_msgs(initial_amount, direction)
         try:
-            fee = self.client.estimate_fee(msgs)
+            fee = self.client.tx.estimate_fee(msgs)
         except LCDResponseError as e:
             log.debug(
                 'Error when estimating fee',
@@ -432,7 +433,7 @@ class LPTowerStrategy:
     def _broadcast_tx(self, execution_config: ArbParams, block: int) -> ArbTx:
         if (latest_block := self.client.get_latest_block()) != block:
             raise BlockchainNewState(f'{latest_block=} different from {block=}')
-        res = self.client.execute_msgs_async(execution_config.msgs, fee=execution_config.est_fee)
+        res = self.client.tx.execute_msgs_async(execution_config.msgs, fee=execution_config.est_fee)
         return ArbTx(
             timestamp_sent=time.time(),
             tx_hash=res.txhash,

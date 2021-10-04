@@ -131,6 +131,8 @@ class BaseTerraClient(ABC):
     wallet: Wallet
     address: str
     code_ids: dict[str, int]
+    fee_denom: str
+    block: int
 
     @abstractmethod
     def contract_query(self, contract_addr: str, query_msg: dict) -> dict:
