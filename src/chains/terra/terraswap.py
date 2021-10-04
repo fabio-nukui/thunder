@@ -10,6 +10,7 @@ from terra_sdk.core.wasm import MsgExecuteContract
 
 from chains.terra.client import TerraClient
 from exceptions import InsufficientLiquidity
+from utils.cache import CacheGroup, ttl_cache
 
 from .core import CW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
 
@@ -82,6 +83,7 @@ class TerraswapLiquidityPair:
             f'{self.__class__.__name__}({self.tokens[0].repr_symbol}/{self.tokens[1].repr_symbol})'
 
     @property
+    @ttl_cache(CacheGroup.TERRA, maxsize=1)
     def reserves(self) -> AmountTuple:
         if not self.stop_updates:
             self._update_reserves()
@@ -95,7 +97,7 @@ class TerraswapLiquidityPair:
     @contextmanager
     def simulate_reserve_change(self, amounts: AmountTuple):
         amounts = self._fix_amounts_order(amounts)
-        reserves = copy(self.reserves)
+        reserves = copy(self.reserves[0]), copy(self.reserves[1])
         stop_updates = self.stop_updates
         try:
             self.stop_updates = True
