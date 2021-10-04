@@ -23,7 +23,6 @@ from exceptions import BlockchainNewState, IsBusy, TxError, UnprofitableArbitrag
 
 log = logging.getLogger(__name__)
 
-MIN_NET_PROFIT_MARGIN = 0.005
 MIN_PROFIT_UST = TerraTokenAmount(UST, 1)
 MIN_START_AMOUNT = TerraTokenAmount(UST, 10)
 OPTIMIZATION_TOLERANCE = TerraTokenAmount(UST, '0.01')
@@ -319,10 +318,6 @@ class LPTowerStrategy:
         if net_profit_ust < MIN_PROFIT_UST:
             raise UnprofitableArbitrage(
                 f'Low profitability: USD {net_profit_ust:.2f}, {balance_ratio=:0.3%}')
-        margin = net_profit_ust / (initial_amount.amount * lp_ust_price)
-        if margin < MIN_NET_PROFIT_MARGIN:
-            raise UnprofitableArbitrage(
-                f'Low profitability margin: USD {margin:.3%}, {balance_ratio=:0.3%}')
 
         return ArbParams(
             timestamp_found=time.time(),
@@ -374,7 +369,7 @@ class LPTowerStrategy:
         if profit.amount * lp_ust_price < 0:
             raise UnprofitableArbitrage(f'No profitability, {balance_ratio=:0.3%}')
         func = partial(self._get_gross_profit_dec, direction=direction)
-        lp_amount, _ = utils.optimization.optimize(
+        lp_amount, _ = utils.optimization.optimize_bissection(
             func,
             x0=initial_lp_amount.amount,
             dx=initial_lp_amount.dx,
