@@ -19,7 +19,7 @@ import utils
 from chains.terra import (LUNA, UST, TerraClient, TerraswapLiquidityPair, TerraToken,
                           TerraTokenAmount)
 from chains.terra.core import TerraNativeToken
-from exceptions import BlockchainNewState, IsBusy, UnprofitableArbitrage
+from exceptions import BlockchainNewState, IsBusy, TxError, UnprofitableArbitrage
 
 log = logging.getLogger(__name__)
 
@@ -213,7 +213,7 @@ class LPTowerStrategy:
         log.debug('Generating execution configuration')
         try:
             self.arbitrage_data.params = params = self._get_arbitrage_params(block, mempool)
-        except UnprofitableArbitrage as e:
+        except (UnprofitableArbitrage, TxError) as e:
             log.debug(e)
             return
         log.debug('Broadcasting transaction')
@@ -299,7 +299,17 @@ class LPTowerStrategy:
             lp_ust_price, direction, pool_0_lp_balance, balance_ratio
         )
         final_amount, msgs = self._get_amount_out_and_msgs(initial_amount, direction)
-        fee = self.client.estimate_fee(msgs)
+        try:
+            fee = self.client.estimate_fee(msgs)
+        except LCDResponseError:
+            log.info(
+                {
+                    'message': 'Error when estimating fee',
+                    'data': {'direction': direction, 'msgs': [msg.to_data() for msg in msgs]},
+                },
+                exc_info=True
+            )
+            raise TxError(*LCDResponseError.args)
         gas_cost = TerraTokenAmount.from_coin(*fee.amount)
         net_profit_ust = (final_amount - initial_amount).amount * lp_ust_price - gas_cost.amount
         if net_profit_ust < MIN_PROFIT_UST:

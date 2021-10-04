@@ -12,3 +12,7 @@ class UnprofitableArbitrage(Exception):
 
 class BlockchainNewState(Exception):
     pass
+
+
+class TxError(Exception):
+    pass
