@@ -196,7 +196,14 @@ class TerraClient(BaseTerraClient):
         return self._execute_msgs(msgs, broadcast_func=self.lcd.tx.broadcast_sync, **kwargs)
 
     def execute_msgs_async(self, msgs: list[Msg], **kwargs) -> AsyncTxBroadcastResult:
-        return self._execute_msgs(msgs, broadcast_func=self.lcd.tx.broadcast_async, **kwargs)
+        # return self._execute_msgs(msgs, broadcast_func=self.lcd.tx.broadcast_async, **kwargs)
+        return self._execute_msgs(msgs, broadcast_func=self._broadcast_async, **kwargs)
+
+    def _broadcast_async(self, tx: StdTx) -> AsyncTxBroadcastResult:
+        payload = {'tx': tx.to_data()['value'], 'mode': 'async'}
+        res = utils.http.post(f'{self.lcd_uri}/txs', json=payload)
+
+        return AsyncTxBroadcastResult(txhash=res.json()['hash'], height=self.block)
 
     @staticmethod
     def encode_msg(msg: dict) -> str:
