@@ -64,14 +64,11 @@ class TokenAmount:
         int_amount: Optional[int | str] = None,
     ):
         self.token = token
-        self.symbol = self.token.symbol
-        self.decimals = self.token.decimals
         self.dx = Decimal(str(10 ** -self.decimals))
 
         self._amount = Decimal('NaN')
 
-        amount = Decimal('NaN') if amount is None else Decimal(amount)
-        if not amount.is_nan():
+        if amount is not None:
             self.amount = amount
         elif int_amount is not None:
             self.int_amount = int_amount
@@ -85,6 +82,14 @@ class TokenAmount:
             'symbol': self.symbol,
             'amount': str(self.amount),
         }
+
+    @property
+    def symbol(self) -> str:
+        return self.token.symbol
+
+    @property
+    def decimals(self) -> int:
+        return self.token.decimals
 
     @property
     def amount(self) -> Decimal:
