@@ -1,23 +1,14 @@
 from decimal import Decimal
-from enum import Enum
 
 import utils
 from utils.cache import CacheGroup, ttl_cache
 
-from ...core import BaseTerraClient, TerraNativeToken, TerraToken, TerraTokenAmount
+from ...core import BaseTreasuryApi, TaxPayer, TerraNativeToken, TerraToken, TerraTokenAmount
 
 TERRA_TAX_CACHE_TTL = 7200
 
 
-class TaxPayer(str, Enum):
-    account = 'account'
-    contract = 'contract'
-
-
-class TreasuryApi:
-    def __init__(self, client: BaseTerraClient):
-        self.client = client
-
+class TreasuryApi(BaseTreasuryApi):
     @property
     @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=TERRA_TAX_CACHE_TTL)
     def tax_rate(self) -> Decimal:
@@ -30,7 +21,7 @@ class TreasuryApi:
         caps = {}
         for cap in res.json()['tax_caps']:
             token = TerraNativeToken(cap['denom'])
-            caps[token] = TerraTokenAmount(token, int_amount=cap['tax_cap'])
+            caps[token] = token.to_amount(int_amount=cap['tax_cap'])
         return caps
 
     def calculate_tax(
@@ -39,7 +30,7 @@ class TreasuryApi:
         payer: TaxPayer = TaxPayer.contract,
     ) -> TerraTokenAmount:
         if amount.token not in self.tax_caps:
-            return TerraTokenAmount(amount.token, 0)
+            return amount.token.to_amount(0)
         if payer == TaxPayer.account:
             effective_rate = self.tax_rate
         else:

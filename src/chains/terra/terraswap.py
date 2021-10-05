@@ -8,10 +8,10 @@ from decimal import Decimal
 
 from terra_sdk.core.wasm import MsgExecuteContract
 
-from chains.terra.client import TerraClient
 from exceptions import InsufficientLiquidity
 from utils.cache import CacheGroup, ttl_cache
 
+from .client import TerraClient
 from .core import CW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
 
 log = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ class NotTerraswapPair(Exception):
     pass
 
 
-def _token_to_data(token: TerraToken) -> dict:
+def _token_to_data(token: TerraToken) -> dict[str, dict[str, str]]:
     if isinstance(token, TerraNativeToken):
         return {'native_token': {'denom': token.denom}}
     return {'token': {'contract_addr': token.contract_addr}}
@@ -76,7 +76,7 @@ class TerraswapLiquidityPair:
         self.lp_token = TerraswapLPToken.from_pool(pair_data['liquidity_token'], self)
 
         self.stop_updates = False
-        self._reserves = TerraTokenAmount(self.tokens[0]), TerraTokenAmount(self.tokens[1])
+        self._reserves = self.tokens[0].to_amount(), self.tokens[1].to_amount()
 
     def __repr__(self) -> str:
         return \
@@ -161,7 +161,7 @@ class TerraswapLiquidityPair:
 
         numerator = reserve_out.amount * amount_in.amount
         denominator = reserve_in.amount + amount_in.amount
-        amount_out = TerraTokenAmount(reserve_out.token, numerator / denominator)
+        amount_out = reserve_out.token.to_amount(numerator / denominator)
         if safety_round:
             amount_out = amount_out.safe_down()
 

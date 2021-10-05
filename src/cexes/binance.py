@@ -17,7 +17,13 @@ DEPTH_CACHE_LIMIT = 1000
 DEPTH_CACHE_REFRESH_INTERVAL = 1800
 
 
-class BinanceToken(Token):
+class BinanceTokenAmount(TokenAmount):
+    token: BinanceToken
+
+
+class BinanceToken(Token[BinanceTokenAmount]):
+    amount_class = BinanceTokenAmount
+
     def __init__(self, symbol: str, decimals: int = DEFAULT_PRECISION) -> None:
         self.symbol = symbol
         self.decimals = decimals
@@ -25,10 +31,6 @@ class BinanceToken(Token):
     @property
     def _id(self) -> tuple:
         return (self.symbol, self.decimals)
-
-
-class BinanceTokenAmount(TokenAmount):
-    token: BinanceToken
 
 
 class TradingPair:

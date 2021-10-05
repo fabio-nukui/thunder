@@ -16,16 +16,15 @@ from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.exceptions import LCDResponseError
 
 import utils
-from chains.terra import (LUNA, UST, TerraClient, TerraswapLiquidityPair, TerraToken,
-                          TerraTokenAmount)
-from chains.terra.core import TerraNativeToken
+from chains.terra import (LUNA, UST, TerraClient, TerraNativeToken, TerraswapLiquidityPair,
+                          TerraToken, TerraTokenAmount)
 from exceptions import BlockchainNewState, IsBusy, TxError, UnprofitableArbitrage
 
 log = logging.getLogger(__name__)
 
-MIN_PROFIT_UST = TerraTokenAmount(UST, 1)
-MIN_START_AMOUNT = TerraTokenAmount(UST, 10)
-OPTIMIZATION_TOLERANCE = TerraTokenAmount(UST, '0.01')
+MIN_PROFIT_UST = UST.to_amount(1)
+MIN_START_AMOUNT = UST.to_amount(10)
+OPTIMIZATION_TOLERANCE = UST.to_amount('0.01')
 MIN_CONFIRMATIONS = 1
 MAX_BLOCKS_WAIT_RECEIPT = 10
 MAX_SLIPPAGE = Decimal('0.001')
@@ -53,7 +52,7 @@ def _parse_from_contract_events(events: list[dict]) -> list[dict[str, list[dict[
         event_logs = defaultdict(list)
         for log_ in from_contract_logs:
             if log_['key'] == 'contract_address':
-                contract_logs = {}
+                contract_logs: dict[str, str] = {}
                 event_logs[log_['value']].append(contract_logs)
             else:
                 contract_logs[log_['key']] = log_['value']
@@ -268,14 +267,14 @@ class LPTowerStrategy:
         last_event = logs_from_contract[-1][self.pool_0.lp_token.contract_addr][-1]
         assert last_event['to'] == self.client.address
 
-        if first_event['action'] == 'send':  # swap first
+        if first_event['to'] == self.pool_tower.contract_addr:  # swap first
             assert last_event['action'] == 'mint'
-        elif first_event['action'] == 'burn':  # remove liquidity first
-            assert last_event['action'] == 'increase_balance'
+        elif first_event['to'] == self.pool_0.contract_addr:  # remove liquidity first
+            assert last_event['action'] == 'transfer'
         else:
             raise Exception('Error when decoding tx info')
-        first_amount = TerraTokenAmount(self.pool_0.lp_token, int_amount=first_event['amount'])
-        final_amount = TerraTokenAmount(self.pool_0.lp_token, int_amount=last_event['amount'])
+        first_amount = self.pool_0.lp_token.to_amount(int_amount=first_event['amount'])
+        final_amount = self.pool_0.lp_token.to_amount(int_amount=last_event['amount'])
 
         pool_0_lp_price_luna = self._get_prices()[self.pool_0.lp_token]
         pool_0_lp_price_ust = pool_0_lp_price_luna * self.client.oracle.get_exchange_rate(LUNA, UST)
@@ -364,8 +363,7 @@ class LPTowerStrategy:
         pool_0_lp_balance: TerraTokenAmount,
         balance_ratio: Decimal,
     ) -> TerraTokenAmount:
-        initial_lp_amount = TerraTokenAmount(
-            self.pool_0.lp_token, MIN_START_AMOUNT.amount / lp_ust_price)
+        initial_lp_amount = self.pool_0.lp_token.to_amount(MIN_START_AMOUNT.amount / lp_ust_price)
         profit = self._get_gross_profit(initial_lp_amount, direction)
         if profit.amount * lp_ust_price < 0:
             raise UnprofitableArbitrage(f'No profitability, {balance_ratio=:0.3%}')
@@ -376,7 +374,7 @@ class LPTowerStrategy:
             dx=initial_lp_amount.dx,
             tol=OPTIMIZATION_TOLERANCE.amount / lp_ust_price,
         )
-        amount = TerraTokenAmount(self.pool_0.lp_token, lp_amount)
+        amount = self.pool_0.lp_token.to_amount(lp_amount)
         if amount > pool_0_lp_balance:
             log.warning(
                 'Not enough balance for full arbitrage: '
@@ -398,7 +396,7 @@ class LPTowerStrategy:
         amount: Decimal,
         direction: Direction,
     ) -> Decimal:
-        token_amount = TerraTokenAmount(self.pool_0.lp_token, amount)
+        token_amount = self.pool_0.lp_token.to_amount(amount)
         return self._get_gross_profit(token_amount, direction).amount
 
     def _get_amount_out_and_msgs(

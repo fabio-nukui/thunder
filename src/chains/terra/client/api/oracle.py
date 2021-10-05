@@ -4,15 +4,13 @@ from decimal import Decimal
 
 from utils.cache import CacheGroup, ttl_cache
 
-from ...core import LUNA, BaseTerraClient, TerraNativeToken
+from ...core import BaseOracleApi, TerraNativeToken
+from ...denoms import LUNA
 
 MAX_PRECISION = 18
 
 
-class OracleApi:
-    def __init__(self, client: BaseTerraClient):
-        self.client = client
-
+class OracleApi(BaseOracleApi):
     @property
     @ttl_cache(CacheGroup.TERRA, maxsize=1)
     def exchange_rates(self) -> dict[TerraNativeToken, Decimal]:

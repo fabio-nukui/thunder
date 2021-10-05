@@ -83,7 +83,8 @@ RUN conda install --quiet --yes \
         'line_profiler' \
         'nodejs' \
         'pytest' \
-        'types-cachetools' && \
+        'types-cachetools' \
+        'types-PyYAML' && \
     conda clean --all -f -y  && \
     fix-permissions $HOME $CONDA_DIR
 

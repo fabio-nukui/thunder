@@ -10,7 +10,7 @@ from terra_sdk.core.msg import Msg
 import utils
 from utils.cache import CacheGroup, ttl_cache
 
-from ...core import BaseTerraClient
+from ...core import BaseTxApi
 
 log = logging.getLogger(__name__)
 
@@ -24,10 +24,7 @@ _BroadcastResutT = TypeVar(
 )
 
 
-class TxApi:
-    def __init__(self, client: BaseTerraClient):
-        self.client = client
-
+class TxApi(BaseTxApi):
     @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=TERRA_GAS_PRICE_CACHE_TTL)
     def get_gas_prices(self) -> Coins:
         res = utils.http.get(f'{self.client.fcd_uri}/v1/txs/gas_prices')

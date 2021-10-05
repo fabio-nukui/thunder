@@ -1,20 +1,23 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from decimal import Decimal, getcontext
-from typing import Optional, TypeVar, Union, overload
+from typing import Generic, Optional, Type, TypeVar, Union, overload
 
 DecInput = Union[str, int, float, Decimal]
-DEFAULT_DECIMALS = 18
 ROUNDING_SAFETY_MARGIN = 5
 
 getcontext().prec = 78  # To allow for calculations with up to 256 bits precision
 
 _MAX_DECIMALS_REPR = 8
 
+_TokenAmountT = TypeVar('_TokenAmountT', bound='TokenAmount')
 
-class Token:
+
+class Token(Generic[_TokenAmountT], ABC):
     symbol: str
-    decimals: int = DEFAULT_DECIMALS
+    decimals: int
+    amount_class: Type[_TokenAmountT]
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}({self.repr_symbol})'
@@ -22,9 +25,17 @@ class Token:
     def __str__(self) -> str:
         return self.repr_symbol
 
+    def to_amount(
+        self,
+        amount: DecInput = None,
+        int_amount: Optional[int | str] = None,
+    ) -> _TokenAmountT:
+        return self.amount_class(self, amount, int_amount)
+
     @property
+    @abstractmethod
     def _id(self) -> tuple:
-        raise NotImplementedError
+        ...
 
     @property
     def repr_symbol(self):
@@ -45,14 +56,11 @@ class Token:
         return round(Decimal(value), self.decimals)
 
 
-_TokenAmountT = TypeVar('_TokenAmountT', bound='TokenAmount')
-
-
 class TokenAmount:
     def __init__(
         self,
         token: Token,
-        amount: DecInput = Decimal('NaN'),
+        amount: DecInput = None,
         int_amount: Optional[int | str] = None,
     ):
         self.token = token
@@ -60,9 +68,9 @@ class TokenAmount:
         self.decimals = self.token.decimals
         self.dx = Decimal(str(10 ** -self.decimals))
 
-        self._amount: Decimal = Decimal('NaN')
+        self._amount = Decimal('NaN')
 
-        amount = Decimal(amount)
+        amount = Decimal('NaN') if amount is None else Decimal(amount)
         if not amount.is_nan():
             self.amount = amount
         elif int_amount is not None:

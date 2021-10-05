@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from abc import ABC, abstractmethod
-from typing import Literal, Union
+from typing import Literal, Optional, Union
 
 from eth_account.signers.local import LocalAccount
 from web3 import Web3
@@ -16,8 +16,8 @@ log = logging.getLogger(__name__)
 
 ERC20_ABI = json.load(open('resources/contracts/evm/abis/ERC20.json'))
 _NATIVE_TOKENS = {
-    configs.ETHEREUM_CHAIN_ID: {'symbol': 'ETH', 'decimals': 18},
-    configs.BSC_CHAIN_ID: {'symbol': 'BNB', 'decimals': 18},
+    configs.ETHEREUM_CHAIN_ID: {'symbol': 'ETH', 'decimals': '18'},
+    configs.BSC_CHAIN_ID: {'symbol': 'BNB', 'decimals': '18'},
 }
 
 # Almost same as max uint256, but uses less gas
@@ -26,7 +26,20 @@ INF_APPROVAL_AMOUNT = 0xff000000000000000000000000000000000000000000000000000000
 DEFAULT_MAX_GAS = 1_000_000
 
 
-class EVMNativeToken(Token):
+class EVMTokenAmount(TokenAmount):
+    token: EVMToken
+
+    def ensure_allowance(self, client: BaseEVMClient, spender: str, infinite_approval: bool = True):
+        if isinstance(self.token, EVMNativeToken):
+            return
+        allowance = self.token.get_allowance(client.address, spender)
+        if allowance < self.int_amount:
+            approval_amount = None if infinite_approval else self
+            self.token.set_allowance(client, spender, approval_amount)
+
+
+class EVMNativeToken(Token[EVMTokenAmount]):
+    amount_class = EVMTokenAmount
     __instances: dict[int, EVMNativeToken] = {}
 
     def __new__(
@@ -49,14 +62,16 @@ class EVMNativeToken(Token):
     ):
         self.chain_id = chain_id
         self.symbol = _NATIVE_TOKENS[chain_id]['symbol'] if symbol is None else symbol
-        self.decimals = _NATIVE_TOKENS[chain_id]['decimals'] if decimals is None else decimals
+        self.decimals = int(_NATIVE_TOKENS[chain_id]['decimals']) if decimals is None else decimals
 
     @property
     def _id(self) -> tuple:
         return (self.chain_id, )
 
 
-class ERC20Token(Token):
+class ERC20Token(Token[EVMTokenAmount]):
+    amount_class = EVMTokenAmount
+
     def __init__(
         self,
         address: str,
@@ -105,7 +120,7 @@ class ERC20Token(Token):
         self,
         client: BaseEVMClient,
         spender: str,
-        amount: int | EVMTokenAmount = None,
+        amount: Optional[int | EVMTokenAmount] = None,
     ) -> str:
         if amount is None:
             amount = INF_APPROVAL_AMOUNT
@@ -134,18 +149,6 @@ class ERC20Token(Token):
 
 
 EVMToken = Union[EVMNativeToken, ERC20Token]
-
-
-class EVMTokenAmount(TokenAmount):
-    token: EVMToken
-
-    def ensure_allowance(self, client: BaseEVMClient, spender: str, infinite_approval: bool = True):
-        if isinstance(self.token, EVMNativeToken):
-            return
-        allowance = self.token.get_allowance(client.address, spender)
-        if allowance < self.int_amount:
-            approval_amount = None if infinite_approval else self
-            self.token.set_allowance(client, spender, approval_amount)
 
 
 class BaseEVMClient(ABC):
