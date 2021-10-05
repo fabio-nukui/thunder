@@ -131,7 +131,7 @@ check-all: isort lint types test check-clean-tree ## Run all checks and tests
 
 check-clean-tree: ## Fail if git tree has unstaged/uncommited changes
 ifneq ($(shell git status -s),)
-	exit 1
+	@echo "unclean git tree"; exit 1
 endif
 	@exit 0
 
