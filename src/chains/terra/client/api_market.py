@@ -22,13 +22,34 @@ class MarketApi(BaseMarketApi):
         if not isinstance(offer_amount.token, TerraNativeToken):
             raise TypeError('Market trades only available to native tokens')
 
-        if LUNA not in (offer_amount.token, ask_denom):
-            tobin_taxes = self.get_tobin_taxes()
-            tobin_tax = max(tobin_taxes[offer_amount.token], tobin_taxes[ask_denom])
-            ask_amount = self._compute_internal_swap(offer_amount, ask_denom)
+        if LUNA in (offer_amount.token, ask_denom):
+            vp_terra, vp_luna = self.get_virtual_pools()
+            vp_offer, vp_ask = (vp_terra, vp_luna) if ask_denom == LUNA else (vp_luna, vp_terra)
 
-            return ask_amount * (1 - tobin_tax)
-        return self._get_amount_luna_market(offer_amount, ask_denom)
+            offer_amount_sdr = self._compute_swap_no_spread(offer_amount, SDT).amount
+            ask_amount_sdr = vp_ask * (offer_amount_sdr / (offer_amount_sdr + vp_offer))
+            vp_spread = (offer_amount_sdr - ask_amount_sdr) / offer_amount_sdr
+
+            spread = max(vp_spread, self.market_parameters['min_stability_spread'])
+        else:
+            tobin_taxes = self.get_tobin_taxes()
+            spread = max(tobin_taxes[offer_amount.token], tobin_taxes[ask_denom])
+
+        ask_amount = self._compute_swap_no_spread(offer_amount, ask_denom)
+        return ask_amount * (1 - spread)
+
+    @ttl_cache(CacheGroup.TERRA, maxsize=1)
+    def get_virtual_pools(self) -> tuple[Decimal, Decimal]:
+        """Calculate virtual liquidity pool reserves in SDR
+        See https://docs.terra.money/Reference/Terra-core/Module-specifications/spec-market.html#market-making-algorithm  # noqa: E501
+        """
+        base_bool = SDT.decimalize(self.market_parameters['base_pool'])
+        terra_pool_delta = SDT.decimalize(str(self.client.lcd.market.terra_pool_delta()))
+
+        pool_terra = base_bool + terra_pool_delta
+        pool_luna = base_bool ** 2 / pool_terra
+
+        return pool_terra, pool_luna
 
     @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=MARKET_PARAMETERS_TTL)
     def get_tobin_taxes(self) -> dict[TerraNativeToken, Decimal]:
@@ -46,42 +67,7 @@ class MarketApi(BaseMarketApi):
             for k, v in self.client.lcd.market.parameters().items()
         }
 
-    @ttl_cache(CacheGroup.TERRA, maxsize=1)
-    def get_virtual_pools(self) -> tuple[Decimal, Decimal]:
-        """Calculate virtual liquidity pool reserves in SDR
-        See https://docs.terra.money/Reference/Terra-core/Module-specifications/spec-market.html#market-making-algorithm  # noqa: E501
-        """
-        base_bool = SDT.decimalize(self.market_parameters['base_pool'])
-        terra_pool_delta = SDT.decimalize(str(self.client.lcd.market.terra_pool_delta()))
-
-        pool_terra = base_bool + terra_pool_delta
-        pool_luna = base_bool ** 2 / pool_terra
-
-        return pool_terra, pool_luna
-
-    def _get_amount_luna_market(
-        self,
-        offer_amount: TerraTokenAmount,
-        ask_denom: TerraNativeToken,
-    ) -> TerraTokenAmount:
-        pool_terra, pool_luna = self.get_virtual_pools()
-        if ask_denom == LUNA:
-            pool_offer = pool_terra
-            pool_ask = pool_luna
-        else:
-            pool_offer = pool_luna
-            pool_ask = pool_terra
-        base_offer_amount = self._compute_internal_swap(offer_amount, SDT)
-        ret_amount = self._compute_internal_swap(base_offer_amount, ask_denom)
-
-        ask_base_amount = pool_ask * (1 - pool_offer / (pool_offer + base_offer_amount.amount))
-        spread = max(
-            self.market_parameters['min_stability_spread'],
-            (base_offer_amount.amount - ask_base_amount) / base_offer_amount.amount
-        )
-        return ask_denom.to_amount(ret_amount.amount * (1 - spread))
-
-    def _compute_internal_swap(
+    def _compute_swap_no_spread(
         self,
         offer_amount: TerraTokenAmount,
         ask_denom: TerraNativeToken,
