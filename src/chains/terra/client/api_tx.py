@@ -10,7 +10,7 @@ from terra_sdk.core.msg import Msg
 import utils
 from utils.cache import CacheGroup, ttl_cache
 
-from ...core import BaseTxApi
+from ..core import BaseTxApi
 
 log = logging.getLogger(__name__)
 

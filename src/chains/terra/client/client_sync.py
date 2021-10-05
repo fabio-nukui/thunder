@@ -16,10 +16,10 @@ from utils.cache import CacheGroup, ttl_cache
 
 from ..core import BaseTerraClient, TerraTokenAmount
 from ..denoms import UST
-from .api.market import MarketApi
-from .api.oracle import OracleApi
-from .api.treasury import TreasuryApi
-from .api.tx import TxApi
+from .api_market import MarketApi
+from .api_oracle import OracleApi
+from .api_treasury import TreasuryApi
+from .api_tx import TxApi
 
 log = logging.getLogger(__name__)
 

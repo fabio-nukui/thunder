@@ -4,8 +4,8 @@ from decimal import Decimal
 
 from utils.cache import CacheGroup, ttl_cache
 
-from ...core import BaseMarketApi, TerraNativeToken, TerraTokenAmount
-from ...denoms import LUNA, SDT
+from ..core import BaseMarketApi, TerraNativeToken, TerraTokenAmount
+from ..denoms import LUNA, SDT
 
 MARKET_PARAMETERS_TTL = 600
 

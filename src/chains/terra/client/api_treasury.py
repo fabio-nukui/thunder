@@ -3,7 +3,7 @@ from decimal import Decimal
 import utils
 from utils.cache import CacheGroup, ttl_cache
 
-from ...core import BaseTreasuryApi, TaxPayer, TerraNativeToken, TerraToken, TerraTokenAmount
+from ..core import BaseTreasuryApi, TaxPayer, TerraNativeToken, TerraToken, TerraTokenAmount
 
 TERRA_TAX_CACHE_TTL = 7200
 

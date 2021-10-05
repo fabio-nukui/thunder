@@ -4,8 +4,8 @@ from decimal import Decimal
 
 from utils.cache import CacheGroup, ttl_cache
 
-from ...core import BaseOracleApi, TerraNativeToken
-from ...denoms import LUNA
+from ..core import BaseOracleApi, TerraNativeToken
+from ..denoms import LUNA
 
 MAX_PRECISION = 18
 
