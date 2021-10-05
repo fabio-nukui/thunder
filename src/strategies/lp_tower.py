@@ -22,12 +22,13 @@ from exceptions import BlockchainNewState, IsBusy, TxError, UnprofitableArbitrag
 
 log = logging.getLogger(__name__)
 
-MIN_PROFIT_UST = UST.to_amount(1)
+MIN_PROFIT_UST = UST.to_amount(2)
 MIN_START_AMOUNT = UST.to_amount(10)
 OPTIMIZATION_TOLERANCE = UST.to_amount('0.01')
 MIN_CONFIRMATIONS = 1
 MAX_BLOCKS_WAIT_RECEIPT = 10
 MAX_SLIPPAGE = Decimal('0.001')
+SWAP_FIRST_LAST_MSG_UST_TOL = Decimal('0.5')
 
 TERRASWAP_ADDRESSES = 'resources/addresses/terra/{chain_id}/terraswap.json'
 
@@ -190,6 +191,7 @@ class LPTowerStrategy:
         self.pool_1 = pool_1
         self.pool_tower = pool_tower
         self.arbitrage_data = ArbitrageData()
+        self._amount_luna_swap_first_last_msg_tol = Decimal(0)
         log.info(f'Initialized {self} at block={self.client.block}')
 
     def __repr__(self) -> str:
@@ -294,6 +296,7 @@ class LPTowerStrategy:
         lp_ust_price = \
             prices[self.pool_0.lp_token] * self.client.oracle.get_exchange_rate(LUNA, UST)
         pool_0_lp_balance = self.pool_0.lp_token.get_balance(self.client)
+        self._amount_luna_swap_first_last_msg_tol = SWAP_FIRST_LAST_MSG_UST_TOL * prices[UST]
         initial_amount = self._get_optimal_argitrage_amount(
             lp_ust_price, direction, pool_0_lp_balance, balance_ratio
         )
@@ -422,6 +425,7 @@ class LPTowerStrategy:
             luna_amount, msgs_remove_single_side = self.pool_1.op_remove_single_side(
                 self.client.address, lp_amount, LUNA, MAX_SLIPPAGE
             )
+            luna_amount.amount = luna_amount.amount - self._amount_luna_swap_first_last_msg_tol
             final_lp_amount, msgs_add_single_side = self.pool_0.op_add_single_side(
                 self.client.address, luna_amount, MAX_SLIPPAGE
             )
