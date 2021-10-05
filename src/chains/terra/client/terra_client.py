@@ -16,7 +16,7 @@ from utils.cache import CacheGroup, ttl_cache
 
 from ..core import BaseTerraClient, TerraTokenAmount
 from ..denoms import UST
-from .api.market import MarketApi
+# from .api.market import MarketApi
 from .api.oracle import OracleApi
 from .api.treasury import TreasuryApi
 from .api.tx import TxApi
@@ -52,7 +52,7 @@ class TerraClient(BaseTerraClient):
         key = MnemonicKey(hd_wallet['mnemonic'], hd_wallet['account'], hd_wallet_index)
         self.key = key  # Set key before get_gas_prices() to avoid error with cache debugging
 
-        self.market = MarketApi(self)
+        # self.market = MarketApi(self)
         self.oracle = OracleApi(self)
         self.treasury = TreasuryApi(self)
         self.tx = TxApi(self)
