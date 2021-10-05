@@ -4,6 +4,7 @@ import json
 import logging
 import time
 from collections import defaultdict
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -191,7 +192,10 @@ class LPTowerStrategy:
         self.pool_1 = pool_1
         self.pool_tower = pool_tower
         self.arbitrage_data = ArbitrageData()
+
         self._amount_luna_swap_first_last_msg_tol = Decimal(0)
+        self._flag_last_msg_tol = False
+
         log.info(f'Initialized {self} at block={self.client.block}')
 
     def __repr__(self) -> str:
@@ -371,12 +375,13 @@ class LPTowerStrategy:
         if profit.amount * lp_ust_price < 0:
             raise UnprofitableArbitrage(f'No profitability, {balance_ratio=:0.3%}')
         func = partial(self._get_gross_profit_dec, direction=direction)
-        lp_amount, _ = utils.optimization.optimize_bissection(
-            func,
-            x0=initial_lp_amount.amount,
-            dx=initial_lp_amount.dx,
-            tol=OPTIMIZATION_TOLERANCE.amount / lp_ust_price,
-        )
+        with self._activate_last_msg_tol():
+            lp_amount, _ = utils.optimization.optimize_bissection(
+                func,
+                x0=initial_lp_amount.amount,
+                dx=initial_lp_amount.dx,
+                tol=OPTIMIZATION_TOLERANCE.amount / lp_ust_price,
+            )
         amount = self.pool_0.lp_token.to_amount(lp_amount)
         if amount > pool_0_lp_balance:
             log.warning(
@@ -385,6 +390,15 @@ class LPTowerStrategy:
             )
             return pool_0_lp_balance
         return amount
+
+    @contextmanager
+    def _activate_last_msg_tol(self):
+        flag = self._flag_last_msg_tol
+        try:
+            self._flag_last_msg_tol = True
+            yield
+        finally:
+            self._flag_last_msg_tol = flag
 
     def _get_gross_profit(
         self,
@@ -425,7 +439,8 @@ class LPTowerStrategy:
             luna_amount, msgs_remove_single_side = self.pool_1.op_remove_single_side(
                 self.client.address, lp_amount, LUNA, MAX_SLIPPAGE
             )
-            luna_amount.amount = luna_amount.amount - self._amount_luna_swap_first_last_msg_tol
+            if self._flag_last_msg_tol:
+                luna_amount.amount = luna_amount.amount - self._amount_luna_swap_first_last_msg_tol
             final_lp_amount, msgs_add_single_side = self.pool_0.op_add_single_side(
                 self.client.address, luna_amount, MAX_SLIPPAGE
             )
