@@ -18,7 +18,7 @@ from terra_sdk.core.msg import Msg
 from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.key.mnemonic import MnemonicKey
 
-from common import Token, TokenAmount
+from common import BlockchainClient, Token, TokenAmount
 
 
 class TerraTokenAmount(TokenAmount):
@@ -148,7 +148,7 @@ class CW20Token(BaseTerraToken):
 TerraToken = Union[TerraNativeToken, CW20Token]
 
 
-class BaseTerraClient(ABC):
+class BaseTerraClient(BlockchainClient, ABC):
     lcd_uri: str
     fcd_uri: str
     chain_id: str

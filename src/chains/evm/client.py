@@ -40,6 +40,7 @@ class EVMClient(BaseEVMClient):
         hd_wallet_index: int = 0,
         timeout: int = DEFAULT_CONN_TIMEOUT,
         block: int | Literal["latest"] = "latest",
+        raise_on_syncing: bool = False,
     ):
         self.endpoint_uri = endpoint_uri
         self.chain_id = chain_id
@@ -56,12 +57,16 @@ class EVMClient(BaseEVMClient):
             account_path=f"m/44'/{coin_type}'/{hd_wallet['account']}'/0/{hd_wallet_index}",
         )
         self.address: str = self.account.address
-        log.info(f"Initialized {self}")
+        super().__init__(raise_on_syncing)
 
     def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__}(endpoint_uri={self.endpoint_uri}, address={self.address})"
         )
+
+    @property
+    def syncing(self) -> bool:
+        return self.w3.eth.syncing
 
     def get_gas_price(self) -> int:
         return self.w3.eth.gas_price

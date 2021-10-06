@@ -26,12 +26,11 @@ from chains.terra import (
 )
 from exceptions import BlockchainNewState, IsBusy, TxError, UnprofitableArbitrage
 
-from .common.single_tx_arbitrage_state import (
-    ArbitrageData,
+from .common.single_tx_arbitrage import (
     BaseArbParams,
     BaseArbResult,
     BaseArbTx,
-    ExecutionState,
+    SingleTxArbitrage,
     TxStatus,
 )
 
@@ -126,7 +125,7 @@ class ArbResult(BaseArbResult):
         }
 
 
-class LPTowerStrategy:
+class LPTowerStrategy(SingleTxArbitrage[TerraClient]):
     def __init__(
         self,
         client: TerraClient,
@@ -134,47 +133,20 @@ class LPTowerStrategy:
         pool_1: terraswap.LiquidityPair,
         pool_tower: terraswap.LiquidityPair,
     ):
-        self.client = client
         self.pool_0 = pool_0
         self.pool_1 = pool_1
         self.pool_tower = pool_tower
-        self.arbitrage_data = ArbitrageData()
 
         self._amount_luna_swap_first_last_msg_tol = Decimal(0)
         self._flag_last_msg_tol = False
 
-        log.info(f"Initialized {self} at block={self.client.block}")
+        super().__init__(client)
 
     def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__}(client={self.client}, "
             f"pool_tower={self.pool_tower}, status={self.arbitrage_data.status})"
         )
-
-    def run(self, block: int, mempool: dict = None):
-        if self.arbitrage_data.status == ExecutionState.waiting_confirmation:
-            log.debug("Looking for tx confirmation(s)")
-            try:
-                self.arbitrage_data.result = self._confirm_tx(block)
-            except IsBusy:
-                return
-            else:
-                log.info("Arbitrage executed", extra={"data": self.arbitrage_data.to_data()})
-                self.arbitrage_data = ArbitrageData()
-        log.debug("Generating execution configuration")
-        try:
-            self.arbitrage_data.params = params = self._get_arbitrage_params(block, mempool)
-        except (UnprofitableArbitrage, TxError) as e:
-            log.debug(e)
-            return
-        log.debug("Broadcasting transaction")
-        try:
-            self.arbitrage_data.tx = self._broadcast_tx(params, block)
-        except BlockchainNewState as e:
-            log.warning(e)
-            return
-        else:
-            log.info("Arbitrage broadcasted", extra={"data": self.arbitrage_data.to_data()})
 
     def _confirm_tx(self, block: int) -> ArbResult:
         assert self.arbitrage_data.params is not None

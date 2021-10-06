@@ -16,7 +16,7 @@ from terra_sdk.key.mnemonic import MnemonicKey
 import auth_secrets
 import configs
 import utils
-from exceptions import NodeSyncing, NotContract
+from exceptions import NotContract
 from utils.cache import CacheGroup, ttl_cache
 
 from ..core import BaseTerraClient, TerraTokenAmount
@@ -71,16 +71,17 @@ class TerraClient(BaseTerraClient):
 
         self.code_ids = _get_code_ids(self.chain_id)
         self.block = self.get_latest_block()
-        if raise_on_syncing and self.lcd.tendermint.syncing():
-            raise NodeSyncing(self.block)
-
-        log.info(f"Initialized {self} at block={self.block}")
+        super().__init__(raise_on_syncing)
 
     def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__}(lcd_uri={self.lcd_uri}, chain_id={self.chain_id}, "
             f"account={self.key.acc_address})"
         )
+
+    @property
+    def syncing(self) -> bool:
+        return self.lcd.tendermint.syncing()
 
     @ttl_cache(CacheGroup.TERRA, TERRA_CONTRACT_QUERY_CACHE_SIZE)
     def contract_query(self, contract_addr: AccAddress, query_msg: dict) -> dict:

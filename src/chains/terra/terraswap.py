@@ -181,7 +181,7 @@ class Router:
                 "send": {
                     "contract": self.contract_addr,
                     "amount": str(amount_in.int_amount),
-                    "msg": swap_msg,
+                    "msg": self.client.encode_msg(swap_msg),
                 }
             }
             coins = []
