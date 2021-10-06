@@ -162,7 +162,28 @@ class Api:
 
 
 class BaseMarketApi(Api, ABC):
-    pass
+    @abstractmethod
+    def get_amount_out(
+        self,
+        offer_amount: TerraTokenAmount,
+        ask_denom: TerraNativeToken,
+    ) -> TerraTokenAmount:
+        ...
+
+    @property
+    @abstractmethod
+    def virtual_pools(self) -> tuple[Decimal, Decimal]:
+        ...
+
+    @property
+    @abstractmethod
+    def tobin_taxes(self) -> dict[TerraNativeToken, Decimal]:
+        ...
+
+    @property
+    @abstractmethod
+    def market_parameters(self) -> dict[str, Decimal]:
+        ...
 
 
 class BaseOracleApi(Api, ABC):

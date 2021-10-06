@@ -11,7 +11,7 @@ MARKET_PARAMETERS_TTL = 600
 
 
 class MarketApi(BaseMarketApi):
-    def get_amount_market(
+    def get_amount_out(
         self,
         offer_amount: TerraTokenAmount,
         ask_denom: TerraNativeToken,
@@ -23,7 +23,7 @@ class MarketApi(BaseMarketApi):
             raise TypeError('Market trades only available to native tokens')
 
         if LUNA in (offer_amount.token, ask_denom):
-            vp_terra, vp_luna = self.get_virtual_pools()
+            vp_terra, vp_luna = self.virtual_pools
             vp_offer, vp_ask = (vp_terra, vp_luna) if ask_denom == LUNA else (vp_luna, vp_terra)
 
             offer_amount_sdr = self._compute_swap_no_spread(offer_amount, SDT).amount
@@ -32,14 +32,14 @@ class MarketApi(BaseMarketApi):
 
             spread = max(vp_spread, self.market_parameters['min_stability_spread'])
         else:
-            tobin_taxes = self.get_tobin_taxes()
-            spread = max(tobin_taxes[offer_amount.token], tobin_taxes[ask_denom])
+            spread = max(self.tobin_taxes[offer_amount.token], self.tobin_taxes[ask_denom])
 
         ask_amount = self._compute_swap_no_spread(offer_amount, ask_denom)
         return ask_amount * (1 - spread)
 
+    @property
     @ttl_cache(CacheGroup.TERRA, maxsize=1)
-    def get_virtual_pools(self) -> tuple[Decimal, Decimal]:
+    def virtual_pools(self) -> tuple[Decimal, Decimal]:
         """Calculate virtual liquidity pool reserves in SDR
         See https://docs.terra.money/Reference/Terra-core/Module-specifications/spec-market.html#market-making-algorithm  # noqa: E501
         """
@@ -51,8 +51,9 @@ class MarketApi(BaseMarketApi):
 
         return pool_terra, pool_luna
 
+    @property
     @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=MARKET_PARAMETERS_TTL)
-    def get_tobin_taxes(self) -> dict[TerraNativeToken, Decimal]:
+    def tobin_taxes(self) -> dict[TerraNativeToken, Decimal]:
         result = self.client.lcd.oracle.parameters()
         return {
             TerraNativeToken(item['name']): Decimal(item['tobin_tax'])
