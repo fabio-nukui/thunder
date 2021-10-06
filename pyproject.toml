@@ -10,6 +10,7 @@ exclude = ["**/node_modules", "**/__pycache__", ".git"]
 [tool.black]
 line-length = 100
 target-version = ["py39"]
+fast = true
 
 [tool.isort]
 line_length = 100
