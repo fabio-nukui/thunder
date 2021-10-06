@@ -1,5 +1,6 @@
 import importlib
 import logging
+import time
 
 import configs
 from startup import setup
@@ -18,7 +19,8 @@ def main():
             strategy.run()  # type: ignore
         except Exception:
             log.error('Error during strategy execution', exc_info=True)
-            log.info('Restarting strategy')
+            log.info('Restarting strategy in 5 seconds')
+            time.sleep(5)
 
 
 if __name__ == '__main__':
