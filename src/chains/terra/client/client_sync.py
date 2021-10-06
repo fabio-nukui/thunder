@@ -5,10 +5,12 @@ import json
 import logging
 import time
 import urllib.parse
+from collections import defaultdict
 from typing import Iterable
 
 from terra_sdk.client.lcd import LCDClient
 from terra_sdk.core import Coins
+from terra_sdk.core.auth import TxLog
 from terra_sdk.key.mnemonic import MnemonicKey
 
 import auth_secrets
@@ -130,3 +132,42 @@ class TerraClient(BaseTerraClient):
                     log.warning(f'More than one block passed since last iteration ({block_diff})')
                 yield self.block
             time.sleep(configs.TERRA_POLL_INTERVAL)
+
+    @staticmethod
+    def extract_log_events(logs: list[TxLog]) -> list[dict]:
+        parsed_logs = []
+        for tx_log in logs:
+            event_types = [e['type'] for e in tx_log.events]
+            assert len(event_types) == len(set(event_types)), 'Duplicated event types in events'
+            parsed_logs.append({e['type']: e['attributes'] for e in tx_log.events})
+        return parsed_logs
+
+    @staticmethod
+    def parse_from_contract_events(events: list[dict]) -> list[dict[str, list[dict[str, str]]]]:
+        """Parse contract events in format:
+        [  # one object per msg
+            {  # one object per contract
+                "contract_addr": [  # one object per contract event
+                    {  # Example event
+                        "action": "transfer",
+                        "from": "terra.....",
+                        "to": "terra....",
+                        ...
+                    }
+                ]
+
+            }
+        ]
+        """
+        logs = []
+        for event in events:
+            from_contract_logs = event['from_contract']
+            event_logs = defaultdict(list)
+            for log_ in from_contract_logs:
+                if log_['key'] == 'contract_address':
+                    contract_logs: dict[str, str] = {}
+                    event_logs[log_['value']].append(contract_logs)
+                else:
+                    contract_logs[log_['key']] = log_['value']
+            logs.append(dict(event_logs))
+        return logs

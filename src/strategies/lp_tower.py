@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import time
-from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
@@ -20,6 +19,9 @@ from chains.terra import (LUNA, UST, TerraClient, TerraNativeToken, TerraToken, 
                           terraswap)
 from exceptions import BlockchainNewState, IsBusy, TxError, UnprofitableArbitrage
 
+from .common.single_tx_arbitrage_state import (ArbitrageData, BaseArbParams, BaseArbResult,
+                                               BaseArbTx, ExecutionState, TxStatus)
+
 log = logging.getLogger(__name__)
 
 MIN_PROFIT_UST = UST.to_amount(2)
@@ -31,50 +33,13 @@ MAX_SLIPPAGE = Decimal('0.001')
 SWAP_FIRST_LAST_MSG_UST_TOL = Decimal('0.5')
 
 
-def _extract_log_events(logs: list[TxLog]) -> list[dict]:
-    parsed_logs = []
-    for tx_log in logs:
-        event_types = [e['type'] for e in tx_log.events]
-        assert len(event_types) == len(set(event_types)), 'Duplicated event types in events'
-        parsed_logs.append({e['type']: e['attributes'] for e in tx_log.events})
-    return parsed_logs
-
-
-def _parse_from_contract_events(events: list[dict]) -> list[dict[str, list[dict[str, str]]]]:
-    logs = []
-    for event in events:
-        from_contract_logs = event['from_contract']
-        event_logs = defaultdict(list)
-        for log_ in from_contract_logs:
-            if log_['key'] == 'contract_address':
-                contract_logs: dict[str, str] = {}
-                event_logs[log_['value']].append(contract_logs)
-            else:
-                contract_logs[log_['key']] = log_['value']
-        logs.append(dict(event_logs))
-    return logs
-
-
 class Direction(str, Enum):
     remove_liquidity_first = 'remove_liquidity_first'
     swap_first = 'swap_first'
 
 
-class ExecutionState(str, Enum):
-    start = 'start'
-    ready_to_broadcast = 'ready_to_broadcast'
-    waiting_confirmation = 'waiting_confirmation'
-    finished = 'finished'
-
-
-class TxStatus(str, Enum):
-    succeeded = 'succeeded'
-    failed = 'failed'
-    not_found = 'not_found'
-
-
 @dataclass
-class ArbParams:
+class ArbParams(BaseArbParams):
     timestamp_found: float
     block_found: int
 
@@ -109,7 +74,7 @@ class ArbParams:
 
 
 @dataclass
-class ArbTx:
+class ArbTx(BaseArbTx):
     timestamp_sent: float
     tx_hash: str
 
@@ -121,7 +86,7 @@ class ArbTx:
 
 
 @dataclass
-class ArbResult:
+class ArbResult(BaseArbResult):
     tx_status: TxStatus
     tx_err_log: Optional[str] = None
     gas_use: Optional[int] = None
@@ -145,30 +110,6 @@ class ArbResult:
             'block_received': self.block_received,
             'final_amount': None if self.final_amount is None else self.final_amount.to_data(),
             'net_profit': None if self.net_profit_ust is None else str(self.net_profit_ust),
-        }
-
-
-@dataclass
-class ArbitrageData:
-    params: Optional[ArbParams] = None
-    tx: Optional[ArbTx] = None
-    result: Optional[ArbResult] = None
-
-    @property
-    def status(self) -> ExecutionState:
-        if self.params is None:
-            return ExecutionState.start
-        if self.tx is None:
-            return ExecutionState.ready_to_broadcast
-        if self.result is None:
-            return ExecutionState.waiting_confirmation
-        return ExecutionState.finished
-
-    def to_data(self) -> dict:
-        return {
-            'params': None if self.params is None else self.params.to_data(),
-            'tx': None if self.tx is None else self.tx.to_data(),
-            'result': None if self.result is None else self.result.to_data(),
         }
 
 
@@ -260,8 +201,8 @@ class LPTowerStrategy:
         )
 
     def _extract_returns_from_logs(self, logs: list[TxLog]) -> tuple[TerraTokenAmount, Decimal]:
-        tx_events = _extract_log_events(logs)
-        logs_from_contract = _parse_from_contract_events(tx_events)
+        tx_events = self.client.extract_log_events(logs)
+        logs_from_contract = self.client.parse_from_contract_events(tx_events)
         first_event = logs_from_contract[0][self.pool_0.lp_token.contract_addr][0]
         last_event = logs_from_contract[-1][self.pool_0.lp_token.contract_addr][-1]
         assert last_event['to'] == self.client.address
