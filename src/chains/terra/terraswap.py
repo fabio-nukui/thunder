@@ -1,24 +1,35 @@
 from __future__ import annotations
 
+import json
 import logging
 import math
+from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from copy import copy
 from decimal import Decimal
 
 from terra_sdk.core.wasm import MsgExecuteContract
 
-from exceptions import InsufficientLiquidity
+from exceptions import InsufficientLiquidity, NotContract
 from utils.cache import CacheGroup, ttl_cache
 
 from .client import TerraClient
 from .core import CW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
+
+__all__ = [
+    'get_addresses',
+    'RouteStepNative',
+    'RouteStepTerraswap',
+    'LiquidityPair',
+    'Router',
+]
 
 log = logging.getLogger(__name__)
 
 FEE = Decimal('0.003')
 TERRASWAP_CODE_ID_KEY = 'terraswap_pair'
 DEFAULT_ADD_LIQUIDITY_SLIPPAGE_TOLERANCE = Decimal(0.001)
+ADDRESSES_FILE = 'resources/addresses/terra/{chain_id}/terraswap.json'
 
 AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
 
@@ -41,8 +52,11 @@ def _token_amount_to_data(token_amount: TerraTokenAmount) -> dict:
 
 
 def _is_terraswap_pool(contract_addr: str, client: TerraClient) -> bool:
-    minter_code_id = int(client.contract_info(contract_addr)['code_id'])
-    return minter_code_id == client.code_ids[TERRASWAP_CODE_ID_KEY]
+    try:
+        info = client.contract_info(contract_addr)
+    except NotContract:
+        return False
+    return int(info['code_id']) == client.code_ids[TERRASWAP_CODE_ID_KEY]
 
 
 def _pair_tokens_from_data(
@@ -58,13 +72,132 @@ def _token_from_data(asset_info: dict, client: TerraClient) -> TerraToken:
     if 'token' in asset_info:
         contract_addr: str = asset_info['token']['contract_addr']
         try:
-            return TerraswapLPToken.from_contract(contract_addr, client)
+            return LPToken.from_contract(contract_addr, client)
         except NotTerraswapPair:
             return CW20Token.from_contract(contract_addr, client)
     raise TypeError(f'Unexpected data format: {asset_info}')
 
 
-class TerraswapLiquidityPair:
+def get_addresses(chain_id: str) -> dict:
+    return json.load(open(ADDRESSES_FILE.format(chain_id=chain_id)))
+
+
+class RouteStep(ABC):
+    def __init__(
+        self,
+        token_in: TerraToken,
+        token_out: TerraToken,
+    ) -> None:
+        self.token_in = token_in
+        self.token_out = token_out
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}(token_in={self.token_in}, token_out={self.token_in})'
+
+    @property
+    def sorted_tokens(self) -> tuple[TerraToken, TerraToken]:
+        if self.token_in < self.token_out:
+            return self.token_in, self.token_out
+        return self.token_out, self.token_in
+
+    @abstractmethod
+    def to_data(self) -> dict:
+        ...
+
+
+class RouteStepTerraswap(RouteStep):
+    def to_data(self) -> dict:
+        return {
+            'terra_swap': {
+                'offer_asset_info': _token_to_data(self.token_in),
+                'ask_asset_info': _token_to_data(self.token_out),
+            }
+        }
+
+
+class RouteStepNative(RouteStep):
+    def __init__(
+        self,
+        token_in: TerraNativeToken,
+        token_out: TerraNativeToken,
+    ):
+        self.token_in = token_in
+        self.token_out = token_out
+
+    def to_data(self) -> dict:
+        return {
+            'native_swap': {
+                'offer_denom': self.token_in.denom,
+                'ask_denom': self.token_out.denom,
+            }
+        }
+
+
+class Router:
+    def __init__(
+        self,
+        liquidity_pairs: list[LiquidityPair],
+        client: TerraClient,
+    ):
+        self.contract_addr = get_addresses(client.chain_id)['router']
+        self.pairs = {pair.sorted_tokens: pair for pair in liquidity_pairs}
+        self.client = client
+
+    def op_route_swap(
+        self,
+        sender: str,
+        amount_in: TerraTokenAmount,
+        route: list[RouteStep],
+        max_slippage: Decimal,
+    ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
+        assert route, 'route cannot be empty'
+
+        swap_operations: list[dict] = []
+        step_amount_in = amount_in
+        for step in route:
+            if isinstance(step, RouteStepTerraswap):
+                if step.sorted_tokens not in self.pairs:
+                    raise Exception(f'No liquidity pair found for {step.sorted_tokens}')
+                pair = self.pairs[step.sorted_tokens]
+                amount_out = pair.get_swap_amount_out(step_amount_in, safety_round=False)
+            else:
+                assert isinstance(step.token_out, TerraNativeToken)
+                amount_out = self.client.market.get_amount_out(step_amount_in, step.token_out)
+            swap_operations.append(step.to_data())
+            step_amount_in = amount_out
+
+        min_amount_out: TerraTokenAmount = amount_out * (1 - max_slippage)  # type: ignore
+        swap_msg = {
+            'execute_swap_operations': {
+                'offer_amount': str(amount_in.int_amount),
+                'minimum_receive': str(min_amount_out.int_amount),
+                'operations': swap_operations,
+            }
+        }
+        if isinstance(amount_in.token, CW20Token):
+            contract = amount_in.token.contract_addr
+            execute_msg = {
+                'send': {
+                    'contract': self.contract_addr,
+                    'amount': str(amount_in.int_amount),
+                    'msg': swap_msg,
+                }
+            }
+            coins = []
+        else:
+            contract = self.contract_addr
+            execute_msg = swap_msg
+            coins = [amount_in.to_coin()]
+        msg = MsgExecuteContract(
+            sender=sender,
+            contract=contract,
+            execute_msg=execute_msg,
+            coins=coins,
+        )
+        return amount_out, [msg]  # type: ignore
+
+
+class LiquidityPair:
     def __init__(self, contract_addr: str, client: TerraClient):
         if not _is_terraswap_pool(contract_addr, client):
             raise NotTerraswapPair
@@ -73,7 +206,7 @@ class TerraswapLiquidityPair:
 
         pair_data = self.client.contract_query(self.contract_addr, {'pair': {}})
         self.tokens = _pair_tokens_from_data(pair_data['asset_infos'], client)
-        self.lp_token = TerraswapLPToken.from_pool(pair_data['liquidity_token'], self)
+        self.lp_token = LPToken.from_pool(pair_data['liquidity_token'], self)
 
         self.stop_updates = False
         self._reserves = self.tokens[0].to_amount(), self.tokens[1].to_amount()
@@ -93,6 +226,12 @@ class TerraswapLiquidityPair:
         data = self.client.contract_query(self.contract_addr, {'pool': {}})['assets']
         for reserve, asset_data in zip(self._reserves, data):
             reserve.int_amount = asset_data['amount']
+
+    @property
+    def sorted_tokens(self) -> tuple[TerraToken, TerraToken]:
+        if self.tokens[0] < self.tokens[1]:
+            return self.tokens[0], self.tokens[1]
+        return self.tokens[1], self.tokens[0]
 
     @contextmanager
     def simulate_reserve_change(self, amounts: AmountTuple):
@@ -422,19 +561,19 @@ class TerraswapLiquidityPair:
         return msgs
 
 
-class TerraswapLPToken(CW20Token):
+class LPToken(CW20Token):
     pair_tokens: tuple[TerraToken, TerraToken]
 
     @classmethod
-    def from_pool(cls, contract_addr: str, pool: TerraswapLiquidityPair) -> TerraswapLPToken:
+    def from_pool(cls, contract_addr: str, pool: LiquidityPair) -> LPToken:
         self = super().from_contract(contract_addr, pool.client)
         self.pair_tokens = pool.tokens
         return self
 
     @classmethod
-    def from_contract(cls, contract_addr: str, client: TerraClient) -> TerraswapLPToken:
+    def from_contract(cls, contract_addr: str, client: TerraClient) -> LPToken:
         minter_addr = client.contract_query(contract_addr, {'minter': {}})['minter']
-        return TerraswapLiquidityPair(minter_addr, client).lp_token
+        return LiquidityPair(minter_addr, client).lp_token
 
     @property
     def repr_symbol(self):

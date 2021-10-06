@@ -30,7 +30,7 @@ def request(
             except httpx.HTTPStatusError as e:
                 status_code = e.response.status_code
                 if status_code not in status_forcelist:
-                    raise e
+                    raise
                 log.debug(f'Error on http {method}, {status_code=}', exc_info=True)
             except Exception as e:
                 log.debug(f'Error on http {method} ({e})', exc_info=True)

@@ -28,9 +28,9 @@ def optimize(
     """
     try:
         return optimize_newton(func, x0, dx, tol, max_iter)
-    except Exception as e:
+    except Exception:
         if not use_fallback:
-            raise e
+            raise
         log.debug('Error on newton optimization', exc_info=True)
         return optimize_bissection(func, x0, dx, tol, max_iter)
 

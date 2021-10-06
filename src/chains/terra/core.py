@@ -42,7 +42,14 @@ class TerraTokenAmount(TokenAmount):
         return self.token.build_msg_increase_allowance(spender, owner, self.int_amount)
 
 
-class TerraNativeToken(Token[TerraTokenAmount]):
+class BaseTerraToken(Token[TerraTokenAmount]):
+    def __lt__(self, other) -> bool:
+        if isinstance(other, BaseTerraToken):
+            return self._id < other._id
+        return NotImplemented
+
+
+class TerraNativeToken(BaseTerraToken):
     amount_class = TerraTokenAmount
 
     def __init__(self, denom: str):
@@ -67,7 +74,7 @@ class TerraNativeToken(Token[TerraTokenAmount]):
 _CW20TokenT = TypeVar('_CW20TokenT', bound='CW20Token')
 
 
-class CW20Token(Token[TerraTokenAmount]):
+class CW20Token(BaseTerraToken):
     amount_class = TerraTokenAmount
 
     def __init__(self, contract_addr: str, symbol: str, decimals: int):
@@ -153,6 +160,14 @@ class BaseTerraClient(ABC):
 
     @abstractmethod
     def get_bank(self, denoms: list[str] = None, address: str = None) -> list[TerraTokenAmount]:
+        ...
+
+    @abstractmethod
+    def fcd_get(self, path: str, **kwargs) -> dict:
+        ...
+
+    @abstractmethod
+    def fcd_post(self, path: str, **kwargs) -> dict:
         ...
 
 

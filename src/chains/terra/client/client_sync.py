@@ -4,6 +4,7 @@ import base64
 import json
 import logging
 import time
+import urllib.parse
 from typing import Iterable
 
 from terra_sdk.client.lcd import LCDClient
@@ -12,6 +13,8 @@ from terra_sdk.key.mnemonic import MnemonicKey
 
 import auth_secrets
 import configs
+import utils
+from exceptions import NotContract
 from utils.cache import CacheGroup, ttl_cache
 
 from ..core import BaseTerraClient, TerraTokenAmount
@@ -24,6 +27,7 @@ from .api_tx import TxApi
 log = logging.getLogger(__name__)
 
 TERRA_CONTRACT_QUERY_CACHE_SIZE = 10_000
+CONTRACT_INFO_CACHE_TTL = 86400  # Contract info should not change; 24h ttl
 TERRA_CODE_IDS = 'resources/contracts/terra/{chain_id}/code_ids.json'
 
 
@@ -77,9 +81,23 @@ class TerraClient(BaseTerraClient):
     def contract_query(self, contract_addr: str, query_msg: dict) -> dict:
         return self.lcd.wasm.contract_query(contract_addr, query_msg)
 
-    @ttl_cache(CacheGroup.TERRA, TERRA_CONTRACT_QUERY_CACHE_SIZE)
-    def contract_info(self, contract_addr: str) -> dict:
-        return self.lcd.wasm.contract_info(contract_addr)
+    @ttl_cache(CacheGroup.TERRA, TERRA_CONTRACT_QUERY_CACHE_SIZE, CONTRACT_INFO_CACHE_TTL)
+    def contract_info(self, address: str) -> dict:
+        # return self.lcd.wasm.contract_info(contract_addr)  # returns 500 on non-account addresses
+        info = self.fcd_get(f'v1/wasm/contract/{address}')
+        if info is None:
+            raise NotContract
+        return info
+
+    def fcd_get(self, path: str, **kwargs) -> dict:
+        url = urllib.parse.urljoin(self.fcd_uri, path)
+        res = utils.http.get(url, **kwargs)
+        return res.json()
+
+    def fcd_post(self, path: str, **kwargs) -> dict:
+        url = urllib.parse.urljoin(self.fcd_uri, path)
+        res = utils.http.get(url, **kwargs)
+        return res.json()
 
     def get_bank(self, denoms: list[str] = None, address: str = None) -> list[TerraTokenAmount]:
         address = self.address if address is None else address

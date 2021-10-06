@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 import time
 from collections import defaultdict
@@ -17,8 +16,8 @@ from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.exceptions import LCDResponseError
 
 import utils
-from chains.terra import (LUNA, UST, TerraClient, TerraNativeToken, TerraswapLiquidityPair,
-                          TerraToken, TerraTokenAmount)
+from chains.terra import (LUNA, UST, TerraClient, TerraNativeToken, TerraToken, TerraTokenAmount,
+                          terraswap)
 from exceptions import BlockchainNewState, IsBusy, TxError, UnprofitableArbitrage
 
 log = logging.getLogger(__name__)
@@ -30,12 +29,6 @@ MIN_CONFIRMATIONS = 1
 MAX_BLOCKS_WAIT_RECEIPT = 10
 MAX_SLIPPAGE = Decimal('0.001')
 SWAP_FIRST_LAST_MSG_UST_TOL = Decimal('0.5')
-
-TERRASWAP_ADDRESSES = 'resources/addresses/terra/{chain_id}/terraswap.json'
-
-
-def _get_pool_addresses(chain_id: str) -> dict[str, str]:
-    return json.load(open(TERRASWAP_ADDRESSES.format(chain_id=chain_id)))['pools']
 
 
 def _extract_log_events(logs: list[TxLog]) -> list[dict]:
@@ -183,9 +176,9 @@ class LPTowerStrategy:
     def __init__(
         self,
         client: TerraClient,
-        pool_0: TerraswapLiquidityPair,
-        pool_1: TerraswapLiquidityPair,
-        pool_tower: TerraswapLiquidityPair,
+        pool_0: terraswap.LiquidityPair,
+        pool_1: terraswap.LiquidityPair,
+        pool_tower: terraswap.LiquidityPair,
     ):
         self.client = client
         self.pool_0 = pool_0
@@ -240,7 +233,7 @@ class LPTowerStrategy:
                 if tx_inclusion_delay >= MAX_BLOCKS_WAIT_RECEIPT:
                     return ArbResult(TxStatus.not_found)
                 raise IsBusy
-            raise e
+            raise
         log.debug(info.to_data())
         if block - info.height < MIN_CONFIRMATIONS:
             raise IsBusy
@@ -459,10 +452,10 @@ class LPTowerStrategy:
 
 def run():
     client = TerraClient()
-    addresses = _get_pool_addresses(client.chain_id)
-    pool_0 = TerraswapLiquidityPair(addresses['bluna_luna'], client)
-    pool_1 = TerraswapLiquidityPair(addresses['ust_luna'], client)
-    pool_tower = TerraswapLiquidityPair(addresses['bluna_luna_ust_luna'], client)
+    addresses = terraswap.get_addresses(client.chain_id)['pools']
+    pool_0 = terraswap.LiquidityPair(addresses['bluna_luna'], client)
+    pool_1 = terraswap.LiquidityPair(addresses['ust_luna'], client)
+    pool_tower = terraswap.LiquidityPair(addresses['bluna_luna_ust_luna'], client)
     strategy = LPTowerStrategy(client, pool_0, pool_1, pool_tower)
     for block in client.wait_next_block():
         strategy.run(block)
