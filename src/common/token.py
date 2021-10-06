@@ -10,6 +10,7 @@ ROUNDING_SAFETY_MARGIN = 5
 getcontext().prec = 78  # To allow for calculations with up to 256 bits precision
 
 _MAX_DECIMALS_REPR = 8
+_MAX_DECIMALS_DATA = 18
 
 _TokenAmountT = TypeVar("_TokenAmountT", bound="TokenAmount")
 
@@ -80,7 +81,7 @@ class TokenAmount:
     def to_data(self) -> dict:
         return {
             "symbol": self.symbol,
-            "amount": str(self.amount),
+            "amount": str(round(self.amount, _MAX_DECIMALS_DATA)),
         }
 
     @property

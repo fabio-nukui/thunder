@@ -72,7 +72,7 @@ class ArbParams(BaseArbParams):
         return {
             "timestamp_found": self.timestamp_found,
             "block_found": self.block_found,
-            "prices": {token.symbol: str(price) for token, price in self.prices.items()},
+            "prices": {token.symbol: float(price) for token, price in self.prices.items()},
             "prices_denom": self.prices_denom.denom,
             "lp_tower_reserves": [reserve.to_data() for reserve in self.lp_tower_reserves],
             "pool_0_lp_balance": self.pool_0_lp_balance.to_data(),
@@ -121,7 +121,7 @@ class ArbResult(BaseArbResult):
             "timestamp_received": self.timestamp_received,
             "block_received": self.block_received,
             "final_amount": None if self.final_amount is None else self.final_amount.to_data(),
-            "net_profit": None if self.net_profit_ust is None else str(self.net_profit_ust),
+            "net_profit": None if self.net_profit_ust is None else float(self.net_profit_ust),
         }
 
 
@@ -372,10 +372,7 @@ class LPTowerStrategy(SingleTxArbitrage[TerraClient]):
         if (latest_block := self.client.get_latest_block()) != block:
             raise BlockchainNewState(f"{latest_block=} different from {block=}")
         res = self.client.tx.execute_msgs_async(execution_config.msgs, fee=execution_config.est_fee)
-        return ArbTx(
-            timestamp_sent=time.time(),
-            tx_hash=res.txhash,
-        )
+        return ArbTx(timestamp_sent=time.time(), tx_hash=res.txhash)
 
 
 def run():
