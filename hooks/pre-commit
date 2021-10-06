@@ -1,1 +1,1 @@
-make lint
+make lint-check
