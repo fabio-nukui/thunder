@@ -61,8 +61,6 @@ class BaseTerraToken(Token[TerraTokenAmount]):
 
 
 class TerraNativeToken(BaseTerraToken):
-    amount_class = TerraTokenAmount
-
     def __init__(self, denom: str):
         self.denom = denom
         self.symbol = "LUNA" if denom == "uluna" else denom[1:-1].upper() + "T"
@@ -86,8 +84,6 @@ _CW20TokenT = TypeVar("_CW20TokenT", bound="CW20Token")
 
 
 class CW20Token(BaseTerraToken):
-    amount_class = TerraTokenAmount
-
     def __init__(self, contract_addr: AccAddress, symbol: str, decimals: int):
         self.contract_addr = contract_addr
         self.symbol = symbol

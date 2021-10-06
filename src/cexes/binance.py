@@ -22,8 +22,6 @@ class BinanceTokenAmount(TokenAmount):
 
 
 class BinanceToken(Token[BinanceTokenAmount]):
-    amount_class = BinanceTokenAmount
-
     def __init__(self, symbol: str, decimals: int = DEFAULT_PRECISION) -> None:
         self.symbol = symbol
         self.decimals = decimals

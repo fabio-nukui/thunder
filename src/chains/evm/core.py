@@ -39,7 +39,6 @@ class EVMTokenAmount(TokenAmount):
 
 
 class EVMNativeToken(Token[EVMTokenAmount]):
-    amount_class = EVMTokenAmount
     __instances: dict[int, EVMNativeToken] = {}
 
     def __new__(
@@ -70,8 +69,6 @@ class EVMNativeToken(Token[EVMTokenAmount]):
 
 
 class ERC20Token(Token[EVMTokenAmount]):
-    amount_class = EVMTokenAmount
-
     def __init__(
         self,
         address: str,
