@@ -48,7 +48,7 @@ class TerraClient(BaseTerraClient):
         gas_prices: Coins.Input = None,
         gas_adjustment: float = configs.TERRA_GAS_ADJUSTMENT,
         hd_wallet_index: int = 0,
-        raise_on_syncing: bool = False,
+        raise_on_syncing: bool = configs.RAISE_ON_SYNCING,
     ):
         self.lcd_uri = lcd_uri
         self.fcd_uri = fcd_uri

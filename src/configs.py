@@ -13,6 +13,9 @@ SECRET_BINANCE_KEY = os.environ["SECRET_BINANCE_KEY"]
 # Cache
 DEFAULT_CACHE_TTL = float(os.getenv("DEFAULT_CACHE_TTL", "5.0"))
 
+# Blockchain
+RAISE_ON_SYNCING = os.getenv("TERRA_CHAIN_ID") == "True"
+
 # Terra
 TERRA_CHAIN_ID = os.getenv("TERRA_CHAIN_ID", "columbus-5")
 TERRA_LCD_URI = os.getenv("TERRA_LCD_URI", "https://lcd.terra.dev")
