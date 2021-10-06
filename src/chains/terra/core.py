@@ -7,16 +7,15 @@ from typing import Type, TypeVar, Union
 
 from terra_sdk.client.lcd.lcdclient import LCDClient
 from terra_sdk.client.lcd.wallet import Wallet
-from terra_sdk.core import Coin
-from terra_sdk.core.auth.data.tx import StdFee
+from terra_sdk.core import AccAddress, Coin, Coins
+from terra_sdk.core.auth import StdFee
 from terra_sdk.core.broadcast import (
     AsyncTxBroadcastResult,
     BlockTxBroadcastResult,
     SyncTxBroadcastResult,
 )
-from terra_sdk.core.coins import Coins
 from terra_sdk.core.msg import Msg
-from terra_sdk.core.wasm.msgs import MsgExecuteContract
+from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.key.mnemonic import MnemonicKey
 
 from common import Token, TokenAmount
@@ -34,13 +33,22 @@ class TerraTokenAmount(TokenAmount):
         assert isinstance(self.token, TerraNativeToken)
         return Coin(self.token.denom, self.int_amount)
 
-    def has_allowance(self, client: BaseTerraClient, spender: str, owner: str = None) -> bool:
+    def has_allowance(
+        self,
+        client: BaseTerraClient,
+        spender: AccAddress,
+        owner: AccAddress = None,
+    ) -> bool:
         if isinstance(self.token, TerraNativeToken):
             return True
         allowance = self.token.get_allowance(client, spender, owner)
         return allowance >= self
 
-    def build_msg_increase_allowance(self, spender: str, owner: str) -> MsgExecuteContract:
+    def build_msg_increase_allowance(
+        self,
+        spender: AccAddress,
+        owner: AccAddress,
+    ) -> MsgExecuteContract:
         assert isinstance(self.token, CW20Token)
         return self.token.build_msg_increase_allowance(spender, owner, self.int_amount)
 
@@ -67,7 +75,7 @@ class TerraNativeToken(BaseTerraToken):
     def _id(self) -> tuple:
         return (self.denom,)
 
-    def get_balance(self, client: BaseTerraClient, address: str = None) -> TerraTokenAmount:
+    def get_balance(self, client: BaseTerraClient, address: AccAddress = None) -> TerraTokenAmount:
         balances = client.get_bank([self.denom], address)
         if not balances:
             return self.to_amount(0)
@@ -80,7 +88,7 @@ _CW20TokenT = TypeVar("_CW20TokenT", bound="CW20Token")
 class CW20Token(BaseTerraToken):
     amount_class = TerraTokenAmount
 
-    def __init__(self, contract_addr: str, symbol: str, decimals: int):
+    def __init__(self, contract_addr: AccAddress, symbol: str, decimals: int):
         self.contract_addr = contract_addr
         self.symbol = symbol
         self.decimals = decimals
@@ -92,7 +100,7 @@ class CW20Token(BaseTerraToken):
     @classmethod
     def from_contract(
         cls: Type[_CW20TokenT],
-        contract_addr: str,
+        contract_addr: AccAddress,
         client: BaseTerraClient,
     ) -> _CW20TokenT:
         res = client.contract_query(contract_addr, {"token_info": {}})
@@ -110,8 +118,8 @@ class CW20Token(BaseTerraToken):
     def get_allowance(
         self,
         client: BaseTerraClient,
-        spender: str,
-        owner: str = None,
+        spender: AccAddress,
+        owner: AccAddress = None,
     ) -> TerraTokenAmount:
         owner = client.address if owner is None else owner
         query = {"allowance": {"owner": owner, "spender": spender}}
@@ -120,8 +128,8 @@ class CW20Token(BaseTerraToken):
 
     def build_msg_increase_allowance(
         self,
-        spender: str,
-        owner: str,
+        spender: AccAddress,
+        owner: AccAddress,
         amount: int | str,
     ) -> MsgExecuteContract:
         execute_msg = {
@@ -147,7 +155,7 @@ class BaseTerraClient(ABC):
     key: MnemonicKey
     lcd: LCDClient
     wallet: Wallet
-    address: str
+    address: AccAddress
     code_ids: dict[str, int]
     fee_denom: str
     block: int
@@ -158,11 +166,15 @@ class BaseTerraClient(ABC):
     tx: BaseTxApi
 
     @abstractmethod
-    def contract_query(self, contract_addr: str, query_msg: dict) -> dict:
+    def contract_query(self, contract_addr: AccAddress, query_msg: dict) -> dict:
         ...
 
     @abstractmethod
-    def get_bank(self, denoms: list[str] = None, address: str = None) -> list[TerraTokenAmount]:
+    def get_bank(
+        self,
+        denoms: list[str] = None,
+        address: AccAddress = None,
+    ) -> list[TerraTokenAmount]:
         ...
 
     @abstractmethod

@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from copy import copy
 from decimal import Decimal
 
+from terra_sdk.core import AccAddress
 from terra_sdk.core.wasm import MsgExecuteContract
 
 from exceptions import InsufficientLiquidity, NotContract
@@ -51,7 +52,7 @@ def _token_amount_to_data(token_amount: TerraTokenAmount) -> dict:
     }
 
 
-def _is_terraswap_pool(contract_addr: str, client: TerraClient) -> bool:
+def _is_terraswap_pool(contract_addr: AccAddress, client: TerraClient) -> bool:
     try:
         info = client.contract_info(contract_addr)
     except NotContract:
@@ -70,7 +71,7 @@ def _token_from_data(asset_info: dict, client: TerraClient) -> TerraToken:
     if "native_token" in asset_info:
         return TerraNativeToken(asset_info["native_token"]["denom"])
     if "token" in asset_info:
-        contract_addr: str = asset_info["token"]["contract_addr"]
+        contract_addr: AccAddress = asset_info["token"]["contract_addr"]
         try:
             return LPToken.from_contract(contract_addr, client)
         except NotTerraswapPair:
@@ -145,7 +146,7 @@ class Router:
 
     def op_route_swap(
         self,
-        sender: str,
+        sender: AccAddress,
         amount_in: TerraTokenAmount,
         route: list[RouteStep],
         max_slippage: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
@@ -198,7 +199,7 @@ class Router:
 
 
 class LiquidityPair:
-    def __init__(self, contract_addr: str, client: TerraClient):
+    def __init__(self, contract_addr: AccAddress, client: TerraClient):
         if not _is_terraswap_pool(contract_addr, client):
             raise NotTerraswapPair
         self.contract_addr = contract_addr
@@ -276,7 +277,7 @@ class LiquidityPair:
 
     def op_swap(
         self,
-        sender: str,
+        sender: AccAddress,
         amount_in: TerraTokenAmount,
         max_slippage: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
         safety_round: bool = True,
@@ -344,7 +345,7 @@ class LiquidityPair:
 
     def build_swap_msg(
         self,
-        sender: str,
+        sender: AccAddress,
         amount_in: TerraTokenAmount,
         min_out: TerraTokenAmount,
     ) -> MsgExecuteContract:
@@ -371,7 +372,7 @@ class LiquidityPair:
 
     def op_remove_single_side(
         self,
-        sender: str,
+        sender: AccAddress,
         amount_burn: TerraTokenAmount,
         token_out: TerraToken,
         max_slippage: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
@@ -421,7 +422,7 @@ class LiquidityPair:
 
     def build_remove_liquidity_msg(
         self,
-        sender: str,
+        sender: AccAddress,
         amount_burn: TerraTokenAmount,
     ) -> MsgExecuteContract:
         assert amount_burn.token == self.lp_token
@@ -440,7 +441,7 @@ class LiquidityPair:
 
     def op_remove_liquidity(
         self,
-        sender: str,
+        sender: AccAddress,
         amount_burn: TerraTokenAmount,
         safety_round: bool = True,
     ) -> tuple[AmountTuple, list[MsgExecuteContract]]:
@@ -450,7 +451,7 @@ class LiquidityPair:
 
     def op_add_single_side(
         self,
-        sender: str,
+        sender: AccAddress,
         amount_in: TerraTokenAmount,
         slippage_tolerance: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
         safety_round: bool = True,
@@ -487,7 +488,7 @@ class LiquidityPair:
 
     def op_add_liquidity(
         self,
-        sender: str,
+        sender: AccAddress,
         amounts_in: AmountTuple,
         slippage_tolerance: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
         safety_round: bool = True,
@@ -520,7 +521,7 @@ class LiquidityPair:
 
     def build_add_liquity_msgs(
         self,
-        sender: str,
+        sender: AccAddress,
         amounts_in: AmountTuple,
         slippage_tolerance: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
     ) -> list[MsgExecuteContract]:
@@ -556,13 +557,13 @@ class LPToken(CW20Token):
     pair_tokens: tuple[TerraToken, TerraToken]
 
     @classmethod
-    def from_pool(cls, contract_addr: str, pool: LiquidityPair) -> LPToken:
+    def from_pool(cls, contract_addr: AccAddress, pool: LiquidityPair) -> LPToken:
         self = super().from_contract(contract_addr, pool.client)
         self.pair_tokens = pool.tokens
         return self
 
     @classmethod
-    def from_contract(cls, contract_addr: str, client: TerraClient) -> LPToken:
+    def from_contract(cls, contract_addr: AccAddress, client: TerraClient) -> LPToken:
         minter_addr = client.contract_query(contract_addr, {"minter": {}})["minter"]
         return LiquidityPair(minter_addr, client).lp_token
 

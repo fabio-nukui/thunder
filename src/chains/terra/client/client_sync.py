@@ -9,7 +9,7 @@ from collections import defaultdict
 from typing import Iterable
 
 from terra_sdk.client.lcd import LCDClient
-from terra_sdk.core import Coins
+from terra_sdk.core import AccAddress, Coins
 from terra_sdk.core.auth import TxLog
 from terra_sdk.key.mnemonic import MnemonicKey
 
@@ -83,11 +83,11 @@ class TerraClient(BaseTerraClient):
         )
 
     @ttl_cache(CacheGroup.TERRA, TERRA_CONTRACT_QUERY_CACHE_SIZE)
-    def contract_query(self, contract_addr: str, query_msg: dict) -> dict:
+    def contract_query(self, contract_addr: AccAddress, query_msg: dict) -> dict:
         return self.lcd.wasm.contract_query(contract_addr, query_msg)
 
     @ttl_cache(CacheGroup.TERRA, TERRA_CONTRACT_QUERY_CACHE_SIZE, CONTRACT_INFO_CACHE_TTL)
-    def contract_info(self, address: str) -> dict:
+    def contract_info(self, address: AccAddress) -> dict:
         # return self.lcd.wasm.contract_info(contract_addr)  # returns 500 on non-account addresses
         info = self.fcd_get(f"v1/wasm/contract/{address}")
         if info is None:
