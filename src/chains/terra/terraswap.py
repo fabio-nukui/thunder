@@ -28,7 +28,7 @@ log = logging.getLogger(__name__)
 
 FEE = Decimal('0.003')
 TERRASWAP_CODE_ID_KEY = 'terraswap_pair'
-DEFAULT_ADD_LIQUIDITY_SLIPPAGE_TOLERANCE = Decimal(0.001)
+DEFAULT_MAX_SLIPPAGE_TOLERANCE = Decimal('0.001')
 ADDRESSES_FILE = 'resources/addresses/terra/{chain_id}/terraswap.json'
 
 AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
@@ -148,7 +148,7 @@ class Router:
         sender: str,
         amount_in: TerraTokenAmount,
         route: list[RouteStep],
-        max_slippage: Decimal,
+        max_slippage: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
         assert route, 'route cannot be empty'
 
@@ -216,16 +216,18 @@ class LiquidityPair:
             f'{self.__class__.__name__}({self.tokens[0].repr_symbol}/{self.tokens[1].repr_symbol})'
 
     @property
-    @ttl_cache(CacheGroup.TERRA, maxsize=1)
     def reserves(self) -> AmountTuple:
         if not self.stop_updates:
-            self._update_reserves()
+            self._reserves = self._get_reserves()
         return self._reserves
 
-    def _update_reserves(self):
+    @ttl_cache(CacheGroup.TERRA, maxsize=1)
+    def _get_reserves(self) -> AmountTuple:
         data = self.client.contract_query(self.contract_addr, {'pool': {}})['assets']
-        for reserve, asset_data in zip(self._reserves, data):
-            reserve.int_amount = asset_data['amount']
+        return (
+            self.tokens[0].to_amount(int_amount=data[0]['amount']),
+            self.tokens[1].to_amount(int_amount=data[1]['amount']),
+        )
 
     @property
     def sorted_tokens(self) -> tuple[TerraToken, TerraToken]:
@@ -275,7 +277,7 @@ class LiquidityPair:
         self,
         sender: str,
         amount_in: TerraTokenAmount,
-        max_slippage: Decimal,
+        max_slippage: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
         safety_round: bool = True,
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
         amount_out = self.get_swap_amount_out(amount_in, safety_round)
@@ -384,7 +386,7 @@ class LiquidityPair:
         sender: str,
         amount_burn: TerraTokenAmount,
         token_out: TerraToken,
-        max_slippage: Decimal,
+        max_slippage: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
         safety_round: bool = True,
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
         assert token_out in self.tokens
@@ -462,7 +464,7 @@ class LiquidityPair:
         self,
         sender: str,
         amount_in: TerraTokenAmount,
-        slippage_tolerance: Decimal = DEFAULT_ADD_LIQUIDITY_SLIPPAGE_TOLERANCE,
+        slippage_tolerance: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
         safety_round: bool = True,
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
         reserve_in, reserve_out = self._get_in_out_reserves(amount_in)
@@ -496,7 +498,7 @@ class LiquidityPair:
         self,
         sender: str,
         amounts_in: AmountTuple,
-        slippage_tolerance: Decimal = DEFAULT_ADD_LIQUIDITY_SLIPPAGE_TOLERANCE,
+        slippage_tolerance: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
         safety_round: bool = True,
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
         amount_out = self.get_add_liquidity_amount_out(amounts_in, slippage_tolerance, safety_round)
@@ -506,7 +508,7 @@ class LiquidityPair:
     def get_add_liquidity_amount_out(
         self,
         amounts_in: AmountTuple,
-        slippage_tolerance: Decimal = DEFAULT_ADD_LIQUIDITY_SLIPPAGE_TOLERANCE,
+        slippage_tolerance: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
         safety_round: bool = True,
     ) -> TerraTokenAmount:
         amounts_in = self._check_amounts_add_liquidity(amounts_in, slippage_tolerance)
@@ -517,7 +519,7 @@ class LiquidityPair:
     def _check_amounts_add_liquidity(
         self,
         amounts_in: AmountTuple,
-        slippage_tolerance: Decimal = DEFAULT_ADD_LIQUIDITY_SLIPPAGE_TOLERANCE,
+        slippage_tolerance: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
     ) -> AmountTuple:
         amounts_in = self._fix_amounts_order(amounts_in)
         amounts_ratio = amounts_in[0].amount / amounts_in[1].amount
@@ -529,7 +531,7 @@ class LiquidityPair:
         self,
         sender: str,
         amounts_in: AmountTuple,
-        slippage_tolerance: Decimal = DEFAULT_ADD_LIQUIDITY_SLIPPAGE_TOLERANCE,
+        slippage_tolerance: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
     ) -> list[MsgExecuteContract]:
         amounts_in = self._check_amounts_add_liquidity(amounts_in, slippage_tolerance)
         msgs = []
