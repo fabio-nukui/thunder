@@ -11,7 +11,7 @@ getcontext().prec = 78  # To allow for calculations with up to 256 bits precisio
 
 _MAX_DECIMALS_REPR = 8
 
-_TokenAmountT = TypeVar('_TokenAmountT', bound='TokenAmount')
+_TokenAmountT = TypeVar("_TokenAmountT", bound="TokenAmount")
 
 
 class Token(Generic[_TokenAmountT], ABC):
@@ -20,7 +20,7 @@ class Token(Generic[_TokenAmountT], ABC):
     amount_class: Type[_TokenAmountT]
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}({self.repr_symbol})'
+        return f"{self.__class__.__name__}({self.repr_symbol})"
 
     def __str__(self) -> str:
         return self.repr_symbol
@@ -66,7 +66,7 @@ class TokenAmount:
         self.token = token
         self.dx = Decimal(str(10 ** -self.decimals))
 
-        self._amount = Decimal('NaN')
+        self._amount = Decimal("NaN")
 
         if amount is not None:
             self.amount = amount
@@ -75,12 +75,12 @@ class TokenAmount:
 
     def __repr__(self) -> str:
         decimals = min(_MAX_DECIMALS_REPR, self.decimals)
-        return f'{self.__class__.__name__}({self.token}: {self.amount:,.{decimals}f})'
+        return f"{self.__class__.__name__}({self.token}: {self.amount:,.{decimals}f})"
 
     def to_data(self) -> dict:
         return {
-            'symbol': self.symbol,
-            'amount': str(self.amount),
+            "symbol": self.symbol,
+            "amount": str(self.amount),
         }
 
     @property
@@ -123,7 +123,7 @@ class TokenAmount:
 
     def _to_decimal(self, value) -> Decimal:
         if isinstance(value, type(self)):
-            assert self.token == value.token, 'Operation only allowed for identical tokens'
+            assert self.token == value.token, "Operation only allowed for identical tokens"
             return value.amount
         try:
             return Decimal(value)
@@ -158,10 +158,12 @@ class TokenAmount:
         return self.__mul__(other)
 
     @overload
-    def __truediv__(self: _TokenAmountT, other: DecInput) -> _TokenAmountT: ...  # noqa: E704
+    def __truediv__(self: _TokenAmountT, other: DecInput) -> _TokenAmountT:
+        ...
 
     @overload
-    def __truediv__(self: _TokenAmountT, other: _TokenAmountT) -> Decimal: ...  # noqa: E704
+    def __truediv__(self: _TokenAmountT, other: _TokenAmountT) -> Decimal:
+        ...
 
     def __truediv__(self, other):
         result = self.amount / self._to_decimal(other)

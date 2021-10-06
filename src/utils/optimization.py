@@ -31,7 +31,7 @@ def optimize(
     except Exception:
         if not use_fallback:
             raise
-        log.debug('Error on newton optimization', exc_info=True)
+        log.debug("Error on newton optimization", exc_info=True)
         return optimize_bissection(func, x0, dx, tol, max_iter)
 
 
@@ -65,7 +65,7 @@ def optimize_newton(
         second_derivative = (f_x_ip - 2 * f_x_i + f_x_im) / (dx ** 2)
         x_i_next = x_i - first_derivative / second_derivative
         if x_i_next < 0 and x_i < 0 and positive_only:
-            raise Exception(f'Negative result when {positive_only=}')
+            raise Exception(f"Negative result when {positive_only=}")
         if abs(x_i_next - x_i) < tol:
             break
         x_i = x_i_next
@@ -92,8 +92,10 @@ def optimize_bissection(
     Returns:
         tuple[Decimal, Decimal]: Result in x and func(x)
     """
+
     def derivative(x: Decimal) -> Decimal:
         return (func(x + dx) - func(x - dx)) / (2 * dx)
+
     x_left = x0
     x_right = x0 * BISSECTION_SEARCH_EXPANSION
 

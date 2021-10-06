@@ -4,16 +4,16 @@ from typing import Optional
 
 
 class ExecutionState(str, Enum):
-    start = 'start'
-    ready_to_broadcast = 'ready_to_broadcast'
-    waiting_confirmation = 'waiting_confirmation'
-    finished = 'finished'
+    start = "start"
+    ready_to_broadcast = "ready_to_broadcast"
+    waiting_confirmation = "waiting_confirmation"
+    finished = "finished"
 
 
 class TxStatus(str, Enum):
-    succeeded = 'succeeded'
-    failed = 'failed'
-    not_found = 'not_found'
+    succeeded = "succeeded"
+    failed = "failed"
+    not_found = "not_found"
 
 
 class BaseArbParams(ABC):
@@ -57,7 +57,7 @@ class ArbitrageData:
 
     def to_data(self) -> dict:
         return {
-            'params': None if self.params is None else self.params.to_data(),
-            'tx': None if self.tx is None else self.tx.to_data(),
-            'result': None if self.result is None else self.result.to_data(),
+            "params": None if self.params is None else self.params.to_data(),
+            "tx": None if self.tx is None else self.tx.to_data(),
+            "result": None if self.result is None else self.result.to_data(),
         }

@@ -3,8 +3,11 @@ from typing import Callable, TypeVar
 
 from terra_sdk.core import Coins
 from terra_sdk.core.auth import StdFee, StdTx
-from terra_sdk.core.broadcast import (AsyncTxBroadcastResult, BlockTxBroadcastResult,
-                                      SyncTxBroadcastResult)
+from terra_sdk.core.broadcast import (
+    AsyncTxBroadcastResult,
+    BlockTxBroadcastResult,
+    SyncTxBroadcastResult,
+)
 from terra_sdk.core.msg import Msg
 
 from utils.cache import CacheGroup, ttl_cache
@@ -16,7 +19,7 @@ log = logging.getLogger(__name__)
 TERRA_GAS_PRICE_CACHE_TTL = 3600
 
 _BroadcastResutT = TypeVar(
-    '_BroadcastResutT',
+    "_BroadcastResutT",
     BlockTxBroadcastResult,
     SyncTxBroadcastResult,
     AsyncTxBroadcastResult,
@@ -26,7 +29,7 @@ _BroadcastResutT = TypeVar(
 class TxApi(BaseTxApi):
     @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=TERRA_GAS_PRICE_CACHE_TTL)
     def get_gas_prices(self) -> Coins:
-        return Coins(self.client.fcd_get('v1/txs/gas_prices'))
+        return Coins(self.client.fcd_get("v1/txs/gas_prices"))
 
     def estimate_fee(
         self,
@@ -56,7 +59,7 @@ class TxApi(BaseTxApi):
         broadcast_func: Callable[[StdTx], _BroadcastResutT],
         **kwargs,
     ) -> _BroadcastResutT:
-        log.debug(f'Sending tx: {msgs}')
+        log.debug(f"Sending tx: {msgs}")
         signed_tx = self.client.wallet.create_and_sign_tx(
             msgs,
             fee_denoms=[self.client.fee_denom],
@@ -64,11 +67,11 @@ class TxApi(BaseTxApi):
         )
 
         res = broadcast_func(signed_tx)
-        log.debug(f'Tx executed: {res.txhash}')
+        log.debug(f"Tx executed: {res.txhash}")
         return res
 
     def _broadcast_async(self, tx: StdTx) -> AsyncTxBroadcastResult:
-        payload = {'tx': tx.to_data()['value'], 'mode': 'async'}
-        res = self.client.fcd_post('txs', json=payload)
+        payload = {"tx": tx.to_data()["value"], "mode": "async"}
+        res = self.client.fcd_post("txs", json=payload)
 
-        return AsyncTxBroadcastResult(txhash=res['txhash'], height=self.client.block)
+        return AsyncTxBroadcastResult(txhash=res["txhash"], height=self.client.block)

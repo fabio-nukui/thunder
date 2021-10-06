@@ -9,8 +9,8 @@ from .core import EVMNativeToken, EVMToken, EVMTokenAmount
 
 log = logging.getLogger(__name__)
 
-NATIVE_ADDRESS = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE'
-ONE_INCH_API_URL = 'https://api.1inch.exchange/v3.0/{chain_id}'
+NATIVE_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
+ONE_INCH_API_URL = "https://api.1inch.exchange/v3.0/{chain_id}"
 TIMEOUT_REQUESTS = 10.0
 
 DEFAULT_MAX_SLIPPAGE = 0.4  # 0.4% maximum slippage
@@ -21,16 +21,16 @@ class OneInchExchange:
     def __init__(self, client: EVMClient):
         self.client = client
 
-        self.api_url = f'{ONE_INCH_API_URL.format(chain_id=self.client.chain_id)}'
+        self.api_url = f"{ONE_INCH_API_URL.format(chain_id=self.client.chain_id)}"
         self.router_address = self._get_router_address()
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}({self.client.__class__.__name__})'
+        return f"{self.__class__.__name__}({self.client.__class__.__name__})"
 
     def _get_router_address(self) -> str:
-        url = f'{self.api_url}/approve/spender'
+        url = f"{self.api_url}/approve/spender"
         res = utils.http.get(url, timeout=TIMEOUT_REQUESTS)
-        return res.json()['address']
+        return res.json()["address"]
 
     def get_quote(
         self,
@@ -44,13 +44,13 @@ class OneInchExchange:
 
         gas_price = self.client.get_gas_price() if gas_price is None else gas_price
         query_params = {
-            'fromTokenAddress': address_from,
-            'toTokenAddress': address_to,
-            'amount': amount_in.int_amount,
-            'gasPrice': gas_price,
+            "fromTokenAddress": address_from,
+            "toTokenAddress": address_to,
+            "amount": amount_in.int_amount,
+            "gasPrice": gas_price,
         }
-        res = utils.http.get(f'{self.api_url}/quote', params=query_params, timeout=TIMEOUT_REQUESTS)
-        int_amount = res.json()['toTokenAmount']
+        res = utils.http.get(f"{self.api_url}/quote", params=query_params, timeout=TIMEOUT_REQUESTS)
+        int_amount = res.json()["toTokenAmount"]
         return EVMTokenAmount(token_out, int_amount=int_amount)
 
     def swap(
@@ -69,24 +69,24 @@ class OneInchExchange:
 
         gas_price = self.client.get_gas_price() if gas_price is None else gas_price
         query_params = {
-            'fromTokenAddress': address_from,
-            'toTokenAddress': address_to,
-            'amount': amount_in.int_amount,
-            'fromAddress': self.client.address,
-            'slippage': max_slippage,
-            'gasPrice': gas_price,
-            'allowPartialFill': True,
+            "fromTokenAddress": address_from,
+            "toTokenAddress": address_to,
+            "amount": amount_in.int_amount,
+            "fromAddress": self.client.address,
+            "slippage": max_slippage,
+            "gasPrice": gas_price,
+            "allowPartialFill": True,
         }
         res = utils.http.get(
-            f'{self.api_url}/swap',
+            f"{self.api_url}/swap",
             n_tries=6,
             params=query_params,
             timeout=TIMEOUT_REQUESTS,
         )
-        tx = res.json()['tx']
-        tx['gas'] = round(tx['gas'] * GAS_ESTIMATE_MARGIN)
-        tx['value'] = int(tx['value'])
-        tx['gasPrice'] = int(tx['gasPrice'])
-        tx['to'] = Web3.toChecksumAddress(tx['to'])
+        tx = res.json()["tx"]
+        tx["gas"] = round(tx["gas"] * GAS_ESTIMATE_MARGIN)
+        tx["value"] = int(tx["value"])
+        tx["gasPrice"] = int(tx["gasPrice"])
+        tx["to"] = Web3.toChecksumAddress(tx["to"])
 
         return self.client.sign_and_send_tx(tx)

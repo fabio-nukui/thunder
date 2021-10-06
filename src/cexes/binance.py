@@ -47,28 +47,28 @@ class TradingPair:
 
         info = client.get_symbol_info(symbol)
         if info is None:
-            raise Exception(f'Binance pair {symbol} not found')
-        self.base_asset = BinanceToken(info['baseAsset'], info['baseAssetPrecision'])
-        self.quote_asset = BinanceToken(info['quoteAsset'], info['quoteAssetPrecision'])
+            raise Exception(f"Binance pair {symbol} not found")
+        self.base_asset = BinanceToken(info["baseAsset"], info["baseAssetPrecision"])
+        self.quote_asset = BinanceToken(info["quoteAsset"], info["quoteAssetPrecision"])
 
-        self.price_tick_size = self._get_filter_value(info['filters'], 'PRICE_FILTER', 'tickSize')
-        self.lot_step_size = self._get_filter_value(info['filters'], 'LOT_SIZE', 'stepSize')
-        self.lot_min_size = self._get_filter_value(info['filters'], 'LOT_SIZE', 'minQty')
-        self.min_notional = self._get_filter_value(info['filters'], 'MIN_NOTIONAL', 'minNotional')
+        self.price_tick_size = self._get_filter_value(info["filters"], "PRICE_FILTER", "tickSize")
+        self.lot_step_size = self._get_filter_value(info["filters"], "LOT_SIZE", "stepSize")
+        self.lot_min_size = self._get_filter_value(info["filters"], "LOT_SIZE", "minQty")
+        self.min_notional = self._get_filter_value(info["filters"], "MIN_NOTIONAL", "minNotional")
 
         self._ready = False
         self._ready_lock = Lock()
         self._start_depth_cache(dcm)
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}({self.symbol})'
+        return f"{self.__class__.__name__}({self.symbol})"
 
     @staticmethod
     def _get_filter_value(list_filters: dict, filter_type: str, key: str) -> Decimal:
         for filter_ in list_filters:
-            if filter_['filterType'] == filter_type:
+            if filter_["filterType"] == filter_type:
                 return Decimal(filter_[key])
-        raise Exception(f'{filter_type} not found')
+        raise Exception(f"{filter_type} not found")
 
     def update_from_depth_cache(self, depth_cache: DepthCache):
         self.bids = depth_cache.get_bids()
@@ -100,7 +100,7 @@ class TradingPair:
                 amount_out += qty
             raise InsufficientLiquidity
         else:
-            raise TypeError(f'{amount_in.token=} not in pair')
+            raise TypeError(f"{amount_in.token=} not in pair")
 
     def _start_depth_cache(self, dcm: ThreadedDepthCacheManager):
         dcm.start_depth_cache(
@@ -115,15 +115,15 @@ class TradingPair:
                 if self._ready:
                     return
             time.sleep(0.1)
-        raise Exception('Timeout on DepthCacheManager initialization')
+        raise Exception("Timeout on DepthCacheManager initialization")
 
 
 class BinanceClient:
     def __init__(self, api_key: str = None, api_secret: str = None):
         if api_key is None or api_secret is None:
             binance_secret = auth_secrets.binance_api()
-            api_key = binance_secret['api_key']
-            api_secret = binance_secret['api_secret']
+            api_key = binance_secret["api_key"]
+            api_secret = binance_secret["api_secret"]
 
         self.client = binance.Client(api_key, api_secret)
         self.dcm = ThreadedDepthCacheManager(api_key, api_secret)
@@ -134,7 +134,7 @@ class BinanceClient:
         self._wait_dcm_ready()
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}'
+        return f"{self.__class__.__name__}"
 
     def get_trading_pair(self, symbol: str) -> TradingPair:
         if symbol not in self._pairs:
@@ -147,4 +147,4 @@ class BinanceClient:
             if self.dcm._client is not None:
                 return
             time.sleep(0.001)
-        raise Exception('Timeout on ThreadedDepthCacheManager initialization')
+        raise Exception("Timeout on ThreadedDepthCacheManager initialization")

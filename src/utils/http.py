@@ -31,11 +31,11 @@ def request(
                 status_code = e.response.status_code
                 if status_code not in status_forcelist:
                     raise
-                log.debug(f'Error on http {method}, {status_code=}', exc_info=True)
+                log.debug(f"Error on http {method}, {status_code=}", exc_info=True)
             except Exception as e:
-                log.debug(f'Error on http {method} ({e})', exc_info=True)
+                log.debug(f"Error on http {method} ({e})", exc_info=True)
             time.sleep((1 + backoff_factor) ** i - 1)
-        raise httpx.HTTPError(f'httpx {method} failed after {n_tries=}')
+        raise httpx.HTTPError(f"httpx {method} failed after {n_tries=}")
 
 
 def get(
@@ -46,7 +46,7 @@ def get(
     **kwargs,
 ) -> httpx.Response:
     """httpx GET with default retries"""
-    return request('GET', url, *args, timeout=timeout, n_tries=n_tries, **kwargs)
+    return request("GET", url, *args, timeout=timeout, n_tries=n_tries, **kwargs)
 
 
 def post(
@@ -57,4 +57,4 @@ def post(
     **kwargs,
 ) -> httpx.Response:
     """httpx POST with default retries"""
-    return request('POST', url, *args, timeout=timeout, n_tries=n_tries, **kwargs)
+    return request("POST", url, *args, timeout=timeout, n_tries=n_tries, **kwargs)

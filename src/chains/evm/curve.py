@@ -17,8 +17,8 @@ FEE_DENOMINATOR: int = 10 ** 10
 N_ITERATIONS = 255  # Number of iterations for numeric calculations
 
 N_POOLS_CACHE = 10  # Must be at least equal to number of pools in strategy
-BASE_POOL_ABI: dict = json.load(open('resources/contracts/evm/abis/curve/BasePool.json'))
-NATIVE_TOKEN_ADDRESS = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE'
+BASE_POOL_ABI: dict = json.load(open("resources/contracts/evm/abis/curve/BasePool.json"))
+NATIVE_TOKEN_ADDRESS = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
 
 
 class CurvePool:
@@ -55,7 +55,7 @@ class CurvePool:
         amount_out = self._get_dy(
             self.tokens.index(amount_in.token),
             self.tokens.index(token_out),
-            amount_in.int_amount
+            amount_in.int_amount,
         )
         return EVMTokenAmount(token_out, int_amount=amount_out)
 

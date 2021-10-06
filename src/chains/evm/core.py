@@ -14,14 +14,14 @@ from common import Token, TokenAmount
 
 log = logging.getLogger(__name__)
 
-ERC20_ABI = json.load(open('resources/contracts/evm/abis/ERC20.json'))
+ERC20_ABI = json.load(open("resources/contracts/evm/abis/ERC20.json"))
 _NATIVE_TOKENS = {
-    configs.ETHEREUM_CHAIN_ID: {'symbol': 'ETH', 'decimals': '18'},
-    configs.BSC_CHAIN_ID: {'symbol': 'BNB', 'decimals': '18'},
+    configs.ETHEREUM_CHAIN_ID: {"symbol": "ETH", "decimals": "18"},
+    configs.BSC_CHAIN_ID: {"symbol": "BNB", "decimals": "18"},
 }
 
 # Almost same as max uint256, but uses less gas
-INF_APPROVAL_AMOUNT = 0xff00000000000000000000000000000000000000000000000000000000000000
+INF_APPROVAL_AMOUNT = 0xFF00000000000000000000000000000000000000000000000000000000000000
 
 DEFAULT_MAX_GAS = 1_000_000
 
@@ -61,12 +61,12 @@ class EVMNativeToken(Token[EVMTokenAmount]):
         decimals: int = None,
     ):
         self.chain_id = chain_id
-        self.symbol = _NATIVE_TOKENS[chain_id]['symbol'] if symbol is None else symbol
-        self.decimals = int(_NATIVE_TOKENS[chain_id]['decimals']) if decimals is None else decimals
+        self.symbol = _NATIVE_TOKENS[chain_id]["symbol"] if symbol is None else symbol
+        self.decimals = int(_NATIVE_TOKENS[chain_id]["decimals"]) if decimals is None else decimals
 
     @property
     def _id(self) -> tuple:
-        return (self.chain_id, )
+        return (self.chain_id,)
 
 
 class ERC20Token(Token[EVMTokenAmount]):
@@ -86,9 +86,9 @@ class ERC20Token(Token[EVMTokenAmount]):
 
         if self.client is None:
             self.contract = None
-            assert chain_id is not None, 'Missing chain_id'
-            assert decimals is not None, 'Missing decimals'
-            assert symbol is not None, 'Missing symbol'
+            assert chain_id is not None, "Missing chain_id"
+            assert decimals is not None, "Missing decimals"
+            assert symbol is not None, "Missing symbol"
         else:
             self.contract = self.client.w3.eth.contract(address=self.address, abi=abi)
             if symbol is None:
@@ -105,14 +105,12 @@ class ERC20Token(Token[EVMTokenAmount]):
         self.decimals = decimals
 
     def __repr__(self):
-        return f'{self.__class__.__name__}(symbol={self.symbol}, address={self.address})'
+        return f"{self.__class__.__name__}(symbol={self.symbol}, address={self.address})"
 
     def get_allowance(self, owner: str, spender: str) -> EVMTokenAmount:
         assert self.contract is not None and self.client is not None
-        allowance: int = (
-            self.contract.functions
-            .allowance(owner, spender)
-            .call(block_identifier=self.client.block)
+        allowance: int = self.contract.functions.allowance(owner, spender).call(
+            block_identifier=self.client.block
         )
         return EVMTokenAmount(self, int_amount=allowance)
 
@@ -131,7 +129,7 @@ class ERC20Token(Token[EVMTokenAmount]):
         assert self.contract is not None
         contract_call = self.contract.functions.approve(spender, amount)
         tx_hash = client.sign_and_send_contract_tx(contract_call)
-        log.debug(f'Set allowance for {spender} to {amount} ({tx_hash})')
+        log.debug(f"Set allowance for {spender} to {amount} ({tx_hash})")
         return tx_hash
 
     @property
@@ -140,10 +138,11 @@ class ERC20Token(Token[EVMTokenAmount]):
 
     def __lt__(self, other):
         """Use same logic as Uniswap:
-            https://github.com/Uniswap/uniswap-sdk-core/blob/main/src/entities/token.ts#L37"""
+        https://github.com/Uniswap/uniswap-sdk-core/blob/main/src/entities/token.ts#L37"""
         if isinstance(other, type(self)):
-            assert self.chain_id == other.chain_id, \
-                f'Cannot compare tokens in different chains {self.chain_id} / {other.chain_id}'
+            assert (
+                self.chain_id == other.chain_id
+            ), f"Cannot compare tokens in different chains {self.chain_id} / {other.chain_id}"
             return self.address.lower() < other.address.lower()
         return NotImplemented
 
@@ -154,7 +153,7 @@ EVMToken = Union[EVMNativeToken, ERC20Token]
 class BaseEVMClient(ABC):
     endpoint_uri: str
     chain_id: int
-    block: int | Literal['latest']
+    block: int | Literal["latest"]
     w3: Web3
     account: LocalAccount
     address: str

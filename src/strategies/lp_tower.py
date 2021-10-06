@@ -15,27 +15,40 @@ from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.exceptions import LCDResponseError
 
 import utils
-from chains.terra import (LUNA, UST, TerraClient, TerraNativeToken, TerraToken, TerraTokenAmount,
-                          terraswap)
+from chains.terra import (
+    LUNA,
+    UST,
+    TerraClient,
+    TerraNativeToken,
+    TerraToken,
+    TerraTokenAmount,
+    terraswap,
+)
 from exceptions import BlockchainNewState, IsBusy, TxError, UnprofitableArbitrage
 
-from .common.single_tx_arbitrage_state import (ArbitrageData, BaseArbParams, BaseArbResult,
-                                               BaseArbTx, ExecutionState, TxStatus)
+from .common.single_tx_arbitrage_state import (
+    ArbitrageData,
+    BaseArbParams,
+    BaseArbResult,
+    BaseArbTx,
+    ExecutionState,
+    TxStatus,
+)
 
 log = logging.getLogger(__name__)
 
 MIN_PROFIT_UST = UST.to_amount(2)
 MIN_START_AMOUNT = UST.to_amount(10)
-OPTIMIZATION_TOLERANCE = UST.to_amount('0.01')
+OPTIMIZATION_TOLERANCE = UST.to_amount("0.01")
 MIN_CONFIRMATIONS = 1
 MAX_BLOCKS_WAIT_RECEIPT = 10
-MAX_SLIPPAGE = Decimal('0.001')
-SWAP_FIRST_LAST_MSG_UST_TOL = Decimal('0.5')
+MAX_SLIPPAGE = Decimal("0.001")
+SWAP_FIRST_LAST_MSG_UST_TOL = Decimal("0.5")
 
 
 class Direction(str, Enum):
-    remove_liquidity_first = 'remove_liquidity_first'
-    swap_first = 'swap_first'
+    remove_liquidity_first = "remove_liquidity_first"
+    swap_first = "swap_first"
 
 
 @dataclass
@@ -58,18 +71,18 @@ class ArbParams(BaseArbParams):
 
     def to_data(self) -> dict:
         return {
-            'timestamp_found': self.timestamp_found,
-            'block_found': self.block_found,
-            'prices': {token.symbol: str(price) for token, price in self.prices.items()},
-            'prices_denom': self.prices_denom.denom,
-            'lp_tower_reserves': [reserve.to_data() for reserve in self.lp_tower_reserves],
-            'pool_0_lp_balance': self.pool_0_lp_balance.to_data(),
-            'direction': self.direction,
-            'initial_amount': self.initial_amount.to_data(),
-            'msgs': [msg.to_data() for msg in self.msgs],
-            'est_final_amount': self.est_final_amount.to_data(),
-            'est_fee': self.est_fee.to_data(),
-            'est_net_profit_ust': float(self.est_net_profit_ust),
+            "timestamp_found": self.timestamp_found,
+            "block_found": self.block_found,
+            "prices": {token.symbol: str(price) for token, price in self.prices.items()},
+            "prices_denom": self.prices_denom.denom,
+            "lp_tower_reserves": [reserve.to_data() for reserve in self.lp_tower_reserves],
+            "pool_0_lp_balance": self.pool_0_lp_balance.to_data(),
+            "direction": self.direction,
+            "initial_amount": self.initial_amount.to_data(),
+            "msgs": [msg.to_data() for msg in self.msgs],
+            "est_final_amount": self.est_final_amount.to_data(),
+            "est_fee": self.est_fee.to_data(),
+            "est_net_profit_ust": float(self.est_net_profit_ust),
         }
 
 
@@ -80,8 +93,8 @@ class ArbTx(BaseArbTx):
 
     def to_data(self) -> dict:
         return {
-            'timestamp_sent': self.timestamp_sent,
-            'tx_hash': self.tx_hash,
+            "timestamp_sent": self.timestamp_sent,
+            "tx_hash": self.tx_hash,
         }
 
 
@@ -101,15 +114,15 @@ class ArbResult(BaseArbResult):
 
     def to_data(self) -> dict:
         return {
-            'tx_status': self.tx_status,
-            'tx_err_log': self.tx_err_log,
-            'gas_use': self.gas_use,
-            'gas_cost': None if self.gas_cost is None else self.gas_cost.to_data(),
-            'tx_inclusion_delay': self.tx_inclusion_delay,
-            'timestamp_received': self.timestamp_received,
-            'block_received': self.block_received,
-            'final_amount': None if self.final_amount is None else self.final_amount.to_data(),
-            'net_profit': None if self.net_profit_ust is None else str(self.net_profit_ust),
+            "tx_status": self.tx_status,
+            "tx_err_log": self.tx_err_log,
+            "gas_use": self.gas_use,
+            "gas_cost": None if self.gas_cost is None else self.gas_cost.to_data(),
+            "tx_inclusion_delay": self.tx_inclusion_delay,
+            "timestamp_received": self.timestamp_received,
+            "block_received": self.block_received,
+            "final_amount": None if self.final_amount is None else self.final_amount.to_data(),
+            "net_profit": None if self.net_profit_ust is None else str(self.net_profit_ust),
         }
 
 
@@ -130,38 +143,38 @@ class LPTowerStrategy:
         self._amount_luna_swap_first_last_msg_tol = Decimal(0)
         self._flag_last_msg_tol = False
 
-        log.info(f'Initialized {self} at block={self.client.block}')
+        log.info(f"Initialized {self} at block={self.client.block}")
 
     def __repr__(self) -> str:
         return (
-            f'{self.__class__.__name__}(client={self.client}, '
-            f'pool_tower={self.pool_tower}, status={self.arbitrage_data.status})'
+            f"{self.__class__.__name__}(client={self.client}, "
+            f"pool_tower={self.pool_tower}, status={self.arbitrage_data.status})"
         )
 
     def run(self, block: int, mempool: dict = None):
         if self.arbitrage_data.status == ExecutionState.waiting_confirmation:
-            log.debug('Looking for tx confirmation(s)')
+            log.debug("Looking for tx confirmation(s)")
             try:
                 self.arbitrage_data.result = self._confirm_tx(block)
             except IsBusy:
                 return
             else:
-                log.info('Arbitrage executed', extra={'data': self.arbitrage_data.to_data()})
+                log.info("Arbitrage executed", extra={"data": self.arbitrage_data.to_data()})
                 self.arbitrage_data = ArbitrageData()
-        log.debug('Generating execution configuration')
+        log.debug("Generating execution configuration")
         try:
             self.arbitrage_data.params = params = self._get_arbitrage_params(block, mempool)
         except (UnprofitableArbitrage, TxError) as e:
             log.debug(e)
             return
-        log.debug('Broadcasting transaction')
+        log.debug("Broadcasting transaction")
         try:
             self.arbitrage_data.tx = self._broadcast_tx(params, block)
         except BlockchainNewState as e:
             log.warning(e)
             return
         else:
-            log.info('Arbitrage broadcasted', extra={'data': self.arbitrage_data.to_data()})
+            log.info("Arbitrage broadcasted", extra={"data": self.arbitrage_data.to_data()})
 
     def _confirm_tx(self, block: int) -> ArbResult:
         assert self.arbitrage_data.params is not None
@@ -205,16 +218,16 @@ class LPTowerStrategy:
         logs_from_contract = self.client.parse_from_contract_events(tx_events)
         first_event = logs_from_contract[0][self.pool_0.lp_token.contract_addr][0]
         last_event = logs_from_contract[-1][self.pool_0.lp_token.contract_addr][-1]
-        assert last_event['to'] == self.client.address
+        assert last_event["to"] == self.client.address
 
-        if first_event['to'] == self.pool_tower.contract_addr:  # swap first
-            assert last_event['action'] == 'mint'
-        elif first_event['to'] == self.pool_0.contract_addr:  # remove liquidity first
-            assert last_event['action'] == 'transfer'
+        if first_event["to"] == self.pool_tower.contract_addr:  # swap first
+            assert last_event["action"] == "mint"
+        elif first_event["to"] == self.pool_0.contract_addr:  # remove liquidity first
+            assert last_event["action"] == "transfer"
         else:
-            raise Exception('Error when decoding tx info')
-        first_amount = self.pool_0.lp_token.to_amount(int_amount=first_event['amount'])
-        final_amount = self.pool_0.lp_token.to_amount(int_amount=last_event['amount'])
+            raise Exception("Error when decoding tx info")
+        first_amount = self.pool_0.lp_token.to_amount(int_amount=first_event["amount"])
+        final_amount = self.pool_0.lp_token.to_amount(int_amount=last_event["amount"])
 
         pool_0_lp_price_luna = self._get_prices()[self.pool_0.lp_token]
         pool_0_lp_price_ust = pool_0_lp_price_luna * self.client.oracle.get_exchange_rate(LUNA, UST)
@@ -231,8 +244,9 @@ class LPTowerStrategy:
             prices[self.pool_1.lp_token],
         )
 
-        lp_ust_price = \
-            prices[self.pool_0.lp_token] * self.client.oracle.get_exchange_rate(LUNA, UST)
+        lp_ust_price = prices[self.pool_0.lp_token] * self.client.oracle.get_exchange_rate(
+            LUNA, UST
+        )
         pool_0_lp_balance = self.pool_0.lp_token.get_balance(self.client)
         self._amount_luna_swap_first_last_msg_tol = SWAP_FIRST_LAST_MSG_UST_TOL * prices[UST]
         initial_amount = self._get_optimal_argitrage_amount(
@@ -243,12 +257,12 @@ class LPTowerStrategy:
             fee = self.client.tx.estimate_fee(msgs)
         except LCDResponseError as e:
             log.debug(
-                'Error when estimating fee',
+                "Error when estimating fee",
                 extra={
-                    'data': {
-                        'balance_ratio': f'{balance_ratio:.3%}',
-                        'direction': direction,
-                        'msgs': [msg.to_data() for msg in msgs],
+                    "data": {
+                        "balance_ratio": f"{balance_ratio:.3%}",
+                        "direction": direction,
+                        "msgs": [msg.to_data() for msg in msgs],
                     },
                 },
                 exc_info=True,
@@ -258,7 +272,8 @@ class LPTowerStrategy:
         net_profit_ust = (final_amount - initial_amount).amount * lp_ust_price - gas_cost.amount
         if net_profit_ust < MIN_PROFIT_UST:
             raise UnprofitableArbitrage(
-                f'Low profitability: USD {net_profit_ust:.2f}, {balance_ratio=:0.3%}')
+                f"Low profitability: USD {net_profit_ust:.2f}, {balance_ratio=:0.3%}"
+            )
 
         return ArbParams(
             timestamp_found=time.time(),
@@ -307,7 +322,7 @@ class LPTowerStrategy:
         initial_lp_amount = self.pool_0.lp_token.to_amount(MIN_START_AMOUNT.amount / lp_ust_price)
         profit = self._get_gross_profit(initial_lp_amount, direction)
         if profit.amount * lp_ust_price < 0:
-            raise UnprofitableArbitrage(f'No profitability, {balance_ratio=:0.3%}')
+            raise UnprofitableArbitrage(f"No profitability, {balance_ratio=:0.3%}")
         func = partial(self._get_gross_profit_dec, direction=direction)
         with self._activate_last_msg_tol():
             lp_amount, _ = utils.optimization.optimize_bissection(
@@ -319,8 +334,8 @@ class LPTowerStrategy:
         amount = self.pool_0.lp_token.to_amount(lp_amount)
         if amount > pool_0_lp_balance:
             log.warning(
-                'Not enough balance for full arbitrage: '
-                f'wanted {amount.amount:.6f}, have {pool_0_lp_balance.amount:.6f}'
+                "Not enough balance for full arbitrage: "
+                f"wanted {amount.amount:.6f}, have {pool_0_lp_balance.amount:.6f}"
             )
             return pool_0_lp_balance
         return amount
@@ -383,7 +398,7 @@ class LPTowerStrategy:
 
     def _broadcast_tx(self, execution_config: ArbParams, block: int) -> ArbTx:
         if (latest_block := self.client.get_latest_block()) != block:
-            raise BlockchainNewState(f'{latest_block=} different from {block=}')
+            raise BlockchainNewState(f"{latest_block=} different from {block=}")
         res = self.client.tx.execute_msgs_async(execution_config.msgs, fee=execution_config.est_fee)
         return ArbTx(
             timestamp_sent=time.time(),
@@ -393,10 +408,10 @@ class LPTowerStrategy:
 
 def run():
     client = TerraClient(raise_on_syncing=True)
-    addresses = terraswap.get_addresses(client.chain_id)['pools']
-    pool_0 = terraswap.LiquidityPair(addresses['bluna_luna'], client)
-    pool_1 = terraswap.LiquidityPair(addresses['ust_luna'], client)
-    pool_tower = terraswap.LiquidityPair(addresses['bluna_luna_ust_luna'], client)
+    addresses = terraswap.get_addresses(client.chain_id)["pools"]
+    pool_0 = terraswap.LiquidityPair(addresses["bluna_luna"], client)
+    pool_1 = terraswap.LiquidityPair(addresses["ust_luna"], client)
+    pool_tower = terraswap.LiquidityPair(addresses["bluna_luna_ust_luna"], client)
     strategy = LPTowerStrategy(client, pool_0, pool_1, pool_tower)
     for block in client.wait_next_block():
         strategy.run(block)

@@ -127,7 +127,7 @@ download-notebooks: ## Download jupyter notebooks
 get-env: ## Download .env files
 	aws s3 sync $(DATA_SOURCE)/env env
 
-check-all: isort lint types test check-clean-tree ## Run all checks and tests
+check-all: lint test check-clean-tree ## Run all checks and tests
 
 check-clean-tree: ## Fail if git tree has unstaged/uncommited changes
 ifneq ($(shell git status -s),)
@@ -135,13 +135,10 @@ ifneq ($(shell git status -s),)
 endif
 	@exit 0
 
-isort: ## Check import sorts
+lint: ## Run linters
 	docker exec $(DEV_CONTAINER_NAME) isort -c src tests app.py
-
-lint: ## Run code style checker
+	docker exec $(DEV_CONTAINER_NAME) black --check src tests app.py
 	docker exec $(DEV_CONTAINER_NAME) flake8 src tests app.py
-
-types: ## Run type checker
 	docker exec $(DEV_CONTAINER_NAME) pyright
 
 test: ## Run test cases in tests directory

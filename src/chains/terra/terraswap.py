@@ -17,19 +17,19 @@ from .client import TerraClient
 from .core import CW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
 
 __all__ = [
-    'get_addresses',
-    'RouteStepNative',
-    'RouteStepTerraswap',
-    'LiquidityPair',
-    'Router',
+    "get_addresses",
+    "RouteStepNative",
+    "RouteStepTerraswap",
+    "LiquidityPair",
+    "Router",
 ]
 
 log = logging.getLogger(__name__)
 
-FEE = Decimal('0.003')
-TERRASWAP_CODE_ID_KEY = 'terraswap_pair'
-DEFAULT_MAX_SLIPPAGE_TOLERANCE = Decimal('0.001')
-ADDRESSES_FILE = 'resources/addresses/terra/{chain_id}/terraswap.json'
+FEE = Decimal("0.003")
+TERRASWAP_CODE_ID_KEY = "terraswap_pair"
+DEFAULT_MAX_SLIPPAGE_TOLERANCE = Decimal("0.001")
+ADDRESSES_FILE = "resources/addresses/terra/{chain_id}/terraswap.json"
 
 AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
 
@@ -40,14 +40,14 @@ class NotTerraswapPair(Exception):
 
 def _token_to_data(token: TerraToken) -> dict[str, dict[str, str]]:
     if isinstance(token, TerraNativeToken):
-        return {'native_token': {'denom': token.denom}}
-    return {'token': {'contract_addr': token.contract_addr}}
+        return {"native_token": {"denom": token.denom}}
+    return {"token": {"contract_addr": token.contract_addr}}
 
 
 def _token_amount_to_data(token_amount: TerraTokenAmount) -> dict:
     return {
-        'info': _token_to_data(token_amount.token),
-        'amount': str(token_amount.int_amount)
+        "info": _token_to_data(token_amount.token),
+        "amount": str(token_amount.int_amount),
     }
 
 
@@ -56,7 +56,7 @@ def _is_terraswap_pool(contract_addr: str, client: TerraClient) -> bool:
         info = client.contract_info(contract_addr)
     except NotContract:
         return False
-    return int(info['code_id']) == client.code_ids[TERRASWAP_CODE_ID_KEY]
+    return int(info["code_id"]) == client.code_ids[TERRASWAP_CODE_ID_KEY]
 
 
 def _pair_tokens_from_data(
@@ -67,15 +67,15 @@ def _pair_tokens_from_data(
 
 
 def _token_from_data(asset_info: dict, client: TerraClient) -> TerraToken:
-    if 'native_token' in asset_info:
-        return TerraNativeToken(asset_info['native_token']['denom'])
-    if 'token' in asset_info:
-        contract_addr: str = asset_info['token']['contract_addr']
+    if "native_token" in asset_info:
+        return TerraNativeToken(asset_info["native_token"]["denom"])
+    if "token" in asset_info:
+        contract_addr: str = asset_info["token"]["contract_addr"]
         try:
             return LPToken.from_contract(contract_addr, client)
         except NotTerraswapPair:
             return CW20Token.from_contract(contract_addr, client)
-    raise TypeError(f'Unexpected data format: {asset_info}')
+    raise TypeError(f"Unexpected data format: {asset_info}")
 
 
 def get_addresses(chain_id: str) -> dict:
@@ -92,7 +92,7 @@ class RouteStep(ABC):
         self.token_out = token_out
 
     def __repr__(self) -> str:
-        return f'{self.__class__.__name__}(token_in={self.token_in}, token_out={self.token_in})'
+        return f"{self.__class__.__name__}(token_in={self.token_in}, token_out={self.token_in})"
 
     @property
     def sorted_tokens(self) -> tuple[TerraToken, TerraToken]:
@@ -108,9 +108,9 @@ class RouteStep(ABC):
 class RouteStepTerraswap(RouteStep):
     def to_data(self) -> dict:
         return {
-            'terra_swap': {
-                'offer_asset_info': _token_to_data(self.token_in),
-                'ask_asset_info': _token_to_data(self.token_out),
+            "terra_swap": {
+                "offer_asset_info": _token_to_data(self.token_in),
+                "ask_asset_info": _token_to_data(self.token_out),
             }
         }
 
@@ -126,9 +126,9 @@ class RouteStepNative(RouteStep):
 
     def to_data(self) -> dict:
         return {
-            'native_swap': {
-                'offer_denom': self.token_in.denom,
-                'ask_denom': self.token_out.denom,
+            "native_swap": {
+                "offer_denom": self.token_in.denom,
+                "ask_denom": self.token_out.denom,
             }
         }
 
@@ -139,7 +139,7 @@ class Router:
         liquidity_pairs: list[LiquidityPair],
         client: TerraClient,
     ):
-        self.contract_addr = get_addresses(client.chain_id)['router']
+        self.contract_addr = get_addresses(client.chain_id)["router"]
         self.pairs = {pair.sorted_tokens: pair for pair in liquidity_pairs}
         self.client = client
 
@@ -150,14 +150,14 @@ class Router:
         route: list[RouteStep],
         max_slippage: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
-        assert route, 'route cannot be empty'
+        assert route, "route cannot be empty"
 
         swap_operations: list[dict] = []
         step_amount_in = amount_in
         for step in route:
             if isinstance(step, RouteStepTerraswap):
                 if step.sorted_tokens not in self.pairs:
-                    raise Exception(f'No liquidity pair found for {step.sorted_tokens}')
+                    raise Exception(f"No liquidity pair found for {step.sorted_tokens}")
                 pair = self.pairs[step.sorted_tokens]
                 amount_out = pair.get_swap_amount_out(step_amount_in, safety_round=False)
             else:
@@ -168,19 +168,19 @@ class Router:
 
         min_amount_out: TerraTokenAmount = amount_out * (1 - max_slippage)  # type: ignore
         swap_msg = {
-            'execute_swap_operations': {
-                'offer_amount': str(amount_in.int_amount),
-                'minimum_receive': str(min_amount_out.int_amount),
-                'operations': swap_operations,
+            "execute_swap_operations": {
+                "offer_amount": str(amount_in.int_amount),
+                "minimum_receive": str(min_amount_out.int_amount),
+                "operations": swap_operations,
             }
         }
         if isinstance(amount_in.token, CW20Token):
             contract = amount_in.token.contract_addr
             execute_msg = {
-                'send': {
-                    'contract': self.contract_addr,
-                    'amount': str(amount_in.int_amount),
-                    'msg': swap_msg,
+                "send": {
+                    "contract": self.contract_addr,
+                    "amount": str(amount_in.int_amount),
+                    "msg": swap_msg,
                 }
             }
             coins = []
@@ -204,16 +204,17 @@ class LiquidityPair:
         self.contract_addr = contract_addr
         self.client = client
 
-        pair_data = self.client.contract_query(self.contract_addr, {'pair': {}})
-        self.tokens = _pair_tokens_from_data(pair_data['asset_infos'], client)
-        self.lp_token = LPToken.from_pool(pair_data['liquidity_token'], self)
+        pair_data = self.client.contract_query(self.contract_addr, {"pair": {}})
+        self.tokens = _pair_tokens_from_data(pair_data["asset_infos"], client)
+        self.lp_token = LPToken.from_pool(pair_data["liquidity_token"], self)
 
         self.stop_updates = False
         self._reserves = self.tokens[0].to_amount(), self.tokens[1].to_amount()
 
     def __repr__(self) -> str:
-        return \
-            f'{self.__class__.__name__}({self.tokens[0].repr_symbol}/{self.tokens[1].repr_symbol})'
+        return (
+            f"{self.__class__.__name__}({self.tokens[0].repr_symbol}/{self.tokens[1].repr_symbol})"
+        )
 
     @property
     def reserves(self) -> AmountTuple:
@@ -223,10 +224,10 @@ class LiquidityPair:
 
     @ttl_cache(CacheGroup.TERRA, maxsize=1)
     def _get_reserves(self) -> AmountTuple:
-        data = self.client.contract_query(self.contract_addr, {'pool': {}})['assets']
+        data = self.client.contract_query(self.contract_addr, {"pool": {}})["assets"]
         return (
-            self.tokens[0].to_amount(int_amount=data[0]['amount']),
-            self.tokens[1].to_amount(int_amount=data[1]['amount']),
+            self.tokens[0].to_amount(int_amount=data[0]["amount"]),
+            self.tokens[1].to_amount(int_amount=data[1]["amount"]),
         )
 
     @property
@@ -253,7 +254,7 @@ class LiquidityPair:
             return amounts[1], amounts[0]
         if (amounts[0].token, amounts[1].token) == self.tokens:
             return amounts
-        raise Exception('Tokens in amounts do not match reserves')
+        raise Exception("Tokens in amounts do not match reserves")
 
     def get_price(self, token_quote: TerraNativeToken) -> Decimal:
         if token_quote in self.tokens:
@@ -265,7 +266,7 @@ class LiquidityPair:
                     reference_token = token
                     break
             else:
-                raise NotImplementedError('not implemented for pools without a native token')
+                raise NotImplementedError("not implemented for pools without a native token")
             exchange_rate = self.client.oracle.get_exchange_rate(reference_token, token_quote)
         for reserve in self.reserves:
             if reserve.token == reference_token:
@@ -291,7 +292,7 @@ class LiquidityPair:
         amount_in: TerraTokenAmount,
         safety_round: bool = True,
     ) -> TerraTokenAmount:
-        return self.get_swap_amounts(amount_in, safety_round)['amounts_out'][1]
+        return self.get_swap_amounts(amount_in, safety_round)["amounts_out"][1]
 
     def get_swap_amounts(
         self,
@@ -310,21 +311,19 @@ class LiquidityPair:
         amount_out = amount_out - (tax := self.client.treasury.calculate_tax(amount_out))
 
         return {
-            'amounts_out': (amount_in * 0, amount_out),
-            'fees': (amount_in * 0, fee),
-            'taxes': (amount_in * 0, tax),
-            'pool_change': (amount_in, -amount_out - tax),
+            "amounts_out": (amount_in * 0, amount_out),
+            "fees": (amount_in * 0, fee),
+            "taxes": (amount_in * 0, tax),
+            "pool_change": (amount_in, -amount_out - tax),
         }
 
     def _get_in_out_reserves(
-        self,
-        amount_in: TerraTokenAmount = None,
-        amount_out: TerraTokenAmount = None
+        self, amount_in: TerraTokenAmount = None, amount_out: TerraTokenAmount = None
     ) -> AmountTuple:
         """Given an amount in and/or an amount out, checks for insuficient liquidity and return
         the reserves pair in order reserve_in, reserve_out"""
-        assert amount_in is None or amount_in.token in self.tokens, 'amount_in not in pair'
-        assert amount_out is None or amount_out.token in self.tokens, 'amount_out not in pair'
+        assert amount_in is None or amount_in.token in self.tokens, "amount_in not in pair"
+        assert amount_out is None or amount_out.token in self.tokens, "amount_out not in pair"
 
         if self.reserves[0] == 0 or self.reserves[1] == 0:
             raise InsufficientLiquidity
@@ -333,7 +332,7 @@ class LiquidityPair:
         elif amount_out is not None:
             token_in = self.tokens[0] if amount_out.token == self.tokens[1] else self.tokens[1]
         else:
-            raise Exception('At least one of token_in or token_out must be passed')
+            raise Exception("At least one of token_in or token_out must be passed")
 
         if token_in == self.tokens[0]:
             reserve_in, reserve_out = self.reserves
@@ -350,35 +349,24 @@ class LiquidityPair:
         min_out: TerraTokenAmount,
     ) -> MsgExecuteContract:
         belief_price = amount_in.amount / min_out.amount
-        swap_msg = {
-            'belief_price': f'{belief_price:.18f}',
-            'max_spread': '0.0'
-        }
+        swap_msg = {"belief_price": f"{belief_price:.18f}", "max_spread": "0.0"}
         if isinstance(token_in := amount_in.token, CW20Token):
             contract = token_in.contract_addr
             execute_msg = {
-                'send': {
-                    'contract': self.contract_addr,
-                    'amount': str(amount_in.int_amount),
-                    'msg': TerraClient.encode_msg({'swap': swap_msg})
+                "send": {
+                    "contract": self.contract_addr,
+                    "amount": str(amount_in.int_amount),
+                    "msg": TerraClient.encode_msg({"swap": swap_msg}),
                 }
             }
             coins = []
         else:
             contract = self.contract_addr
-            execute_msg = {
-                'swap': {
-                    'offer_asset': _token_amount_to_data(amount_in),
-                    **swap_msg
-                }
-            }
+            execute_msg = {"swap": {"offer_asset": _token_amount_to_data(amount_in), **swap_msg}}
             coins = [amount_in.to_coin()]
 
         return MsgExecuteContract(
-            sender=sender,
-            contract=contract,
-            execute_msg=execute_msg,
-            coins=coins
+            sender=sender, contract=contract, execute_msg=execute_msg, coins=coins
         )
 
     def op_remove_single_side(
@@ -393,10 +381,10 @@ class LiquidityPair:
         amounts = self.get_remove_liquidity_amounts(amount_burn)
         msg_remove_liquidity = self.build_remove_liquidity_msg(sender, amount_burn)
         if token_out == self.tokens[0]:
-            amount_keep, amount_swap = amounts['amounts_out']
+            amount_keep, amount_swap = amounts["amounts_out"]
         else:
-            amount_swap, amount_keep = amounts['amounts_out']
-        with self.simulate_reserve_change(amounts['pool_change']):
+            amount_swap, amount_keep = amounts["amounts_out"]
+        with self.simulate_reserve_change(amounts["pool_change"]):
             amount_out, msgs_swap = self.op_swap(sender, amount_swap, max_slippage, safety_round)
         return amount_keep + amount_out, [msg_remove_liquidity] + msgs_swap
 
@@ -405,7 +393,7 @@ class LiquidityPair:
         amount_burn: TerraTokenAmount,
         safety_round: bool = True,
     ) -> AmountTuple:
-        return self.get_remove_liquidity_amounts(amount_burn, safety_round)['amounts_out']
+        return self.get_remove_liquidity_amounts(amount_burn, safety_round)["amounts_out"]
 
     def get_remove_liquidity_amounts(
         self,
@@ -422,13 +410,13 @@ class LiquidityPair:
 
         taxes = (
             self.client.treasury.calculate_tax(amounts[0]),
-            self.client.treasury.calculate_tax(amounts[1])
+            self.client.treasury.calculate_tax(amounts[1]),
         )
         amounts_out = amounts[0] - taxes[0], amounts[1] - taxes[1]
         return {
-            'amounts_out': amounts_out,
-            'taxes': taxes,
-            'pool_change': (-amounts[0], -amounts[1]),
+            "amounts_out": amounts_out,
+            "taxes": taxes,
+            "pool_change": (-amounts[0], -amounts[1]),
         }
 
     def build_remove_liquidity_msg(
@@ -438,10 +426,10 @@ class LiquidityPair:
     ) -> MsgExecuteContract:
         assert amount_burn.token == self.lp_token
         execute_msg = {
-            'send': {
-                'amount': str(amount_burn.int_amount),
-                'contract': self.contract_addr,
-                'msg': TerraClient.encode_msg({'withdraw_liquidity': {}})
+            "send": {
+                "amount": str(amount_burn.int_amount),
+                "contract": self.contract_addr,
+                "msg": TerraClient.encode_msg({"withdraw_liquidity": {}}),
             }
         }
         return MsgExecuteContract(
@@ -478,17 +466,20 @@ class LiquidityPair:
         amount_in_swap = amount_in * ratio_swap
         amounts_swap = self.get_swap_amounts(amount_in_swap, safety_round=False)
 
-        if (tax := amounts_swap['taxes'][1]) > 0:
+        if (tax := amounts_swap["taxes"][1]) > 0:
             amount_in_swap += reserve_in * (tax / reserve_out / 2)
             amounts_swap = self.get_swap_amounts(amount_in_swap, safety_round=False)
 
-        min_amount_out = amounts_swap['amounts_out'][1] * (1 - slippage_tolerance)
+        min_amount_out = amounts_swap["amounts_out"][1] * (1 - slippage_tolerance)
         msg_swap = self.build_swap_msg(sender, amount_in_swap, min_amount_out)
 
         amount_in_keep = amount_in - amount_in_swap
-        amounts_add = (amount_in_keep.safe_down(), amounts_swap['amounts_out'][1].safe_down())
+        amounts_add = (
+            amount_in_keep.safe_down(),
+            amounts_swap["amounts_out"][1].safe_down(),
+        )
 
-        with self.simulate_reserve_change(amounts_swap['pool_change']):
+        with self.simulate_reserve_change(amounts_swap["pool_change"]):
             amount_out, msgs_add_liquidity = self.op_add_liquidity(
                 sender, amounts_add, slippage_tolerance, safety_round
             )
@@ -539,25 +530,23 @@ class LiquidityPair:
             if not amount.has_allowance(self.client, self.contract_addr, sender):
                 msgs.append(amount.build_msg_increase_allowance(self.contract_addr, sender))
         execute_msg = {
-            'provide_liquidity': {
-                'assets': [
+            "provide_liquidity": {
+                "assets": [
                     _token_amount_to_data(amounts_in[0]),
                     _token_amount_to_data(amounts_in[1]),
                 ],
-                'slippage_tolerance': str(round(slippage_tolerance, 18)),
+                "slippage_tolerance": str(round(slippage_tolerance, 18)),
             }
         }
         coins = [
-            amount.to_coin()
-            for amount in amounts_in
-            if isinstance(amount.token, TerraNativeToken)
+            amount.to_coin() for amount in amounts_in if isinstance(amount.token, TerraNativeToken)
         ]
         msgs.append(
             MsgExecuteContract(
                 sender=sender,
                 contract=self.contract_addr,
                 execute_msg=execute_msg,
-                coins=coins
+                coins=coins,
             )
         )
         return msgs
@@ -574,9 +563,9 @@ class LPToken(CW20Token):
 
     @classmethod
     def from_contract(cls, contract_addr: str, client: TerraClient) -> LPToken:
-        minter_addr = client.contract_query(contract_addr, {'minter': {}})['minter']
+        minter_addr = client.contract_query(contract_addr, {"minter": {}})["minter"]
         return LiquidityPair(minter_addr, client).lp_token
 
     @property
     def repr_symbol(self):
-        return '-'.join(t.repr_symbol for t in self.pair_tokens)
+        return "-".join(t.repr_symbol for t in self.pair_tokens)

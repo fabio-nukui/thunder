@@ -1,1 +1,1 @@
-make isort lint types
+make lint

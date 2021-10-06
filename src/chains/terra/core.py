@@ -9,8 +9,11 @@ from terra_sdk.client.lcd.lcdclient import LCDClient
 from terra_sdk.client.lcd.wallet import Wallet
 from terra_sdk.core import Coin
 from terra_sdk.core.auth.data.tx import StdFee
-from terra_sdk.core.broadcast import (AsyncTxBroadcastResult, BlockTxBroadcastResult,
-                                      SyncTxBroadcastResult)
+from terra_sdk.core.broadcast import (
+    AsyncTxBroadcastResult,
+    BlockTxBroadcastResult,
+    SyncTxBroadcastResult,
+)
 from terra_sdk.core.coins import Coins
 from terra_sdk.core.msg import Msg
 from terra_sdk.core.wasm.msgs import MsgExecuteContract
@@ -54,15 +57,15 @@ class TerraNativeToken(BaseTerraToken):
 
     def __init__(self, denom: str):
         self.denom = denom
-        self.symbol = 'LUNA' if denom == 'uluna' else denom[1:-1].upper() + 'T'
-        if denom[0] == 'u':
+        self.symbol = "LUNA" if denom == "uluna" else denom[1:-1].upper() + "T"
+        if denom[0] == "u":
             self.decimals = 6
         else:
-            raise NotImplementedError('TerraNativeToken only implemented for micro (µ) demons')
+            raise NotImplementedError("TerraNativeToken only implemented for micro (µ) demons")
 
     @property
     def _id(self) -> tuple:
-        return (self.denom, )
+        return (self.denom,)
 
     def get_balance(self, client: BaseTerraClient, address: str = None) -> TerraTokenAmount:
         balances = client.get_bank([self.denom], address)
@@ -71,7 +74,7 @@ class TerraNativeToken(BaseTerraToken):
         return balances[0]
 
 
-_CW20TokenT = TypeVar('_CW20TokenT', bound='CW20Token')
+_CW20TokenT = TypeVar("_CW20TokenT", bound="CW20Token")
 
 
 class CW20Token(BaseTerraToken):
@@ -84,7 +87,7 @@ class CW20Token(BaseTerraToken):
 
     @property
     def _id(self) -> tuple:
-        return (self.contract_addr, )
+        return (self.contract_addr,)
 
     @classmethod
     def from_contract(
@@ -92,17 +95,17 @@ class CW20Token(BaseTerraToken):
         contract_addr: str,
         client: BaseTerraClient,
     ) -> _CW20TokenT:
-        res = client.contract_query(contract_addr, {'token_info': {}})
-        return cls(contract_addr, res['symbol'], res['decimals'])
+        res = client.contract_query(contract_addr, {"token_info": {}})
+        return cls(contract_addr, res["symbol"], res["decimals"])
 
     def get_balance(self, client: BaseTerraClient, address: str = None) -> TerraTokenAmount:
         address = client.address if address is None else address
-        res = client.contract_query(self.contract_addr, {'balance': {'address': address}})
-        return self.to_amount(int_amount=res['balance'])
+        res = client.contract_query(self.contract_addr, {"balance": {"address": address}})
+        return self.to_amount(int_amount=res["balance"])
 
     def get_supply(self, client: BaseTerraClient) -> TerraTokenAmount:
-        res = client.contract_query(self.contract_addr, {'token_info': {}})
-        return self.to_amount(int_amount=res['total_supply'])
+        res = client.contract_query(self.contract_addr, {"token_info": {}})
+        return self.to_amount(int_amount=res["total_supply"])
 
     def get_allowance(
         self,
@@ -111,9 +114,9 @@ class CW20Token(BaseTerraToken):
         owner: str = None,
     ) -> TerraTokenAmount:
         owner = client.address if owner is None else owner
-        query = {'allowance': {'owner': owner, 'spender': spender}}
+        query = {"allowance": {"owner": owner, "spender": spender}}
         res = client.contract_query(self.contract_addr, query)
-        return self.to_amount(int_amount=res['allowance'])
+        return self.to_amount(int_amount=res["allowance"])
 
     def build_msg_increase_allowance(
         self,
@@ -122,9 +125,9 @@ class CW20Token(BaseTerraToken):
         amount: int | str,
     ) -> MsgExecuteContract:
         execute_msg = {
-            'increase_allowance': {
-                'spender': spender,
-                'amount': str(amount),
+            "increase_allowance": {
+                "spender": spender,
+                "amount": str(amount),
             }
         }
         return MsgExecuteContract(
@@ -217,8 +220,8 @@ class BaseOracleApi(Api, ABC):
 
 
 class TaxPayer(str, Enum):
-    account = 'account'
-    contract = 'contract'
+    account = "account"
+    contract = "contract"
 
 
 class BaseTreasuryApi(Api, ABC):

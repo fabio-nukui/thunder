@@ -1,5 +1,5 @@
-[tool.isort]
-line_length = 100
+[tool.pytest.ini_options]
+filterwarnings = ["ignore::FutureWarning"]
 
 [tool.pyright]
 include = ["src", "tests", "app.py"]
@@ -7,5 +7,10 @@ pythonVersion = "3.9"
 pythonPlatform = "Linux"
 exclude = ["**/node_modules", "**/__pycache__", ".git"]
 
-[tool.pytest.ini_options]
-filterwarnings = ["ignore::FutureWarning"]
+[tool.black]
+line-length = 100
+target-version = ["py39"]
+
+[tool.isort]
+line_length = 100
+profile = "black"

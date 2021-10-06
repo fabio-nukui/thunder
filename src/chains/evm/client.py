@@ -39,7 +39,7 @@ class EVMClient(BaseEVMClient):
         hd_wallet: dict = None,
         hd_wallet_index: int = 0,
         timeout: int = DEFAULT_CONN_TIMEOUT,
-        block: int | Literal['latest'] = 'latest',
+        block: int | Literal["latest"] = "latest",
     ):
         self.endpoint_uri = endpoint_uri
         self.chain_id = chain_id
@@ -52,32 +52,33 @@ class EVMClient(BaseEVMClient):
         hd_wallet = auth_secrets.hd_wallet() if hd_wallet is None else hd_wallet
 
         self.account: LocalAccount = Account.from_mnemonic(
-            hd_wallet['mnemonic'],
+            hd_wallet["mnemonic"],
             account_path=f"m/44'/{coin_type}'/{hd_wallet['account']}'/0/{hd_wallet_index}",
         )
         self.address: str = self.account.address
-        log.info(f'Initialized {self}')
+        log.info(f"Initialized {self}")
 
     def __repr__(self) -> str:
-        return \
-            f'{self.__class__.__name__}(endpoint_uri={self.endpoint_uri}, address={self.address})'
+        return (
+            f"{self.__class__.__name__}(endpoint_uri={self.endpoint_uri}, address={self.address})"
+        )
 
     def get_gas_price(self) -> int:
         return self.w3.eth.gas_price
 
     def sign_and_send_tx(self, tx: dict) -> str:
         tx = copy(tx)
-        tx.setdefault('gas', DEFAULT_MAX_GAS)
+        tx.setdefault("gas", DEFAULT_MAX_GAS)
 
         # Avoid dict's setdefault() or get() to avoid side effects / calling expensive functions
-        if 'nonce' not in tx:
-            tx['nonce'] = self.w3.eth.get_transaction_count(self.address)
-        tx['gasPrice'] = tx['gasPrice'] if 'gasPrice' in tx else self.get_gas_price()
+        if "nonce" not in tx:
+            tx["nonce"] = self.w3.eth.get_transaction_count(self.address)
+        tx["gasPrice"] = tx["gasPrice"] if "gasPrice" in tx else self.get_gas_price()
 
         signed_tx: SignedTransaction = self.account.sign_transaction(tx)
         tx_hash = signed_tx.hash.hex()
 
-        log.debug(f'Sending transaction {tx_hash}: {tx}')
+        log.debug(f"Sending transaction {tx_hash}: {tx}")
         return self.w3.eth.send_raw_transaction(signed_tx.rawTransaction).hex()
 
     def sign_and_send_contract_tx(
@@ -87,13 +88,15 @@ class EVMClient(BaseEVMClient):
         gas_price: int = None,
         max_gas: int = DEFAULT_MAX_GAS,
     ) -> str:
-        tx = contract_call.buildTransaction({
-            'from': self.address,
-            'value': value,
-            'chainId': self.chain_id,
-            'gas': max_gas,
-            'gasPrice': self.get_gas_price() if gas_price is None else gas_price,
-        })
+        tx = contract_call.buildTransaction(
+            {
+                "from": self.address,
+                "value": value,
+                "chainId": self.chain_id,
+                "gas": max_gas,
+                "gasPrice": self.get_gas_price() if gas_price is None else gas_price,
+            }
+        )
         return self.sign_and_send_tx(tx)
 
 
@@ -140,14 +143,14 @@ def get_w3(
     middlewares: list[str] = None,
     timeout: int = DEFAULT_CONN_TIMEOUT,
 ) -> Web3:
-    if endpoint_uri.startswith('http'):
-        provider = HTTPProvider(endpoint_uri, request_kwargs={'timeout': timeout})
-    elif endpoint_uri.startswith('wss'):
+    if endpoint_uri.startswith("http"):
+        provider = HTTPProvider(endpoint_uri, request_kwargs={"timeout": timeout})
+    elif endpoint_uri.startswith("wss"):
         provider = WebsocketProvider(endpoint_uri, websocket_timeout=timeout)
-    elif endpoint_uri.endswith('ipc'):
+    elif endpoint_uri.endswith("ipc"):
         provider = IPCProvider(endpoint_uri, timeout)
     else:
-        raise ValueError(f'Invalid {endpoint_uri=}')
+        raise ValueError(f"Invalid {endpoint_uri=}")
 
     if middlewares is None:
         middlewares = []

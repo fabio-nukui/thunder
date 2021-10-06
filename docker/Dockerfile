@@ -77,6 +77,7 @@ USER $USER
 
 RUN conda install --quiet --yes \
         'autopep8' \
+        'black' \
         'flake8' \
         'ipython' \
         'isort' \

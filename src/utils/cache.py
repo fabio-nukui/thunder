@@ -17,11 +17,11 @@ _caches: dict[CacheGroup, list[TTLCache | TTLCacheStats]] = defaultdict(list)
 
 
 class CacheGroup(Enum):
-    ALL = 'all'
-    DEFAULT = 'default'
-    BSC = 'bsc'
-    ETHEREUM = 'ethereum'
-    TERRA = 'terra'
+    ALL = "all"
+    DEFAULT = "default"
+    BSC = "bsc"
+    ETHEREUM = "ethereum"
+    TERRA = "terra"
 
 
 CACHE_GROUPS_TTL = {
@@ -36,6 +36,7 @@ CACHE_GROUPS_TTL[CacheGroup.ALL] = min(CACHE_GROUPS_TTL.values())
 
 class _HashedTupleJSON(_HashedTuple):
     """Use JSON serialization as fallback for non-hashable arguments in caches"""
+
     __hashvalue = None
 
     def __hash__(self, hash=tuple.__hash__):
@@ -86,7 +87,7 @@ class TTLCacheStats(TTLCache):
         hit = super().__getitem__(key)
         self._n_hit += 1
         self._n_hit_total += 1
-        log.debug(f'Cache hit: {key}, {hit}')
+        log.debug(f"Cache hit: {key}, {hit}")
 
         return hit
 
@@ -94,12 +95,12 @@ class TTLCacheStats(TTLCache):
         super().__setitem__(k, v)
         self._n_miss += 1
         self._n_miss_total += 1
-        log.debug(f'Cache set: {k}, {v}')
+        log.debug(f"Cache set: {k}, {v}")
 
     def setdefault(self, k, v):
         self._n_miss += 1
         self._n_miss_total += 1
-        log.debug(f'Cache set: {k}, {v}')
+        log.debug(f"Cache set: {k}, {v}")
 
         return super().setdefault(k, v)
 
@@ -126,7 +127,7 @@ def ttl_cache(
     if isinstance(group, CacheGroup):
         cache = _get_ttl_cache(group, maxsize, ttl)
         return cached(cache, key=_hashkey_json)
-    raise TypeError('Expected first argument to be a CacheGroup or a callable')
+    raise TypeError("Expected first argument to be a CacheGroup or a callable")
 
 
 def clear_caches(
@@ -146,15 +147,16 @@ def clear_caches(
 
 def get_stats():
     if not configs.CACHE_STATS:
-        raise Exception('Stats only available if configs.CACHE_STATS=True')
+        raise Exception("Stats only available if configs.CACHE_STATS=True")
     all_caches = [
         cache
-        for list_caches in _caches.values() for cache in list_caches
+        for list_caches in _caches.values()
+        for cache in list_caches
         if isinstance(cache, TTLCacheStats)
     ]
     return {
-        'n_hit': sum(cache._n_hit for cache in all_caches),
-        'n_miss': sum(cache._n_miss for cache in all_caches),
-        'n_hit_total': sum(cache._n_hit_total for cache in all_caches),
-        'n_miss_total': sum(cache._n_hit_total for cache in all_caches),
+        "n_hit": sum(cache._n_hit for cache in all_caches),
+        "n_miss": sum(cache._n_miss for cache in all_caches),
+        "n_hit_total": sum(cache._n_hit_total for cache in all_caches),
+        "n_miss_total": sum(cache._n_hit_total for cache in all_caches),
     }

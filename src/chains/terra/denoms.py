@@ -1,5 +1,5 @@
 from .core import TerraNativeToken
 
-UST = TerraNativeToken('uusd')
-SDT = TerraNativeToken('usdr')
-LUNA = TerraNativeToken('uluna')
+UST = TerraNativeToken("uusd")
+SDT = TerraNativeToken("usdr")
+LUNA = TerraNativeToken("uluna")
