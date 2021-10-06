@@ -14,7 +14,7 @@ from terra_sdk.key.mnemonic import MnemonicKey
 import auth_secrets
 import configs
 import utils
-from exceptions import NotContract
+from exceptions import NodeSyncing, NotContract
 from utils.cache import CacheGroup, ttl_cache
 
 from ..core import BaseTerraClient, TerraTokenAmount
@@ -46,6 +46,7 @@ class TerraClient(BaseTerraClient):
         gas_prices: Coins.Input = None,
         gas_adjustment: float = configs.TERRA_GAS_ADJUSTMENT,
         hd_wallet_index: int = 0,
+        raise_on_syncing: bool = False,
     ):
         self.lcd_uri = lcd_uri
         self.fcd_uri = fcd_uri
@@ -68,6 +69,8 @@ class TerraClient(BaseTerraClient):
 
         self.code_ids = _get_code_ids(self.chain_id)
         self.block = self.get_latest_block()
+        if raise_on_syncing and self.lcd.tendermint.syncing():
+            raise NodeSyncing(self.block)
 
         log.info(f'Initialized {self} at block={self.block}')
 

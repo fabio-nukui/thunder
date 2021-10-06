@@ -451,7 +451,7 @@ class LPTowerStrategy:
 
 
 def run():
-    client = TerraClient()
+    client = TerraClient(raise_on_syncing=True)
     addresses = terraswap.get_addresses(client.chain_id)['pools']
     pool_0 = terraswap.LiquidityPair(addresses['bluna_luna'], client)
     pool_1 = terraswap.LiquidityPair(addresses['ust_luna'], client)
