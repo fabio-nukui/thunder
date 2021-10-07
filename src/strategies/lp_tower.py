@@ -112,7 +112,7 @@ class LPTowerStrategy(TerraSingleTxArbitrage):
             balance_ratio,
             luna_swap_first_adjustment,
         )
-        final_amount, msgs = self._get_amount_out_and_msgs(initial_amount, direction)
+        final_amount, msgs = self._op_arbitrage(initial_amount, direction)
         try:
             fee = self.client.tx.estimate_fee(msgs)
         except LCDResponseError as e:
@@ -210,9 +210,7 @@ class LPTowerStrategy(TerraSingleTxArbitrage):
         direction: Direction,
         luna_swap_first_adjustment: Decimal = None,
     ) -> TerraTokenAmount:
-        amount_out, _ = self._get_amount_out_and_msgs(
-            initial_lp_amount, direction, luna_swap_first_adjustment
-        )
+        amount_out, _ = self._op_arbitrage(initial_lp_amount, direction, luna_swap_first_adjustment)
         return amount_out - initial_lp_amount
 
     def _get_gross_profit_dec(
@@ -224,7 +222,7 @@ class LPTowerStrategy(TerraSingleTxArbitrage):
         token_amount = self.pool_0.lp_token.to_amount(amount)
         return self._get_gross_profit(token_amount, direction, luna_swap_first_adjustment).amount
 
-    def _get_amount_out_and_msgs(
+    def _op_arbitrage(
         self,
         initial_lp_amount: TerraTokenAmount,
         direction: Direction,
@@ -257,8 +255,8 @@ class LPTowerStrategy(TerraSingleTxArbitrage):
         return final_lp_amount, msgs
 
     def _extract_returns_from_logs(self, logs: list[TxLog]) -> tuple[TerraTokenAmount, Decimal]:
-        tx_events = self.client.extract_log_events(logs)
-        logs_from_contract = self.client.parse_from_contract_events(tx_events)
+        tx_events = TerraClient.extract_log_events(logs)
+        logs_from_contract = TerraClient.parse_from_contract_events(tx_events)
         first_event = logs_from_contract[0][self.pool_0.lp_token.contract_addr][0]
         last_event = logs_from_contract[-1][self.pool_0.lp_token.contract_addr][-1]
         assert last_event["to"] == self.client.address

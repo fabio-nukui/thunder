@@ -8,8 +8,7 @@ from terra_sdk.core.auth import StdFee, TxLog
 from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.exceptions import LCDResponseError
 
-from chains.terra.client.client_sync import TerraClient
-from chains.terra.core import TerraTokenAmount
+from chains.terra import TerraClient, TerraTokenAmount
 from exceptions import BlockchainNewState, IsBusy
 
 from .single_tx_arbitrage import ArbResult, ArbTx, BaseArbParams, SingleTxArbitrage, TxStatus
