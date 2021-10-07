@@ -24,7 +24,7 @@ class State(str, Enum):
 class TxStatus(str, Enum):
     succeeded = "succeeded"
     failed = "failed"
-    not_found = "not_found"
+    not_found = "not found"
 
 
 class BaseArbParams(ABC):
@@ -127,6 +127,7 @@ class SingleTxArbitrage(Generic[_BlockchainClientT], ABC):
                 self.data.tx = self._broadcast_tx(self.data.params, block)  # type: ignore
             except BlockchainNewState as e:
                 log.warning(e)
+                self.data.reset()
                 return
             else:
                 log.debug("Arbitrage broadcasted", extra={"data": self.data.to_data()})
@@ -138,7 +139,8 @@ class SingleTxArbitrage(Generic[_BlockchainClientT], ABC):
             except IsBusy:
                 return
             else:
-                log.info("Arbitrage executed", extra={"data": self.data.to_data()})
+                status = self.data.result.tx_status
+                log.info(f"Arbitrage {status}", extra={"data": self.data.to_data()})
                 self.data.reset()
 
     @abstractmethod
