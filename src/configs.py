@@ -7,8 +7,8 @@ STRATEGY = os.getenv("STRATEGY", "no_strategy")
 LOG_AWS = os.getenv("LOG_AWS") == "True"
 
 # Secrets
-SECRET_HD_WALLET = os.environ["SECRET_HD_WALLET"]
-SECRET_BINANCE_KEY = os.environ["SECRET_BINANCE_KEY"]
+SECRET_HD_WALLET = os.getenv("SECRET_HD_WALLET", "")
+SECRET_BINANCE_KEY = os.getenv("SECRET_BINANCE_KEY", "")
 
 # Cache
 DEFAULT_CACHE_TTL = float(os.getenv("DEFAULT_CACHE_TTL", "5.0"))
