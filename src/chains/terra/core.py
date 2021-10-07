@@ -54,6 +54,8 @@ class TerraTokenAmount(TokenAmount):
 
 
 class BaseTerraToken(Token[TerraTokenAmount]):
+    amount_class = TerraTokenAmount
+
     def __lt__(self, other) -> bool:
         if isinstance(other, BaseTerraToken):
             return self._id < other._id

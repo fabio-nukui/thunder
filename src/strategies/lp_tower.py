@@ -51,7 +51,6 @@ class ArbParams(BaseArbParams):
     prices: dict[TerraToken, Decimal]
     prices_denom: TerraNativeToken
     lp_tower_reserves: tuple[TerraTokenAmount, TerraTokenAmount]
-
     pool_0_lp_balance: TerraTokenAmount
     direction: Direction
 
