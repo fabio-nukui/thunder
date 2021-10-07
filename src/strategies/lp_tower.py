@@ -8,7 +8,6 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from functools import partial
-from typing import Optional
 
 from terra_sdk.core.auth import StdFee, TxLog
 from terra_sdk.core.wasm import MsgExecuteContract
@@ -26,13 +25,7 @@ from chains.terra import (
 )
 from exceptions import BlockchainNewState, IsBusy, TxError, UnprofitableArbitrage
 
-from .common.single_tx_arbitrage import (
-    BaseArbParams,
-    BaseArbResult,
-    BaseArbTx,
-    SingleTxArbitrage,
-    TxStatus,
-)
+from .common.single_tx_arbitrage import ArbResult, ArbTx, BaseArbParams, SingleTxArbitrage, TxStatus
 
 log = logging.getLogger(__name__)
 
@@ -82,46 +75,6 @@ class ArbParams(BaseArbParams):
             "est_final_amount": self.est_final_amount.to_data(),
             "est_fee": self.est_fee.to_data(),
             "est_net_profit_ust": float(self.est_net_profit_ust),
-        }
-
-
-@dataclass
-class ArbTx(BaseArbTx):
-    timestamp_sent: float
-    tx_hash: str
-
-    def to_data(self) -> dict:
-        return {
-            "timestamp_sent": self.timestamp_sent,
-            "tx_hash": self.tx_hash,
-        }
-
-
-@dataclass
-class ArbResult(BaseArbResult):
-    tx_status: TxStatus
-    tx_err_log: Optional[str] = None
-    gas_use: Optional[int] = None
-    gas_cost: Optional[TerraTokenAmount] = None
-
-    tx_inclusion_delay: Optional[int] = None
-    timestamp_received: Optional[float] = None
-    block_received: Optional[float] = None
-
-    final_amount: Optional[TerraTokenAmount] = None
-    net_profit_ust: Optional[Decimal] = None
-
-    def to_data(self) -> dict:
-        return {
-            "tx_status": self.tx_status,
-            "tx_err_log": self.tx_err_log,
-            "gas_use": self.gas_use,
-            "gas_cost": None if self.gas_cost is None else self.gas_cost.to_data(),
-            "tx_inclusion_delay": self.tx_inclusion_delay,
-            "timestamp_received": self.timestamp_received,
-            "block_received": self.block_received,
-            "final_amount": None if self.final_amount is None else self.final_amount.to_data(),
-            "net_profit": None if self.net_profit_ust is None else float(self.net_profit_ust),
         }
 
 
@@ -349,7 +302,7 @@ class LPTowerStrategy(SingleTxArbitrage[TerraClient]):
             timestamp_received=datetime.fromisoformat(info.timestamp[:-1]).timestamp(),
             block_received=info.height,
             final_amount=final_amount,
-            net_profit_ust=net_profit_ust,
+            net_profit_usd=net_profit_ust,
         )
 
     def _extract_returns_from_logs(self, logs: list[TxLog]) -> tuple[TerraTokenAmount, Decimal]:
