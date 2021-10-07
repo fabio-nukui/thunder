@@ -38,6 +38,11 @@ def _get_code_ids(chain_id: str) -> dict[str, int]:
 
 
 class TerraClient(BaseTerraClient):
+    market: MarketApi
+    oracle: OracleApi
+    treasury: TreasuryApi
+    tx: TxApi
+
     def __init__(
         self,
         hd_wallet: dict = None,

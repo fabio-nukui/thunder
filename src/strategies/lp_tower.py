@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
-from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from functools import partial
@@ -23,17 +21,15 @@ from chains.terra import (
     TerraTokenAmount,
     terraswap,
 )
-from exceptions import BlockchainNewState, IsBusy, TxError, UnprofitableArbitrage
+from exceptions import TxError, UnprofitableArbitrage
 
-from .common.single_tx_arbitrage import ArbResult, ArbTx, BaseArbParams, SingleTxArbitrage, TxStatus
+from .common.terra_single_tx_arbitrage import TerraArbParams, TerraSingleTxArbitrage
 
 log = logging.getLogger(__name__)
 
 MIN_PROFIT_UST = UST.to_amount(2)
 MIN_START_AMOUNT = UST.to_amount(10)
 OPTIMIZATION_TOLERANCE = UST.to_amount("0.01")
-MIN_CONFIRMATIONS = 1
-MAX_BLOCKS_WAIT_RECEIPT = 10
 MAX_SLIPPAGE = Decimal("0.001")
 SWAP_FIRST_LAST_MSG_UST_TOL = Decimal("0.5")
 
@@ -44,7 +40,7 @@ class Direction(str, Enum):
 
 
 @dataclass
-class ArbParams(BaseArbParams):
+class ArbParams(TerraArbParams):
     timestamp_found: float
     block_found: int
 
@@ -77,7 +73,7 @@ class ArbParams(BaseArbParams):
         }
 
 
-class LPTowerStrategy(SingleTxArbitrage[TerraClient]):
+class LPTowerStrategy(TerraSingleTxArbitrage):
     def __init__(
         self,
         client: TerraClient,
@@ -259,49 +255,6 @@ class LPTowerStrategy(SingleTxArbitrage[TerraClient]):
             )
             msgs = msgs_tower_swap + msgs_remove_single_side + msgs_add_single_side
         return final_lp_amount, msgs
-
-    def _broadcast_tx(self, execution_config: ArbParams, block: int) -> ArbTx:
-        if (latest_block := self.client.get_latest_block()) != block:
-            raise BlockchainNewState(f"{latest_block=} different from {block=}")
-        res = self.client.tx.execute_msgs_async(execution_config.msgs, fee=execution_config.est_fee)
-        return ArbTx(timestamp_sent=time.time(), tx_hash=res.txhash)
-
-    def _confirm_tx(self, block: int) -> ArbResult:
-        assert self.data.params is not None
-        assert self.data.tx is not None
-        tx_inclusion_delay = block - self.data.params.block_found
-        try:
-            info = self.client.lcd.tx.tx_info(self.data.tx.tx_hash)
-        except LCDResponseError as e:
-            if e.response.status == 404:
-                if tx_inclusion_delay >= MAX_BLOCKS_WAIT_RECEIPT:
-                    return ArbResult(TxStatus.not_found)
-                raise IsBusy
-            raise
-        log.debug(info.to_data())
-        if block - info.height < MIN_CONFIRMATIONS:
-            raise IsBusy
-        gas_cost = TerraTokenAmount.from_coin(*info.tx.fee.amount)
-        if info.logs is None:
-            status = TxStatus.failed
-            tx_err_log = info.rawlog
-            final_amount = None
-            net_profit_ust = -gas_cost.amount
-        else:
-            status = TxStatus.succeeded
-            tx_err_log = None
-            final_amount, net_profit_ust = self._extract_returns_from_logs(info.logs)
-        return ArbResult(
-            tx_status=status,
-            tx_err_log=tx_err_log,
-            gas_use=info.gas_used,
-            gas_cost=gas_cost,
-            tx_inclusion_delay=tx_inclusion_delay,
-            timestamp_received=datetime.fromisoformat(info.timestamp[:-1]).timestamp(),
-            block_received=info.height,
-            final_amount=final_amount,
-            net_profit_usd=net_profit_ust,
-        )
 
     def _extract_returns_from_logs(self, logs: list[TxLog]) -> tuple[TerraTokenAmount, Decimal]:
         tx_events = self.client.extract_log_events(logs)

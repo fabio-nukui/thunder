@@ -5,8 +5,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Type, TypeVar, Union
 
-from terra_sdk.client.lcd.lcdclient import LCDClient
-from terra_sdk.client.lcd.wallet import Wallet
+from terra_sdk.client.lcd import LCDClient, Wallet
 from terra_sdk.core import AccAddress, Coin, Coins
 from terra_sdk.core.auth import StdFee
 from terra_sdk.core.broadcast import (
