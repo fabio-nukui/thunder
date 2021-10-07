@@ -58,7 +58,7 @@ class ArbParams(BaseArbParams):
     msgs: list[MsgExecuteContract]
     est_final_amount: TerraTokenAmount
     est_fee: StdFee
-    est_net_profit_ust: Decimal
+    est_net_profit_usd: Decimal
 
     def to_data(self) -> dict:
         return {
@@ -73,7 +73,7 @@ class ArbParams(BaseArbParams):
             "msgs": [msg.to_data() for msg in self.msgs],
             "est_final_amount": self.est_final_amount.to_data(),
             "est_fee": self.est_fee.to_data(),
-            "est_net_profit_ust": float(self.est_net_profit_ust),
+            "est_net_profit_usd": float(self.est_net_profit_usd),
         }
 
 
@@ -88,9 +88,6 @@ class LPTowerStrategy(SingleTxArbitrage[TerraClient]):
         self.pool_0 = pool_0
         self.pool_1 = pool_1
         self.pool_tower = pool_tower
-
-        self._amount_luna_swap_first_last_msg_tol = Decimal(0)
-        self._flag_last_msg_tol = False
 
         super().__init__(client)
 
@@ -108,14 +105,16 @@ class LPTowerStrategy(SingleTxArbitrage[TerraClient]):
             prices[self.pool_0.lp_token],
             prices[self.pool_1.lp_token],
         )
-
-        lp_ust_price = prices[self.pool_0.lp_token] * self.client.oracle.get_exchange_rate(
-            LUNA, UST
-        )
+        lp_ust_price = prices[self.pool_0.lp_token] * self.client.oracle.exchange_rates[UST]
         pool_0_lp_balance = self.pool_0.lp_token.get_balance(self.client)
-        self._amount_luna_swap_first_last_msg_tol = SWAP_FIRST_LAST_MSG_UST_TOL * prices[UST]
+
+        luna_swap_first_adjustment = SWAP_FIRST_LAST_MSG_UST_TOL * prices[UST]
         initial_amount = self._get_optimal_argitrage_amount(
-            lp_ust_price, direction, pool_0_lp_balance, balance_ratio
+            lp_ust_price,
+            direction,
+            pool_0_lp_balance,
+            balance_ratio,
+            luna_swap_first_adjustment,
         )
         final_amount, msgs = self._get_amount_out_and_msgs(initial_amount, direction)
         try:
@@ -152,7 +151,7 @@ class LPTowerStrategy(SingleTxArbitrage[TerraClient]):
             msgs=msgs,
             est_final_amount=final_amount,
             est_fee=fee,
-            est_net_profit_ust=net_profit_ust,
+            est_net_profit_usd=net_profit_ust,
         )
 
     def _get_prices(self) -> dict[TerraToken, Decimal]:
@@ -183,19 +182,23 @@ class LPTowerStrategy(SingleTxArbitrage[TerraClient]):
         direction: Direction,
         pool_0_lp_balance: TerraTokenAmount,
         balance_ratio: Decimal,
+        luna_swap_first_adjustment: Decimal,
     ) -> TerraTokenAmount:
         initial_lp_amount = self.pool_0.lp_token.to_amount(MIN_START_AMOUNT.amount / lp_ust_price)
         profit = self._get_gross_profit(initial_lp_amount, direction)
-        if profit.amount * lp_ust_price < 0:
+        if profit < 0:
             raise UnprofitableArbitrage(f"No profitability, {balance_ratio=:0.3%}")
-        func = partial(self._get_gross_profit_dec, direction=direction)
-        with self._activate_last_msg_tol():
-            lp_amount, _ = utils.optimization.optimize_bissection(
-                func,
-                x0=initial_lp_amount.amount,
-                dx=initial_lp_amount.dx,
-                tol=OPTIMIZATION_TOLERANCE.amount / lp_ust_price,
-            )
+        func = partial(
+            self._get_gross_profit_dec,
+            direction=direction,
+            luna_swap_first_adjustment=luna_swap_first_adjustment,
+        )
+        lp_amount, _ = utils.optimization.optimize_bissection(
+            func,
+            x0=initial_lp_amount.amount,
+            dx=initial_lp_amount.dx,
+            tol=OPTIMIZATION_TOLERANCE.amount / lp_ust_price,
+        )
         amount = self.pool_0.lp_token.to_amount(lp_amount)
         if amount > pool_0_lp_balance:
             log.warning(
@@ -205,35 +208,31 @@ class LPTowerStrategy(SingleTxArbitrage[TerraClient]):
             return pool_0_lp_balance
         return amount
 
-    @contextmanager
-    def _activate_last_msg_tol(self):
-        flag = self._flag_last_msg_tol
-        try:
-            self._flag_last_msg_tol = True
-            yield
-        finally:
-            self._flag_last_msg_tol = flag
-
     def _get_gross_profit(
         self,
         initial_lp_amount: TerraTokenAmount,
         direction: Direction,
+        luna_swap_first_adjustment: Decimal = None,
     ) -> TerraTokenAmount:
-        amount_out = self._get_amount_out_and_msgs(initial_lp_amount, direction)[0]
+        amount_out, _ = self._get_amount_out_and_msgs(
+            initial_lp_amount, direction, luna_swap_first_adjustment
+        )
         return amount_out - initial_lp_amount
 
     def _get_gross_profit_dec(
         self,
         amount: Decimal,
         direction: Direction,
+        luna_swap_first_adjustment: Decimal = None,
     ) -> Decimal:
         token_amount = self.pool_0.lp_token.to_amount(amount)
-        return self._get_gross_profit(token_amount, direction).amount
+        return self._get_gross_profit(token_amount, direction, luna_swap_first_adjustment).amount
 
     def _get_amount_out_and_msgs(
         self,
         initial_lp_amount: TerraTokenAmount,
         direction: Direction,
+        luna_swap_first_adjustment: Decimal = None,
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
         if direction == Direction.remove_liquidity_first:
             luna_amount, msgs_remove_single_side = self.pool_0.op_remove_single_side(
@@ -253,8 +252,8 @@ class LPTowerStrategy(SingleTxArbitrage[TerraClient]):
             luna_amount, msgs_remove_single_side = self.pool_1.op_remove_single_side(
                 self.client.address, lp_amount, LUNA, MAX_SLIPPAGE
             )
-            if self._flag_last_msg_tol:
-                luna_amount.amount = luna_amount.amount - self._amount_luna_swap_first_last_msg_tol
+            if luna_swap_first_adjustment is not None:
+                luna_amount.amount = luna_amount.amount - luna_swap_first_adjustment
             final_lp_amount, msgs_add_single_side = self.pool_0.op_add_single_side(
                 self.client.address, luna_amount, MAX_SLIPPAGE
             )
