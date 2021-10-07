@@ -4,7 +4,7 @@ import os
 STRATEGY = os.getenv("STRATEGY", "no_strategy")
 
 # Logs
-LOG_AWS = os.getenv("LOG_AWS") == "True"
+LOG_AWS = os.getenv("LOG_AWS", "").lower() == "true"
 
 # Secrets
 SECRET_HD_WALLET = os.getenv("SECRET_HD_WALLET", "")
@@ -14,7 +14,7 @@ SECRET_BINANCE_KEY = os.getenv("SECRET_BINANCE_KEY", "")
 DEFAULT_CACHE_TTL = float(os.getenv("DEFAULT_CACHE_TTL", "5.0"))
 
 # Blockchain
-RAISE_ON_SYNCING = os.getenv("TERRA_CHAIN_ID") == "True"
+RAISE_ON_SYNCING = os.getenv("RAISE_ON_SYNCING", "").lower() == "true"
 
 # Terra
 TERRA_CHAIN_ID = os.getenv("TERRA_CHAIN_ID", "columbus-5")
@@ -39,5 +39,5 @@ BSC_POLL_INTERVAL = float(os.getenv("BSC_POLL_INTERVAL", "0.01"))
 BSC_WEB3_MIDDEWARES = os.getenv("BSC_WEB3_MIDDEWARES", "geth_poa_middleware").split(",")
 
 # Debug / optimization
-CACHE_STATS = os.getenv("CACHE_STATS") == "True"
+CACHE_STATS = os.getenv("CACHE_STATS", "").lower() == "true"
 CACHE_LOG_LEVEL = os.getenv("CACHE_LOG_LEVEL", "INFO")
