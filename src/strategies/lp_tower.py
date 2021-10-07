@@ -145,67 +145,8 @@ class LPTowerStrategy(SingleTxArbitrage[TerraClient]):
     def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__}(client={self.client}, "
-            f"pool_tower={self.pool_tower}, status={self.arbitrage_data.status})"
+            f"pool_tower={self.pool_tower}, state={self.state})"
         )
-
-    def _confirm_tx(self, block: int) -> ArbResult:
-        assert self.arbitrage_data.params is not None
-        assert self.arbitrage_data.tx is not None
-        tx_inclusion_delay = block - self.arbitrage_data.params.block_found
-        try:
-            info = self.client.lcd.tx.tx_info(self.arbitrage_data.tx.tx_hash)
-        except LCDResponseError as e:
-            if e.response.status == 404:
-                if tx_inclusion_delay >= MAX_BLOCKS_WAIT_RECEIPT:
-                    return ArbResult(TxStatus.not_found)
-                raise IsBusy
-            raise
-        log.debug(info.to_data())
-        if block - info.height < MIN_CONFIRMATIONS:
-            raise IsBusy
-        gas_cost = TerraTokenAmount.from_coin(*info.tx.fee.amount)
-        if info.logs is None:
-            status = TxStatus.failed
-            tx_err_log = info.rawlog
-            final_amount = None
-            net_profit_ust = -gas_cost.amount
-        else:
-            status = TxStatus.succeeded
-            tx_err_log = None
-            final_amount, net_profit_ust = self._extract_returns_from_logs(info.logs)
-        return ArbResult(
-            tx_status=status,
-            tx_err_log=tx_err_log,
-            gas_use=info.gas_used,
-            gas_cost=gas_cost,
-            tx_inclusion_delay=tx_inclusion_delay,
-            timestamp_received=datetime.fromisoformat(info.timestamp[:-1]).timestamp(),
-            block_received=info.height,
-            final_amount=final_amount,
-            net_profit_ust=net_profit_ust,
-        )
-
-    def _extract_returns_from_logs(self, logs: list[TxLog]) -> tuple[TerraTokenAmount, Decimal]:
-        tx_events = self.client.extract_log_events(logs)
-        logs_from_contract = self.client.parse_from_contract_events(tx_events)
-        first_event = logs_from_contract[0][self.pool_0.lp_token.contract_addr][0]
-        last_event = logs_from_contract[-1][self.pool_0.lp_token.contract_addr][-1]
-        assert last_event["to"] == self.client.address
-
-        if first_event["to"] == self.pool_tower.contract_addr:  # swap first
-            assert last_event["action"] == "mint"
-        elif first_event["to"] == self.pool_0.contract_addr:  # remove liquidity first
-            assert last_event["action"] == "transfer"
-        else:
-            raise Exception("Error when decoding tx info")
-        first_amount = self.pool_0.lp_token.to_amount(int_amount=first_event["amount"])
-        final_amount = self.pool_0.lp_token.to_amount(int_amount=last_event["amount"])
-
-        pool_0_lp_price_luna = self._get_prices()[self.pool_0.lp_token]
-        pool_0_lp_price_ust = pool_0_lp_price_luna * self.client.oracle.get_exchange_rate(LUNA, UST)
-        increase_tokens = final_amount - first_amount
-
-        return final_amount, round(increase_tokens.amount * pool_0_lp_price_ust, 18)
 
     def _get_arbitrage_params(self, block: int, mempool: dict = None) -> ArbParams:
         if mempool:
@@ -373,6 +314,65 @@ class LPTowerStrategy(SingleTxArbitrage[TerraClient]):
             raise BlockchainNewState(f"{latest_block=} different from {block=}")
         res = self.client.tx.execute_msgs_async(execution_config.msgs, fee=execution_config.est_fee)
         return ArbTx(timestamp_sent=time.time(), tx_hash=res.txhash)
+
+    def _confirm_tx(self, block: int) -> ArbResult:
+        assert self.data.params is not None
+        assert self.data.tx is not None
+        tx_inclusion_delay = block - self.data.params.block_found
+        try:
+            info = self.client.lcd.tx.tx_info(self.data.tx.tx_hash)
+        except LCDResponseError as e:
+            if e.response.status == 404:
+                if tx_inclusion_delay >= MAX_BLOCKS_WAIT_RECEIPT:
+                    return ArbResult(TxStatus.not_found)
+                raise IsBusy
+            raise
+        log.debug(info.to_data())
+        if block - info.height < MIN_CONFIRMATIONS:
+            raise IsBusy
+        gas_cost = TerraTokenAmount.from_coin(*info.tx.fee.amount)
+        if info.logs is None:
+            status = TxStatus.failed
+            tx_err_log = info.rawlog
+            final_amount = None
+            net_profit_ust = -gas_cost.amount
+        else:
+            status = TxStatus.succeeded
+            tx_err_log = None
+            final_amount, net_profit_ust = self._extract_returns_from_logs(info.logs)
+        return ArbResult(
+            tx_status=status,
+            tx_err_log=tx_err_log,
+            gas_use=info.gas_used,
+            gas_cost=gas_cost,
+            tx_inclusion_delay=tx_inclusion_delay,
+            timestamp_received=datetime.fromisoformat(info.timestamp[:-1]).timestamp(),
+            block_received=info.height,
+            final_amount=final_amount,
+            net_profit_ust=net_profit_ust,
+        )
+
+    def _extract_returns_from_logs(self, logs: list[TxLog]) -> tuple[TerraTokenAmount, Decimal]:
+        tx_events = self.client.extract_log_events(logs)
+        logs_from_contract = self.client.parse_from_contract_events(tx_events)
+        first_event = logs_from_contract[0][self.pool_0.lp_token.contract_addr][0]
+        last_event = logs_from_contract[-1][self.pool_0.lp_token.contract_addr][-1]
+        assert last_event["to"] == self.client.address
+
+        if first_event["to"] == self.pool_tower.contract_addr:  # swap first
+            assert last_event["action"] == "mint"
+        elif first_event["to"] == self.pool_0.contract_addr:  # remove liquidity first
+            assert last_event["action"] == "transfer"
+        else:
+            raise Exception("Error when decoding tx info")
+        first_amount = self.pool_0.lp_token.to_amount(int_amount=first_event["amount"])
+        final_amount = self.pool_0.lp_token.to_amount(int_amount=last_event["amount"])
+
+        pool_0_lp_price_luna = self._get_prices()[self.pool_0.lp_token]
+        pool_0_lp_price_ust = pool_0_lp_price_luna * self.client.oracle.get_exchange_rate(LUNA, UST)
+        increase_tokens = final_amount - first_amount
+
+        return final_amount, round(increase_tokens.amount * pool_0_lp_price_ust, 18)
 
 
 def run():

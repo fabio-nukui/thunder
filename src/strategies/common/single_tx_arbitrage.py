@@ -11,7 +11,7 @@ from exceptions import BlockchainNewState, IsBusy, TxError, UnprofitableArbitrag
 log = logging.getLogger(__name__)
 
 
-class ExecutionState(str, Enum):
+class State(str, Enum):
     start = "start"
     ready_to_broadcast = "ready_to_broadcast"
     waiting_confirmation = "waiting_confirmation"
@@ -53,22 +53,17 @@ class ArbitrageData:
     tx: Optional[BaseArbTx] = None
     result: Optional[BaseArbResult] = None
 
-    @property
-    def status(self) -> ExecutionState:
-        if self.params is None:
-            return ExecutionState.start
-        if self.tx is None:
-            return ExecutionState.ready_to_broadcast
-        if self.result is None:
-            return ExecutionState.waiting_confirmation
-        return ExecutionState.finished
-
     def to_data(self) -> dict:
         return {
             "params": None if self.params is None else self.params.to_data(),
             "tx": None if self.tx is None else self.tx.to_data(),
             "result": None if self.result is None else self.result.to_data(),
         }
+
+    def reset(self):
+        self.params = None
+        self.tx = None
+        self.result = None
 
 
 _BlockchainClientT = TypeVar("_BlockchainClientT", bound=BlockchainClient)
@@ -77,33 +72,46 @@ _BlockchainClientT = TypeVar("_BlockchainClientT", bound=BlockchainClient)
 class SingleTxArbitrage(Generic[_BlockchainClientT], ABC):
     def __init__(self, client: _BlockchainClientT):
         self.client = client
-        self.arbitrage_data = ArbitrageData()
+        self.data = ArbitrageData()
         log.info(f"Initialized {self} at block={self.client.block}")
 
+    @property
+    def state(self) -> State:
+        if self.data.params is None:
+            return State.start
+        if self.data.tx is None:
+            return State.ready_to_broadcast
+        if self.data.result is None:
+            return State.waiting_confirmation
+        return State.finished
+
     def run(self, block: int, mempool: dict = None):
-        if self.arbitrage_data.status == ExecutionState.waiting_confirmation:
+        if self.state == State.start:
+            log.debug("Generating execution configuration")
+            try:
+                self.data.params = self._get_arbitrage_params(block, mempool)
+            except (UnprofitableArbitrage, TxError) as e:
+                log.debug(e)
+                return
+        if self.state == State.ready_to_broadcast:
+            log.info("Broadcasting transaction")
+            try:
+                self.data.tx = self._broadcast_tx(self.data.params, block)  # type: ignore
+            except BlockchainNewState as e:
+                log.warning(e)
+                return
+            else:
+                log.debug("Arbitrage broadcasted", extra={"data": self.data.to_data()})
+                return
+        if self.state == State.waiting_confirmation:
             log.debug("Looking for tx confirmation(s)")
             try:
-                self.arbitrage_data.result = self._confirm_tx(block)
+                self.data.result = self._confirm_tx(block)
             except IsBusy:
                 return
             else:
-                log.info("Arbitrage executed", extra={"data": self.arbitrage_data.to_data()})
-                self.arbitrage_data = ArbitrageData()
-        log.debug("Generating execution configuration")
-        try:
-            self.arbitrage_data.params = params = self._get_arbitrage_params(block, mempool)
-        except (UnprofitableArbitrage, TxError) as e:
-            log.debug(e)
-            return
-        log.debug("Broadcasting transaction")
-        try:
-            self.arbitrage_data.tx = self._broadcast_tx(params, block)
-        except BlockchainNewState as e:
-            log.warning(e)
-            return
-        else:
-            log.info("Arbitrage broadcasted", extra={"data": self.arbitrage_data.to_data()})
+                log.info("Arbitrage executed", extra={"data": self.data.to_data()})
+                self.data.reset()
 
     @abstractmethod
     def _confirm_tx(self, block: int) -> BaseArbResult:
