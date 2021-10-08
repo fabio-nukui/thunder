@@ -20,6 +20,7 @@ log = logging.getLogger(__name__)
 MIN_PROFIT_UST = UST.to_amount(2)
 MIN_START_AMOUNT = UST.to_amount(200)
 OPTIMIZATION_TOLERANCE = UST.to_amount("0.01")
+MIN_UST_RESERVED_AMOUNT = 5
 MAX_SLIPPAGE = Decimal("0.001")
 
 
@@ -162,7 +163,7 @@ class LunaUstMarketStrategy(TerraSingleTxArbitrage):
                 "Not enough balance for full arbitrage: "
                 f"wanted UST {ust_amount:,.2f}, have UST {ust_balance:,.2f}"
             )
-            return UST.to_amount(ust_balance)
+            return UST.to_amount(ust_balance - MIN_UST_RESERVED_AMOUNT)
         return UST.to_amount(ust_amount)
 
     def _get_gross_profit(
