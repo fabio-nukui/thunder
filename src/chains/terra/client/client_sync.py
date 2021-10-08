@@ -107,7 +107,7 @@ class TerraClient(BaseTerraClient):
 
     def fcd_post(self, path: str, **kwargs) -> dict:
         url = urllib.parse.urljoin(self.fcd_uri, path)
-        res = utils.http.get(url, **kwargs)
+        res = utils.http.post(url, **kwargs)
         return res.json()
 
     def get_bank(self, denoms: list[str] = None, address: str = None) -> list[TerraTokenAmount]:
