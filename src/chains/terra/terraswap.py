@@ -154,20 +154,20 @@ class Router:
         assert route, "route cannot be empty"
 
         swap_operations: list[dict] = []
-        step_amount_in = amount_in
+        next_amount_in = amount_in
         for step in route:
             if isinstance(step, RouteStepTerraswap):
                 if step.sorted_tokens not in self.pairs:
                     raise Exception(f"No liquidity pair found for {step.sorted_tokens}")
                 pair = self.pairs[step.sorted_tokens]
-                amount_out = pair.get_swap_amount_out(step_amount_in, safety_round=False)
+                next_amount_in = pair.get_swap_amount_out(next_amount_in, safety_round=False)
             else:
                 assert isinstance(step.token_out, TerraNativeToken)
-                amount_out = self.client.market.get_amount_out(step_amount_in, step.token_out)
+                next_amount_in = self.client.market.get_amount_out(next_amount_in, step.token_out)
             swap_operations.append(step.to_data())
-            step_amount_in = amount_out
 
-        min_amount_out: TerraTokenAmount = amount_out * (1 - max_slippage)  # type: ignore
+        amount_out = next_amount_in
+        min_amount_out: TerraTokenAmount = amount_out * (1 - max_slippage)
         swap_msg = {
             "execute_swap_operations": {
                 "offer_amount": str(amount_in.int_amount),
@@ -195,7 +195,7 @@ class Router:
             execute_msg=execute_msg,
             coins=coins,
         )
-        return amount_out, [msg]  # type: ignore
+        return amount_out, [msg]
 
 
 class LiquidityPair:
