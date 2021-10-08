@@ -60,6 +60,11 @@ class TxApi(BaseTxApi):
         **kwargs,
     ) -> _BroadcastResutT:
         log.debug(f"Sending tx: {msgs}")
+
+        # Fixes bug in terraswap_sdk==1.0.0b2
+        if "fee" not in kwargs:
+            kwargs["fee"] = self.estimate_fee(msgs)
+
         signed_tx = self.client.wallet.create_and_sign_tx(
             msgs,
             fee_denoms=[self.client.fee_denom],

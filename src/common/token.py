@@ -5,7 +5,7 @@ from decimal import Decimal, getcontext
 from typing import Generic, Optional, Type, TypeVar, Union, overload
 
 DecInput = Union[str, int, float, Decimal]
-ROUNDING_SAFETY_MARGIN = 3
+ROUNDING_SAFETY_MARGIN = 2
 
 getcontext().prec = 78  # To allow for calculations with up to 256 bits precision
 
@@ -118,6 +118,9 @@ class TokenAmount:
 
     def safe_up(self: _TokenAmountT, n: int = ROUNDING_SAFETY_MARGIN) -> _TokenAmountT:
         return self + self.dx * n
+
+    def floor_amount(self: _TokenAmountT) -> _TokenAmountT:
+        return self.token.to_amount(int_amount=self.int_amount)
 
     def is_empty(self) -> bool:
         return self.amount.is_nan()

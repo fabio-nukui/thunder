@@ -305,6 +305,8 @@ class LiquidityPair:
         numerator = reserve_out.amount * amount_in.amount
         denominator = reserve_in.amount + amount_in.amount
         amount_out = reserve_out.token.to_amount(numerator / denominator)
+
+        amount_out = amount_out.floor_amount()
         if safety_round:
             amount_out = amount_out.safe_down()
 
@@ -406,6 +408,8 @@ class LiquidityPair:
         total_supply = self.lp_token.get_supply(self.client)
         share = amount_burn / total_supply
         amounts = self.reserves[0] * share, self.reserves[1] * share
+
+        amounts = amounts[0].floor_amount(), amounts[1].floor_amount()
         if safety_round:
             amounts = amounts[0].safe_down(), amounts[1].safe_down()
 
@@ -506,6 +510,8 @@ class LiquidityPair:
         amounts_in = self._check_amounts_add_liquidity(amounts_in, slippage_tolerance)
         add_ratio = min(amounts_in[0] / self.reserves[0], amounts_in[1] / self.reserves[1])
         amount = self.lp_token.get_supply(self.client) * add_ratio
+
+        amount = amount.floor_amount()
         return amount.safe_down() if safety_round else amount
 
     def _check_amounts_add_liquidity(
