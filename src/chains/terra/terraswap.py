@@ -15,7 +15,7 @@ from exceptions import InsufficientLiquidity, NotContract
 from utils.cache import CacheGroup, ttl_cache
 
 from .client import TerraClient
-from .core import CW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
+from .core import CW20Token, TaxPayer, TerraNativeToken, TerraToken, TerraTokenAmount
 
 __all__ = [
     "get_addresses",
@@ -93,7 +93,7 @@ class RouteStep(ABC):
         self.token_out = token_out
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(token_in={self.token_in}, token_out={self.token_in})"
+        return f"{self.__class__.__name__}(token_in={self.token_in}, token_out={self.token_out})"
 
     @property
     def sorted_tokens(self) -> tuple[TerraToken, TerraToken]:
@@ -154,7 +154,7 @@ class Router:
         assert route, "route cannot be empty"
 
         swap_operations: list[dict] = []
-        next_amount_in = amount_in
+        next_amount_in = self.client.treasury.deduct_tax(amount_in)
         for step in route:
             if isinstance(step, RouteStepTerraswap):
                 if step.sorted_tokens not in self.pairs:
@@ -166,7 +166,7 @@ class Router:
                 next_amount_in = self.client.market.get_amount_out(next_amount_in, step.token_out)
             swap_operations.append(step.to_data())
 
-        amount_out = next_amount_in
+        amount_out = next_amount_in.safe_down()
         min_amount_out: TerraTokenAmount = amount_out * (1 - max_slippage)
         swap_msg = {
             "execute_swap_operations": {
