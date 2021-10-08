@@ -110,7 +110,7 @@ class LunaUstMarketStrategy(TerraSingleTxArbitrage):
             )
             raise TxError(e)
         gas_cost = TerraTokenAmount.from_coin(*fee.amount)
-        net_profit_ust = final_amount - initial_amount - gas_cost
+        net_profit_ust = (final_amount - initial_amount - gas_cost).amount
         if net_profit_ust < MIN_PROFIT_UST:
             raise UnprofitableArbitrage(
                 f"Low profitability: USD {net_profit_ust:.2f}, {terraswap_premium=:0.3%}"
@@ -128,7 +128,7 @@ class LunaUstMarketStrategy(TerraSingleTxArbitrage):
             msgs=msgs,
             est_final_amount=final_amount,
             est_fee=fee,
-            est_net_profit_usd=net_profit_ust.amount,
+            est_net_profit_usd=net_profit_ust,
         )
 
     def _get_prices(self) -> dict[str, Decimal]:
