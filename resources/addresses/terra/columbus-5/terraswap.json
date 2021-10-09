@@ -2,7 +2,10 @@
   "pools": {
     "bluna_luna": "terra1jxazgm67et0ce260kvrpfv50acuushpjsz2y0p",
     "ust_luna": "terra1tndcaqxkpc5ce9qee5ggqf430mr2z3pefe5wj6",
-    "bluna_luna_ust_luna": "terra1wrwf3um5vm30vpwnlpvjzgwpf5fjknt68nah05"
+    "bluna_luna_ust_luna": "terra1wrwf3um5vm30vpwnlpvjzgwpf5fjknt68nah05",
+    "meth_beth": "terra1c5swgtnuunpf75klq5uztynurazuwqf0mmmcyy",
+    "beth_ust": "terra1c0afrdc5253tkp5wt7rxhuj42xwyf2lcre0s7c",
+    "ust_meth": "terra14fyt2g3umeatsr4j4g2rs8ca0jceu3k0mcs7ry"
   },
   "router": "terra19qx5xe6q9ll4w0890ux7lv2p4mf3csd4qvt3ex"
 }
