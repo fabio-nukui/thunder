@@ -31,7 +31,6 @@ MIN_PROFIT_UST = UST.to_amount(2)
 MIN_START_AMOUNT = UST.to_amount(10)
 OPTIMIZATION_TOLERANCE = UST.to_amount("0.01")
 MAX_SLIPPAGE = Decimal("0.001")
-SWAP_FIRST_LAST_MSG_UST_TOL = Decimal("0.5")
 
 
 class Direction(str, Enum):
@@ -104,15 +103,13 @@ class LPTowerStrategy(TerraSingleTxArbitrage):
         lp_ust_price = prices[self.pool_0.lp_token] * self.client.oracle.exchange_rates[UST]
         pool_0_lp_balance = self.pool_0.lp_token.get_balance(self.client)
 
-        luna_swap_first_adjustment = SWAP_FIRST_LAST_MSG_UST_TOL * prices[UST]
         initial_amount = self._get_optimal_argitrage_amount(
             lp_ust_price,
             direction,
             pool_0_lp_balance,
             balance_ratio,
-            luna_swap_first_adjustment,
         )
-        final_amount, msgs = self._op_arbitrage(initial_amount, direction)
+        final_amount, msgs = self._op_arbitrage(initial_amount, direction, safety_margin=True)
         try:
             fee = self.client.tx.estimate_fee(msgs)
         except LCDResponseError as e:
@@ -178,17 +175,12 @@ class LPTowerStrategy(TerraSingleTxArbitrage):
         direction: Direction,
         pool_0_lp_balance: TerraTokenAmount,
         balance_ratio: Decimal,
-        luna_swap_first_adjustment: Decimal,
     ) -> TerraTokenAmount:
         initial_lp_amount = self.pool_0.lp_token.to_amount(MIN_START_AMOUNT.amount / lp_ust_price)
         profit = self._get_gross_profit(initial_lp_amount, direction)
         if profit < 0:
             raise UnprofitableArbitrage(f"No profitability, {balance_ratio=:0.3%}")
-        func = partial(
-            self._get_gross_profit_dec,
-            direction=direction,
-            luna_swap_first_adjustment=luna_swap_first_adjustment,
-        )
+        func = partial(self._get_gross_profit_dec, direction=direction)
         lp_amount, _ = utils.optimization.optimize_bissection(
             func,
             x0=initial_lp_amount.amount,
@@ -208,48 +200,46 @@ class LPTowerStrategy(TerraSingleTxArbitrage):
         self,
         initial_lp_amount: TerraTokenAmount,
         direction: Direction,
-        luna_swap_first_adjustment: Decimal = None,
+        safety_margin: bool = False,
     ) -> TerraTokenAmount:
-        amount_out, _ = self._op_arbitrage(initial_lp_amount, direction, luna_swap_first_adjustment)
+        amount_out, _ = self._op_arbitrage(initial_lp_amount, direction, safety_margin)
         return amount_out - initial_lp_amount
 
     def _get_gross_profit_dec(
         self,
         amount: Decimal,
         direction: Direction,
-        luna_swap_first_adjustment: Decimal = None,
+        safety_margin: bool = False,
     ) -> Decimal:
         token_amount = self.pool_0.lp_token.to_amount(amount)
-        return self._get_gross_profit(token_amount, direction, luna_swap_first_adjustment).amount
+        return self._get_gross_profit(token_amount, direction, safety_margin).amount
 
     def _op_arbitrage(
         self,
         initial_lp_amount: TerraTokenAmount,
         direction: Direction,
-        luna_swap_first_adjustment: Decimal = None,
+        safety_margin: bool,
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
         if direction == Direction.remove_liquidity_first:
             luna_amount, msgs_remove_single_side = self.pool_0.op_remove_single_side(
-                self.client.address, initial_lp_amount, LUNA, MAX_SLIPPAGE
+                self.client.address, initial_lp_amount, LUNA, MAX_SLIPPAGE, safety_margin
             )
             lp_amount, msgs_add_single_side = self.pool_1.op_add_single_side(
-                self.client.address, luna_amount, MAX_SLIPPAGE
+                self.client.address, luna_amount, MAX_SLIPPAGE, safety_margin
             )
             final_lp_amount, msgs_tower_swap = self.pool_tower.op_swap(
-                self.client.address, lp_amount, MAX_SLIPPAGE
+                self.client.address, lp_amount, MAX_SLIPPAGE, safety_margin
             )
             msgs = msgs_remove_single_side + msgs_add_single_side + msgs_tower_swap
         else:
             lp_amount, msgs_tower_swap = self.pool_tower.op_swap(
-                self.client.address, initial_lp_amount, MAX_SLIPPAGE
+                self.client.address, initial_lp_amount, MAX_SLIPPAGE, safety_margin
             )
             luna_amount, msgs_remove_single_side = self.pool_1.op_remove_single_side(
-                self.client.address, lp_amount, LUNA, MAX_SLIPPAGE
+                self.client.address, lp_amount, LUNA, MAX_SLIPPAGE, safety_margin
             )
-            if luna_swap_first_adjustment is not None:
-                luna_amount.amount = luna_amount.amount - luna_swap_first_adjustment
             final_lp_amount, msgs_add_single_side = self.pool_0.op_add_single_side(
-                self.client.address, luna_amount, MAX_SLIPPAGE
+                self.client.address, luna_amount, MAX_SLIPPAGE, safety_margin
             )
             msgs = msgs_tower_swap + msgs_remove_single_side + msgs_add_single_side
         return final_lp_amount, msgs

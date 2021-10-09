@@ -94,7 +94,7 @@ class LunaUstMarketStrategy(TerraSingleTxArbitrage):
         ust_balance = UST.get_balance(self.client).amount
 
         initial_amount = self._get_optimal_argitrage_amount(route, terraswap_premium, ust_balance)
-        final_amount, msgs = self._op_arbitrage(initial_amount, route)
+        final_amount, msgs = self._op_arbitrage(initial_amount, route, safety_round=True)
         try:
             fee = self.client.tx.estimate_fee(msgs)
         except LCDResponseError as e:
@@ -170,25 +170,28 @@ class LunaUstMarketStrategy(TerraSingleTxArbitrage):
         self,
         initial_lp_amount: TerraTokenAmount,
         route: list[terraswap.RouteStep],
+        safety_round: bool = False,
     ) -> TerraTokenAmount:
-        amount_out, _ = self._op_arbitrage(initial_lp_amount, route)
+        amount_out, _ = self._op_arbitrage(initial_lp_amount, route, safety_round)
         return amount_out - initial_lp_amount
 
     def _get_gross_profit_dec(
         self,
         amount: Decimal,
         route: list[terraswap.RouteStep],
+        safety_round: bool = False,
     ) -> Decimal:
         token_amount = UST.to_amount(amount)
-        return self._get_gross_profit(token_amount, route).amount
+        return self._get_gross_profit(token_amount, route, safety_round).amount
 
     def _op_arbitrage(
         self,
         initial_ust_amount: TerraTokenAmount,
         route: list[terraswap.RouteStep],
+        safety_round: bool,
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
         return self.router.op_route_swap(
-            self.client.address, initial_ust_amount, route, MAX_SLIPPAGE
+            self.client.address, initial_ust_amount, route, MAX_SLIPPAGE, safety_round
         )
 
     def _extract_returns_from_logs(self, logs: list[TxLog]) -> tuple[TerraTokenAmount, Decimal]:

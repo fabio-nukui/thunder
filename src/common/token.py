@@ -113,14 +113,11 @@ class TokenAmount:
     def int_amount(self, value: int | str):  # type: ignore
         self._amount = self.token.decimalize(value)
 
-    def safe_down(self: _TokenAmountT, n: int = ROUNDING_SAFETY_MARGIN) -> _TokenAmountT:
-        return self - self.dx * n
-
-    def safe_up(self: _TokenAmountT, n: int = ROUNDING_SAFETY_MARGIN) -> _TokenAmountT:
-        return self + self.dx * n
-
-    def floor_amount(self: _TokenAmountT) -> _TokenAmountT:
-        return self.token.to_amount(int_amount=self.int_amount)
+    def safe_margin(self: _TokenAmountT, margin: bool | int = True) -> _TokenAmountT:
+        if margin is False:
+            return self
+        margin = ROUNDING_SAFETY_MARGIN if margin is True else margin
+        return self.token.to_amount(int_amount=self.int_amount - margin)
 
     def is_empty(self) -> bool:
         return self.amount.is_nan()

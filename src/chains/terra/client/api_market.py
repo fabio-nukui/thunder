@@ -15,6 +15,7 @@ class MarketApi(BaseMarketApi):
         self,
         offer_amount: TerraTokenAmount,
         ask_denom: TerraNativeToken,
+        safety_margin: bool | int = False,
     ) -> TerraTokenAmount:
         """Get market swap amount, based on Terra implementation at
         https://github.com/terra-money/core/blob/v0.5.5/x/market/keeper/swap.go
@@ -35,7 +36,7 @@ class MarketApi(BaseMarketApi):
             spread = max(self.tobin_taxes[offer_amount.token], self.tobin_taxes[ask_denom])
 
         ask_amount = self._compute_swap_no_spread(offer_amount, ask_denom)
-        return ask_amount * (1 - spread)
+        return (ask_amount * (1 - spread)).safe_margin(safety_margin)
 
     @property
     @ttl_cache(CacheGroup.TERRA, maxsize=1)
