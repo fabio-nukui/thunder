@@ -17,6 +17,7 @@ from terra_sdk.core.msg import Msg
 from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.key.mnemonic import MnemonicKey
 
+import utils
 from common import BlockchainClient, Token, TokenAmount
 
 
@@ -147,7 +148,9 @@ TerraToken = Union[TerraNativeToken, CW20Token]
 
 class BaseTerraClient(BlockchainClient, ABC):
     lcd_uri: str
-    fcd_uri: str
+    fcd_client: utils.http.Client
+    rpc_http_client: utils.http.Client
+    rpc_websocket_uri: str
     chain_id: str
     key: MnemonicKey
     lcd: LCDClient
@@ -158,6 +161,7 @@ class BaseTerraClient(BlockchainClient, ABC):
     block: int
 
     market: BaseMarketApi
+    mempool: BaseMempoolApi
     oracle: BaseOracleApi
     treasury: BaseTreasuryApi
     tx: BaseTxApi
@@ -172,14 +176,6 @@ class BaseTerraClient(BlockchainClient, ABC):
         denoms: list[str] = None,
         address: AccAddress = None,
     ) -> list[TerraTokenAmount]:
-        ...
-
-    @abstractmethod
-    def fcd_get(self, path: str, **kwargs) -> dict:
-        ...
-
-    @abstractmethod
-    def fcd_post(self, path: str, **kwargs) -> dict:
         ...
 
 
@@ -284,4 +280,19 @@ class BaseTxApi(Api, ABC):
 
     @abstractmethod
     def execute_msgs_async(self, msgs: list[Msg], **kwargs) -> AsyncTxBroadcastResult:
+        ...
+
+
+class BaseMempoolApi(Api, ABC):
+    @abstractmethod
+    def start_cache(self):
+        ...
+
+    @abstractmethod
+    def get_new_txs(self, height: int) -> dict[str, dict]:
+        ...
+
+    @property
+    @abstractmethod
+    def height(self) -> int:
         ...

@@ -21,6 +21,8 @@ RAISE_ON_SYNCING = os.getenv("RAISE_ON_SYNCING", "").lower() == "true"
 TERRA_CHAIN_ID = os.getenv("TERRA_CHAIN_ID", "columbus-5")
 TERRA_LCD_URI = os.getenv("TERRA_LCD_URI", "https://lcd.terra.dev")
 TERRA_FCD_URI = os.getenv("TERRA_FCD_URI", "https://fcd.terra.dev")
+TERRA_RPC_HTTP_URI = os.getenv("TERRA_RPC_HTTP_URI", "")
+TERRA_RPC_WEBSOCKET_URI = os.getenv("TERRA_RPC_WEBSOCKET_URI", "")
 TERRA_CACHE_TTL = float(os.getenv("TERRA_CACHE_TTL", "5.0"))
 TERRA_POLL_INTERVAL = float(os.getenv("TERRA_POLL_INTERVAL", "0.001"))
 TERRA_GAS_ADJUSTMENT = Decimal(os.getenv("TERRA_GAS_ADJUSTMENT", "1.4"))

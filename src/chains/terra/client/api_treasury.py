@@ -17,7 +17,7 @@ class TreasuryApi(BaseTreasuryApi):
     @property
     @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=TERRA_TAX_CACHE_TTL)
     def tax_caps(self) -> dict[TerraToken, TerraTokenAmount]:
-        res = utils.http.get(f"{self.client.lcd_uri}/terra/treasury/v1beta1/tax_caps")
+        res = utils.http.get(f"{self.client.lcd.url}/terra/treasury/v1beta1/tax_caps")
         caps = {}
         for cap in res.json()["tax_caps"]:
             token = TerraNativeToken(cap["denom"])

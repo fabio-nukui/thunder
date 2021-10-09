@@ -23,6 +23,7 @@ from utils.cache import CacheGroup, ttl_cache
 from ..core import BaseTerraClient, TerraTokenAmount
 from ..denoms import UST
 from .api_market import MarketApi
+from .api_mempool import MempoolApi
 from .api_oracle import OracleApi
 from .api_treasury import TreasuryApi
 from .api_tx import TxApi
@@ -49,22 +50,30 @@ class TerraClient(BaseTerraClient):
         hd_wallet: dict = None,
         lcd_uri: str = configs.TERRA_LCD_URI,
         fcd_uri: str = configs.TERRA_FCD_URI,
+        rpc_http_uri: str = configs.TERRA_RPC_HTTP_URI,
+        rpc_websocket_uri: str = configs.TERRA_RPC_WEBSOCKET_URI,
         chain_id: str = configs.TERRA_CHAIN_ID,
         fee_denom: str = UST.denom,
         gas_prices: Coins.Input = None,
         gas_adjustment: Decimal = configs.TERRA_GAS_ADJUSTMENT,
         hd_wallet_index: int = 0,
         raise_on_syncing: bool = configs.RAISE_ON_SYNCING,
+        use_mempool_cache: bool = False,
     ):
-        self.lcd_uri = lcd_uri
-        self.fcd_uri = fcd_uri
+        self.fcd_client = utils.http.Client(base_url=fcd_uri)
+        self.rcp_http_client = utils.http.Client(base_url=rpc_http_uri)
+        self.rpc_websocket_uri = rpc_websocket_uri
         self.chain_id = chain_id
         self.fee_denom = fee_denom
 
         self.market = MarketApi(self)
+        self.mempool = MempoolApi(self)
         self.oracle = OracleApi(self)
         self.treasury = TreasuryApi(self)
         self.tx = TxApi(self)
+
+        if use_mempool_cache:
+            self.mempool.start_cache()
 
         hd_wallet = auth_secrets.hd_wallet() if hd_wallet is None else hd_wallet
         key = MnemonicKey(hd_wallet["mnemonic"], hd_wallet["account"], hd_wallet_index)
@@ -81,7 +90,7 @@ class TerraClient(BaseTerraClient):
 
     def __repr__(self) -> str:
         return (
-            f"{self.__class__.__name__}(lcd_uri={self.lcd_uri}, chain_id={self.chain_id}, "
+            f"{self.__class__.__name__}(lcd.url={self.lcd.url}, chain_id={self.chain_id}, "
             f"account={self.key.acc_address})"
         )
 
@@ -96,20 +105,10 @@ class TerraClient(BaseTerraClient):
     @ttl_cache(CacheGroup.TERRA, TERRA_CONTRACT_QUERY_CACHE_SIZE, CONTRACT_INFO_CACHE_TTL)
     def contract_info(self, address: AccAddress) -> dict:
         # return self.lcd.wasm.contract_info(contract_addr)  # returns 500 on non-account addresses
-        info = self.fcd_get(f"v1/wasm/contract/{address}")
+        info = self.fcd_client.get(f"v1/wasm/contract/{address}").json()
         if info is None:
             raise NotContract
         return info
-
-    def fcd_get(self, path: str, **kwargs) -> dict:
-        url = urllib.parse.urljoin(self.fcd_uri, path)
-        res = utils.http.get(url, **kwargs)
-        return res.json()
-
-    def fcd_post(self, path: str, **kwargs) -> dict:
-        url = urllib.parse.urljoin(self.fcd_uri, path)
-        res = utils.http.post(url, **kwargs)
-        return res.json()
 
     def get_bank(self, denoms: list[str] = None, address: str = None) -> list[TerraTokenAmount]:
         address = self.address if address is None else address

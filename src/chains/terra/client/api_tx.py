@@ -29,7 +29,7 @@ _BroadcastResutT = TypeVar(
 class TxApi(BaseTxApi):
     @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=TERRA_GAS_PRICE_CACHE_TTL)
     def get_gas_prices(self) -> Coins:
-        return Coins(self.client.fcd_get("v1/txs/gas_prices"))
+        return Coins(self.client.fcd_client.get("v1/txs/gas_prices").json())
 
     def estimate_fee(
         self,
@@ -77,6 +77,6 @@ class TxApi(BaseTxApi):
 
     def _broadcast_async(self, tx: StdTx) -> AsyncTxBroadcastResult:
         payload = {"tx": tx.to_data()["value"], "mode": "async"}
-        res = self.client.fcd_post("txs", json=payload)
+        res = self.client.fcd_client.post("txs", json=payload).json()
 
         return AsyncTxBroadcastResult(txhash=res["txhash"], height=self.client.block)
