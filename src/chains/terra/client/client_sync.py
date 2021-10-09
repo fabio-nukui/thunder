@@ -6,6 +6,7 @@ import logging
 import time
 import urllib.parse
 from collections import defaultdict
+from decimal import Decimal
 from typing import Iterable
 
 from terra_sdk.client.lcd import LCDClient
@@ -51,7 +52,7 @@ class TerraClient(BaseTerraClient):
         chain_id: str = configs.TERRA_CHAIN_ID,
         fee_denom: str = UST.denom,
         gas_prices: Coins.Input = None,
-        gas_adjustment: float = configs.TERRA_GAS_ADJUSTMENT,
+        gas_adjustment: Decimal = configs.TERRA_GAS_ADJUSTMENT,
         hd_wallet_index: int = 0,
         raise_on_syncing: bool = configs.RAISE_ON_SYNCING,
     ):

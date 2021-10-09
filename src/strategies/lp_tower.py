@@ -126,7 +126,8 @@ class LPTowerStrategy(TerraSingleTxArbitrage):
             )
             raise TxError(e)
         gas_cost = TerraTokenAmount.from_coin(*fee.amount)
-        net_profit_ust = (final_amount - initial_amount).amount * lp_ust_price - gas_cost.amount
+        gas_cost_raw = gas_cost.amount / self.client.lcd.gas_adjustment
+        net_profit_ust = (final_amount - initial_amount).amount * lp_ust_price - gas_cost_raw
         if net_profit_ust < MIN_PROFIT_UST:
             raise UnprofitableArbitrage(
                 f"Low profitability: USD {net_profit_ust:.2f}, {balance_ratio=:0.3%}"
