@@ -37,7 +37,7 @@ class MempoolCacheManager(threading.Thread):
             self._txs_cache = mempool_txs
             time.sleep(configs.TERRA_POLL_INTERVAL)
 
-    def get_txs(self, height: int) -> dict[str, dict]:
+    def get_txs(self, height: int) -> dict[str, dict]:  # Not thread-safe for multiple readers!
         if height > self.height:
             return {}
         unread_tx_hashes = self._txs_cache.keys() - self._read_txs.keys()

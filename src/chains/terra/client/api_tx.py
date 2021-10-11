@@ -77,6 +77,6 @@ class TxApi(BaseTxApi):
 
     def _broadcast_async(self, tx: StdTx) -> AsyncTxBroadcastResult:
         payload = {"tx": tx.to_data()["value"], "mode": "async"}
-        res = self.client.fcd_client.post("txs", json=payload).json()
+        res = self.client.lcd_http_client.post("txs", json=payload).json()
 
         return AsyncTxBroadcastResult(txhash=res["txhash"], height=self.client.block)

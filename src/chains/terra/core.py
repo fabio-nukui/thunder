@@ -147,7 +147,7 @@ TerraToken = Union[TerraNativeToken, CW20Token]
 
 
 class BaseTerraClient(BlockchainClient, ABC):
-    lcd_uri: str
+    lcd_http_client: utils.http.Client
     fcd_client: utils.http.Client
     rpc_http_client: utils.http.Client
     rpc_websocket_uri: str

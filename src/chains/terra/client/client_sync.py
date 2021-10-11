@@ -4,7 +4,6 @@ import base64
 import json
 import logging
 import time
-import urllib.parse
 from collections import defaultdict
 from decimal import Decimal
 from typing import Iterable
@@ -12,6 +11,7 @@ from typing import Iterable
 from terra_sdk.client.lcd import LCDClient
 from terra_sdk.core import AccAddress, Coins
 from terra_sdk.core.auth import TxLog
+from terra_sdk.exceptions import LCDResponseError
 from terra_sdk.key.mnemonic import MnemonicKey
 
 import auth_secrets
@@ -60,6 +60,7 @@ class TerraClient(BaseTerraClient):
         raise_on_syncing: bool = configs.RAISE_ON_SYNCING,
         use_mempool_cache: bool = False,
     ):
+        self.lcd_http_client = utils.http.Client(base_url=lcd_uri)
         self.fcd_client = utils.http.Client(base_url=fcd_uri)
         self.rcp_http_client = utils.http.Client(base_url=rpc_http_uri)
         self.rpc_websocket_uri = rpc_websocket_uri
@@ -104,11 +105,12 @@ class TerraClient(BaseTerraClient):
 
     @ttl_cache(CacheGroup.TERRA, TERRA_CONTRACT_QUERY_CACHE_SIZE, CONTRACT_INFO_CACHE_TTL)
     def contract_info(self, address: AccAddress) -> dict:
-        # return self.lcd.wasm.contract_info(contract_addr)  # returns 500 on non-account addresses
-        info = self.fcd_client.get(f"v1/wasm/contract/{address}").json()
-        if info is None:
-            raise NotContract
-        return info
+        try:
+            return self.lcd.wasm.contract_info(address)
+        except LCDResponseError as e:
+            if e.response.status == 500:
+                raise NotContract
+            raise e
 
     def get_bank(self, denoms: list[str] = None, address: str = None) -> list[TerraTokenAmount]:
         address = self.address if address is None else address

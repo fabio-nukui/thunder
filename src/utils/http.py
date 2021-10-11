@@ -95,9 +95,9 @@ def request(
             method,
             url,
             *args,
-            n_tries,
-            backoff_factor,
-            status_forcelist,
+            n_tries=n_tries,
+            backoff_factor=backoff_factor,
+            status_forcelist=status_forcelist,
             **kwargs,
         )
     with httpx.Client(http2=http2, timeout=timeout) as client:
@@ -106,9 +106,9 @@ def request(
             method,
             url,
             *args,
-            n_tries,
-            backoff_factor,
-            status_forcelist,
+            n_tries=n_tries,
+            backoff_factor=backoff_factor,
+            status_forcelist=status_forcelist,
             **kwargs,
         )
 
