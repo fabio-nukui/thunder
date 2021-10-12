@@ -80,10 +80,10 @@ class LunaUstMarketStrategy(TerraSingleTxArbitrage):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(client={self.client}, state={self.state})"
 
-    def _get_arbitrage_params(self, block: int, mempool: dict = None) -> ArbParams:
+    async def _get_arbitrage_params(self, height: int, mempool: dict = None) -> ArbParams:
         if mempool:
             raise NotImplementedError
-        prices = self._get_prices()
+        prices = await self._get_prices()
         terraswap_premium = prices["terraswap"] / prices["market"] - 1
         if terraswap_premium > 0:
             direction = Direction.native_first
@@ -91,12 +91,14 @@ class LunaUstMarketStrategy(TerraSingleTxArbitrage):
         else:
             direction = Direction.terraswap_first
             route = self._route_terraswap_first
-        ust_balance = UST.get_balance(self.client).amount
+        ust_balance = (await UST.get_balance(self.client)).amount
 
-        initial_amount = self._get_optimal_argitrage_amount(route, terraswap_premium, ust_balance)
-        final_amount, msgs = self._op_arbitrage(initial_amount, route, safety_round=True)
+        initial_amount = await self._get_optimal_argitrage_amount(
+            route, terraswap_premium, ust_balance
+        )
+        final_amount, msgs = await self._op_arbitrage(initial_amount, route, safety_round=True)
         try:
-            fee = self.client.tx.estimate_fee(msgs)
+            fee = await self.client.tx.estimate_fee(msgs)
         except LCDResponseError as e:
             log.debug(
                 "Error when estimating fee",
@@ -120,9 +122,9 @@ class LunaUstMarketStrategy(TerraSingleTxArbitrage):
 
         return ArbParams(
             timestamp_found=time.time(),
-            block_found=block,
+            block_found=height,
             prices=prices,
-            terra_virtual_pools=self.client.market.virtual_pools,
+            terra_virtual_pools=await self.client.market.get_virtual_pools(),
             ust_balance=ust_balance,
             pool_reserves=self.terraswap_pool.reserves,
             direction=direction,
@@ -133,27 +135,26 @@ class LunaUstMarketStrategy(TerraSingleTxArbitrage):
             est_net_profit_usd=net_profit_ust,
         )
 
-    def _get_prices(self) -> dict[str, Decimal]:
-        terraswap_price = (
-            self.terraswap_pool.reserves[0].amount / self.terraswap_pool.reserves[1].amount
-        )
-        market_price = self.client.oracle.exchange_rates[UST]
+    async def _get_prices(self) -> dict[str, Decimal]:
+        reserves = self.terraswap_pool.reserves
+        terraswap_price = reserves[0].amount / reserves[1].amount
+        market_price = await self.client.oracle.get_exchange_rate(LUNA, UST)
         return {
             "terraswap": terraswap_price,
             "market": market_price,
         }
 
-    def _get_optimal_argitrage_amount(
+    async def _get_optimal_argitrage_amount(
         self,
         route: list[terraswap.RouteStep],
         terraswap_premium: Decimal,
         ust_balance: Decimal,
     ) -> TerraTokenAmount:
-        profit = self._get_gross_profit(MIN_START_AMOUNT, route)
+        profit = await self._get_gross_profit(MIN_START_AMOUNT, route)
         if profit < 0:
             raise UnprofitableArbitrage(f"No profitability, {terraswap_premium=:0.3%}")
         func = partial(self._get_gross_profit_dec, route=route)
-        ust_amount, _ = utils.optimization.optimize(
+        ust_amount, _ = await utils.aoptimization.optimize(
             func,
             x0=MIN_START_AMOUNT.amount,
             dx=MIN_START_AMOUNT.dx,
@@ -167,48 +168,51 @@ class LunaUstMarketStrategy(TerraSingleTxArbitrage):
             return UST.to_amount(ust_balance - MIN_UST_RESERVED_AMOUNT)
         return UST.to_amount(ust_amount)
 
-    def _get_gross_profit(
+    async def _get_gross_profit(
         self,
         initial_lp_amount: TerraTokenAmount,
         route: list[terraswap.RouteStep],
         safety_round: bool = False,
     ) -> TerraTokenAmount:
-        amount_out, _ = self._op_arbitrage(initial_lp_amount, route, safety_round)
+        amount_out, _ = await self._op_arbitrage(initial_lp_amount, route, safety_round)
         return amount_out - initial_lp_amount
 
-    def _get_gross_profit_dec(
+    async def _get_gross_profit_dec(
         self,
         amount: Decimal,
         route: list[terraswap.RouteStep],
         safety_round: bool = False,
     ) -> Decimal:
         token_amount = UST.to_amount(amount)
-        return self._get_gross_profit(token_amount, route, safety_round).amount
+        return (await self._get_gross_profit(token_amount, route, safety_round)).amount
 
-    def _op_arbitrage(
+    async def _op_arbitrage(
         self,
         initial_ust_amount: TerraTokenAmount,
         route: list[terraswap.RouteStep],
         safety_round: bool,
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
-        return self.router.op_route_swap(
+        return await self.router.op_route_swap(
             self.client.address, initial_ust_amount, route, MAX_SLIPPAGE, safety_round
         )
 
-    def _extract_returns_from_logs(self, logs: list[TxLog]) -> tuple[TerraTokenAmount, Decimal]:
+    async def _extract_returns_from_logs(
+        self,
+        logs: list[TxLog],
+    ) -> tuple[TerraTokenAmount, Decimal]:
         tx_events = TerraClient.extract_log_events(logs)
         logs_from_contract = TerraClient.parse_from_contract_events(tx_events)
         log.debug(logs_from_contract)
         return UST.to_amount(), Decimal(0)  # TODO: implement
 
 
-def run():
+async def run():
     client = TerraClient()
     pool_addresses = terraswap.get_addresses(client.chain_id)
     pairs = [terraswap.LiquidityPair(pool_addresses["pools"]["ust_luna"], client)]
     router = terraswap.Router(pairs, client)
 
     strategy = LunaUstMarketStrategy(client, router)
-    for block in client.wait_next_block():
-        strategy.run(block)
+    async for height in client.loop_latest_height():
+        await strategy.run(height)
         utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)

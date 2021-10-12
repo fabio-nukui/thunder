@@ -1,18 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 from abc import ABC, abstractmethod
 from decimal import Decimal
 from enum import Enum
-from typing import Type, TypeVar, Union
+from typing import Iterator, Type, TypeVar, Union
 
-from terra_sdk.client.lcd import LCDClient, Wallet
+from terra_sdk.client.lcd import AsyncLCDClient, AsyncWallet
 from terra_sdk.core import AccAddress, Coin, Coins
 from terra_sdk.core.auth import StdFee
-from terra_sdk.core.broadcast import (
-    AsyncTxBroadcastResult,
-    BlockTxBroadcastResult,
-    SyncTxBroadcastResult,
-)
+from terra_sdk.core.broadcast import AsyncTxBroadcastResult
 from terra_sdk.core.msg import Msg
 from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.key.mnemonic import MnemonicKey
@@ -75,8 +72,12 @@ class TerraNativeToken(BaseTerraToken):
     def _id(self) -> tuple:
         return (self.denom,)
 
-    def get_balance(self, client: BaseTerraClient, address: AccAddress = None) -> TerraTokenAmount:
-        balances = client.get_bank([self.denom], address)
+    async def get_balance(
+        self,
+        client: BaseTerraClient,
+        address: AccAddress = None,
+    ) -> TerraTokenAmount:
+        balances = await client.get_bank([self.denom], address)
         if not balances:
             return self.to_amount(0)
         return balances[0]
@@ -96,24 +97,24 @@ class CW20Token(BaseTerraToken):
         return (self.contract_addr,)
 
     @classmethod
-    def from_contract(
+    async def from_contract(
         cls: Type[_CW20TokenT],
         contract_addr: AccAddress,
         client: BaseTerraClient,
     ) -> _CW20TokenT:
-        res = client.contract_query(contract_addr, {"token_info": {}})
+        res = await client.contract_query(contract_addr, {"token_info": {}})
         return cls(contract_addr, res["symbol"], res["decimals"])
 
-    def get_balance(self, client: BaseTerraClient, address: str = None) -> TerraTokenAmount:
+    async def get_balance(self, client: BaseTerraClient, address: str = None) -> TerraTokenAmount:
         address = client.address if address is None else address
-        res = client.contract_query(self.contract_addr, {"balance": {"address": address}})
+        res = await client.contract_query(self.contract_addr, {"balance": {"address": address}})
         return self.to_amount(int_amount=res["balance"])
 
-    def get_supply(self, client: BaseTerraClient) -> TerraTokenAmount:
-        res = client.contract_query(self.contract_addr, {"token_info": {}})
+    async def get_supply(self, client: BaseTerraClient) -> TerraTokenAmount:
+        res = await client.contract_query(self.contract_addr, {"token_info": {}})
         return self.to_amount(int_amount=res["total_supply"])
 
-    def get_allowance(
+    async def get_allowance(
         self,
         client: BaseTerraClient,
         spender: AccAddress,
@@ -121,7 +122,7 @@ class CW20Token(BaseTerraToken):
     ) -> TerraTokenAmount:
         owner = client.address if owner is None else owner
         query = {"allowance": {"owner": owner, "spender": spender}}
-        res = client.contract_query(self.contract_addr, query)
+        res = await client.contract_query(self.contract_addr, query)
         return self.to_amount(int_amount=res["allowance"])
 
     def build_msg_increase_allowance(
@@ -147,18 +148,19 @@ TerraToken = Union[TerraNativeToken, CW20Token]
 
 
 class BaseTerraClient(BlockchainClient, ABC):
-    lcd_http_client: utils.http.Client
-    fcd_client: utils.http.Client
-    rpc_http_client: utils.http.Client
+    loop: asyncio.AbstractEventLoop
+    lcd_http_client: utils.ahttp.AsyncClient
+    fcd_client: utils.ahttp.AsyncClient
+    rpc_http_client: utils.ahttp.AsyncClient
     rpc_websocket_uri: str
     chain_id: str
     key: MnemonicKey
-    lcd: LCDClient
-    wallet: Wallet
+    lcd: AsyncLCDClient
+    wallet: AsyncWallet
     address: AccAddress
     code_ids: dict[str, int]
     fee_denom: str
-    block: int
+    height: int
 
     market: BaseMarketApi
     mempool: BaseMempoolApi
@@ -167,11 +169,11 @@ class BaseTerraClient(BlockchainClient, ABC):
     tx: BaseTxApi
 
     @abstractmethod
-    def contract_query(self, contract_addr: AccAddress, query_msg: dict) -> dict:
+    async def contract_query(self, contract_addr: AccAddress, query_msg: dict) -> dict:
         ...
 
     @abstractmethod
-    def get_bank(
+    async def get_bank(
         self,
         denoms: list[str] = None,
         address: AccAddress = None,
@@ -186,37 +188,37 @@ class Api:
 
 class BaseMarketApi(Api, ABC):
     @abstractmethod
-    def get_amount_out(
+    async def get_amount_out(
         self,
         offer_amount: TerraTokenAmount,
         ask_denom: TerraNativeToken,
     ) -> TerraTokenAmount:
         ...
 
-    @property
     @abstractmethod
-    def virtual_pools(self) -> tuple[Decimal, Decimal]:
+    async def get_virtual_pools(self) -> tuple[Decimal, Decimal]:
         ...
 
-    @property
     @abstractmethod
-    def tobin_taxes(self) -> dict[TerraNativeToken, Decimal]:
+    async def get_tobin_taxes(self) -> dict[TerraNativeToken, Decimal]:
         ...
 
-    @property
     @abstractmethod
-    def market_parameters(self) -> dict[str, Decimal]:
+    async def get_market_parameters(self) -> dict[str, Decimal]:
+        ...
+
+    @abstractmethod
+    async def get_market_parameter(self, param_name: str) -> dict[str, Decimal]:
         ...
 
 
 class BaseOracleApi(Api, ABC):
-    @property
     @abstractmethod
-    def exchange_rates(self) -> dict[TerraNativeToken, Decimal]:
+    async def get_exchange_rates(self) -> dict[TerraNativeToken, Decimal]:
         ...
 
     @abstractmethod
-    def get_exchange_rate(
+    async def get_exchange_rate(
         self,
         from_coin: TerraNativeToken | str,
         to_coin: TerraNativeToken | str,
@@ -230,14 +232,12 @@ class TaxPayer(str, Enum):
 
 
 class BaseTreasuryApi(Api, ABC):
-    @property
     @abstractmethod
-    def tax_rate(self) -> Decimal:
+    async def get_tax_rate(self) -> Decimal:
         ...
 
-    @property
     @abstractmethod
-    def tax_caps(self) -> dict[TerraToken, TerraTokenAmount]:
+    async def get_tax_caps(self) -> dict[TerraToken, TerraTokenAmount]:
         ...
 
     @abstractmethod
@@ -259,11 +259,11 @@ class BaseTreasuryApi(Api, ABC):
 
 class BaseTxApi(Api, ABC):
     @abstractmethod
-    def get_gas_prices(self) -> Coins:
+    async def get_gas_prices(self) -> Coins:
         ...
 
     @abstractmethod
-    def estimate_fee(
+    async def estimate_fee(
         self,
         msgs: list[Msg],
         gas_adjustment: float = None,
@@ -271,28 +271,15 @@ class BaseTxApi(Api, ABC):
         ...
 
     @abstractmethod
-    def execute_msgs_block(self, msgs: list[Msg], **kwargs) -> BlockTxBroadcastResult:
-        ...
-
-    @abstractmethod
-    def execute_msgs_sync(self, msgs: list[Msg], **kwargs) -> SyncTxBroadcastResult:
-        ...
-
-    @abstractmethod
-    def execute_msgs_async(self, msgs: list[Msg], **kwargs) -> AsyncTxBroadcastResult:
+    async def execute_msgs(self, msgs: list[Msg], **kwargs) -> AsyncTxBroadcastResult:
         ...
 
 
 class BaseMempoolApi(Api, ABC):
     @abstractmethod
-    def start_cache(self):
+    async def get_height_mempool(self, height: int) -> tuple[int, dict[str, dict]]:
         ...
 
     @abstractmethod
-    def get_new_txs(self, height: int) -> dict[str, dict]:
-        ...
-
-    @property
-    @abstractmethod
-    def height(self) -> int:
+    async def loop_height_mempool(self, height: int) -> Iterator[tuple[int, dict[str, dict]]]:
         ...

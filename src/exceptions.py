@@ -11,9 +11,9 @@ class IsBusy(Exception):
 
 
 class NodeSyncing(Exception):
-    def __init__(self, latest_block: int, *args) -> None:
-        self.latest_block = latest_block
-        super().__init__(f"Latest block={latest_block}", *args)
+    def __init__(self, latest_height: int, *args) -> None:
+        self.latest_height = latest_height
+        super().__init__(f"Latest height={latest_height}", *args)
 
 
 class NotContract(Exception):

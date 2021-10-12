@@ -1,4 +1,4 @@
-from .client_sync import TerraClient
+from .async_client import TerraClient
 
 __all__ = [
     "TerraClient",

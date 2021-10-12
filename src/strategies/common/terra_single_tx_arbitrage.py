@@ -28,18 +28,18 @@ class TerraArbParams(BaseArbParams):
 
 
 class TerraSingleTxArbitrage(SingleTxArbitrage[TerraClient], ABC):
-    def _broadcast_tx(self, execution_config: TerraArbParams, block: int) -> ArbTx:
-        if (latest_block := self.client.get_latest_block()) != block:
-            raise BlockchainNewState(f"{latest_block=} different from {block=}")
-        res = self.client.tx.execute_msgs_async(execution_config.msgs, fee=execution_config.est_fee)
+    async def _broadcast_tx(self, execution_config: TerraArbParams, height: int) -> ArbTx:
+        if (latest_height := await self.client.get_latest_height()) != height:
+            raise BlockchainNewState(f"{latest_height=} different from {height=}")
+        res = await self.client.tx.execute_msgs(execution_config.msgs, fee=execution_config.est_fee)
         return ArbTx(timestamp_sent=time.time(), tx_hash=res.txhash)
 
-    def _confirm_tx(self, block: int) -> ArbResult:
+    async def _confirm_tx(self, height: int) -> ArbResult:
         assert self.data.params is not None
         assert self.data.tx is not None
-        tx_inclusion_delay = block - self.data.params.block_found
+        tx_inclusion_delay = height - self.data.params.block_found
         try:
-            info = self.client.lcd.tx.tx_info(self.data.tx.tx_hash)
+            info = await self.client.lcd.tx.tx_info(self.data.tx.tx_hash)
         except LCDResponseError as e:
             if e.response.status == 404:
                 if tx_inclusion_delay >= MAX_BLOCKS_WAIT_RECEIPT:
@@ -47,7 +47,7 @@ class TerraSingleTxArbitrage(SingleTxArbitrage[TerraClient], ABC):
                 raise IsBusy
             raise
         log.debug(info.to_data())
-        if block - info.height < MIN_CONFIRMATIONS:
+        if height - info.height < MIN_CONFIRMATIONS:
             raise IsBusy
         gas_cost = TerraTokenAmount.from_coin(*info.tx.fee.amount)
         if info.logs is None:
@@ -58,7 +58,7 @@ class TerraSingleTxArbitrage(SingleTxArbitrage[TerraClient], ABC):
         else:
             status = TxStatus.succeeded
             tx_err_log = None
-            final_amount, net_profit_ust = self._extract_returns_from_logs(info.logs)
+            final_amount, net_profit_ust = await self._extract_returns_from_logs(info.logs)
         return ArbResult(
             tx_status=status,
             tx_err_log=tx_err_log,
@@ -72,5 +72,8 @@ class TerraSingleTxArbitrage(SingleTxArbitrage[TerraClient], ABC):
         )
 
     @abstractmethod
-    def _extract_returns_from_logs(self, logs: list[TxLog]) -> tuple[TerraTokenAmount, Decimal]:
+    async def _extract_returns_from_logs(
+        self,
+        logs: list[TxLog],
+    ) -> tuple[TerraTokenAmount, Decimal]:
         ...

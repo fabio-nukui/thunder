@@ -39,14 +39,14 @@ class EVMClient(BaseEVMClient):
         hd_wallet: dict = None,
         hd_wallet_index: int = 0,
         timeout: int = DEFAULT_CONN_TIMEOUT,
-        block: int | Literal["latest"] = "latest",
+        height: int | Literal["latest"] = "latest",
         raise_on_syncing: bool = False,
     ):
         self.endpoint_uri = endpoint_uri
         self.chain_id = chain_id
         self.middlewares = middlewares
         self.timeout = timeout
-        self.block = block
+        self.height = height
 
         self.w3 = get_w3(endpoint_uri, middlewares, timeout)
 

@@ -101,7 +101,7 @@ class SingleTxArbitrage(Generic[_BlockchainClientT], ABC):
     def __init__(self, client: _BlockchainClientT):
         self.client = client
         self.data = ArbitrageData()
-        log.info(f"Initialized {self} at block={self.client.block}")
+        log.info(f"Initialized {self} at height={self.client.height}")
 
     @property
     def state(self) -> State:
@@ -113,18 +113,18 @@ class SingleTxArbitrage(Generic[_BlockchainClientT], ABC):
             return State.waiting_confirmation
         return State.finished
 
-    def run(self, block: int, mempool: dict = None):
+    async def run(self, height: int, mempool: dict = None):
         if self.state == State.start:
             log.debug("Generating execution configuration")
             try:
-                self.data.params = self._get_arbitrage_params(block, mempool)
+                self.data.params = await self._get_arbitrage_params(height, mempool)
             except (UnprofitableArbitrage, TxError) as e:
                 log.debug(e)
                 return
         if self.state == State.ready_to_broadcast:
             log.info("Broadcasting transaction")
             try:
-                self.data.tx = self._broadcast_tx(self.data.params, block)  # type: ignore
+                self.data.tx = await self._broadcast_tx(self.data.params, height)  # type: ignore
             except BlockchainNewState as e:
                 log.warning(e)
                 self.data.reset()
@@ -135,7 +135,7 @@ class SingleTxArbitrage(Generic[_BlockchainClientT], ABC):
         if self.state == State.waiting_confirmation:
             log.debug("Looking for tx confirmation(s)")
             try:
-                self.data.result = self._confirm_tx(block)
+                self.data.result = await self._confirm_tx(height)
             except IsBusy:
                 return
             else:
@@ -144,13 +144,13 @@ class SingleTxArbitrage(Generic[_BlockchainClientT], ABC):
                 self.data.reset()
 
     @abstractmethod
-    def _get_arbitrage_params(self, block: int, mempool: dict = None) -> BaseArbParams:
+    async def _get_arbitrage_params(self, height: int, mempool: dict = None) -> BaseArbParams:
         ...
 
     @abstractmethod
-    def _broadcast_tx(self, execution_config: BaseArbParams, block: int) -> ArbTx:
+    async def _broadcast_tx(self, execution_config: BaseArbParams, height: int) -> ArbTx:
         ...
 
     @abstractmethod
-    def _confirm_tx(self, block: int) -> ArbResult:
+    async def _confirm_tx(self, height: int) -> ArbResult:
         ...

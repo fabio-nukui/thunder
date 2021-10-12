@@ -1,4 +1,3 @@
 [flake8]
 max-line-length = 100
-select = W504
-ignore = E203,E731
+ignore = E203,E731,W503

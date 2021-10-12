@@ -93,10 +93,10 @@ class ERC20Token(Token[EVMTokenAmount]):
             self.contract = self.client.w3.eth.contract(address=self.address, abi=abi)
             if symbol is None:
                 symbol_func = self.contract.functions.symbol()
-                symbol = symbol_func.call(block_identifier=self.client.block)
+                symbol = symbol_func.call(block_identifier=self.client.height)
             if decimals is None:
                 decimal_func = self.contract.functions.decimals()
-                decimals = decimal_func.call(block_identifier=self.client.block)
+                decimals = decimal_func.call(block_identifier=self.client.height)
             if chain_id is None:
                 chain_id = self.client.chain_id
 
@@ -110,7 +110,7 @@ class ERC20Token(Token[EVMTokenAmount]):
     def get_allowance(self, owner: str, spender: str) -> EVMTokenAmount:
         assert self.contract is not None and self.client is not None
         allowance: int = self.contract.functions.allowance(owner, spender).call(
-            block_identifier=self.client.block
+            block_identifier=self.client.height
         )
         return EVMTokenAmount(self, int_amount=allowance)
 
@@ -153,7 +153,7 @@ EVMToken = Union[EVMNativeToken, ERC20Token]
 class BaseEVMClient(BlockchainClient, ABC):
     endpoint_uri: str
     chain_id: int
-    block: int | Literal["latest"]
+    height: int | Literal["latest"]
     w3: Web3
     account: LocalAccount
     address: str

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import math
 from abc import ABC, abstractmethod
-from contextlib import contextmanager
-from copy import copy
+from contextlib import asynccontextmanager
+from copy import deepcopy
 from decimal import Decimal
 
 from terra_sdk.core import AccAddress
@@ -15,7 +16,7 @@ from exceptions import InsufficientLiquidity, NotContract
 from utils.cache import CacheGroup, ttl_cache
 
 from .client import TerraClient
-from .core import CW20Token, TaxPayer, TerraNativeToken, TerraToken, TerraTokenAmount
+from .core import CW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
 
 __all__ = [
     "get_addresses",
@@ -52,30 +53,34 @@ def _token_amount_to_data(token_amount: TerraTokenAmount) -> dict:
     }
 
 
-def _is_terraswap_pool(contract_addr: AccAddress, client: TerraClient) -> bool:
+async def _is_terraswap_pool(contract_addr: AccAddress, client: TerraClient) -> bool:
     try:
-        info = client.contract_info(contract_addr)
+        info = await client.contract_info(contract_addr)
     except NotContract:
         return False
     return int(info["code_id"]) == client.code_ids[TERRASWAP_CODE_ID_KEY]
 
 
-def _pair_tokens_from_data(
+async def _pair_tokens_from_data(
     asset_infos: list[dict],
     client: TerraClient,
 ) -> tuple[TerraToken, TerraToken]:
-    return _token_from_data(asset_infos[0], client), _token_from_data(asset_infos[1], client)
+    token_0, token_1 = await asyncio.gather(
+        _token_from_data(asset_infos[0], client),
+        _token_from_data(asset_infos[1], client),
+    )
+    return token_0, token_1
 
 
-def _token_from_data(asset_info: dict, client: TerraClient) -> TerraToken:
+async def _token_from_data(asset_info: dict, client: TerraClient) -> TerraToken:
     if "native_token" in asset_info:
         return TerraNativeToken(asset_info["native_token"]["denom"])
     if "token" in asset_info:
         contract_addr: AccAddress = asset_info["token"]["contract_addr"]
         try:
-            return LPToken.from_contract(contract_addr, client)
+            return await LPToken.from_contract(contract_addr, client)
         except NotTerraswapPair:
-            return CW20Token.from_contract(contract_addr, client)
+            return await CW20Token.from_contract(contract_addr, client)
     raise TypeError(f"Unexpected data format: {asset_info}")
 
 
@@ -144,7 +149,7 @@ class Router:
         self.pairs = {pair.sorted_tokens: pair for pair in liquidity_pairs}
         self.client = client
 
-    def op_route_swap(
+    async def op_route_swap(
         self,
         sender: AccAddress,
         amount_in: TerraTokenAmount,
@@ -161,10 +166,10 @@ class Router:
                 if step.sorted_tokens not in self.pairs:
                     raise Exception(f"No liquidity pair found for {step.sorted_tokens}")
                 pair = self.pairs[step.sorted_tokens]
-                next_amount_in = pair.get_swap_amount_out(next_amount_in, safety_margin)
+                next_amount_in = await pair.get_swap_amount_out(next_amount_in, safety_margin)
             else:
                 assert isinstance(step.token_out, TerraNativeToken)
-                next_amount_in = self.client.market.get_amount_out(
+                next_amount_in = await self.client.market.get_amount_out(
                     next_amount_in, step.token_out, safety_margin
                 )
             swap_operations.append(step.to_data())
@@ -203,14 +208,17 @@ class Router:
 
 class LiquidityPair:
     def __init__(self, contract_addr: AccAddress, client: TerraClient):
-        if not _is_terraswap_pool(contract_addr, client):
+        client.loop.run_until_complete(self._init(contract_addr, client))
+
+    async def _init(self, contract_addr: AccAddress, client: TerraClient):
+        if not await _is_terraswap_pool(contract_addr, client):
             raise NotTerraswapPair
         self.contract_addr = contract_addr
         self.client = client
 
-        pair_data = self.client.contract_query(self.contract_addr, {"pair": {}})
-        self.tokens = _pair_tokens_from_data(pair_data["asset_infos"], client)
-        self.lp_token = LPToken.from_pool(pair_data["liquidity_token"], self)
+        pair_data = await self.client.contract_query(self.contract_addr, {"pair": {}})
+        self.tokens = await _pair_tokens_from_data(pair_data["asset_infos"], self.client)
+        self.lp_token = await LPToken.from_pool(pair_data["liquidity_token"], self)
 
         self.stop_updates = False
         self._reserves = self.tokens[0].to_amount(), self.tokens[1].to_amount()
@@ -223,15 +231,23 @@ class LiquidityPair:
     @property
     def reserves(self) -> AmountTuple:
         if not self.stop_updates:
-            self._reserves = self._get_reserves()
+            try:
+                self._reserves = self.client.loop.run_until_complete(self._get_reserves())
+            except RuntimeError:
+                pass
+        return self._reserves
+
+    async def get_reserves(self) -> AmountTuple:
+        if not self.stop_updates:
+            self._reserves = await self._get_reserves()
         return self._reserves
 
     @ttl_cache(CacheGroup.TERRA, maxsize=1)
-    def _get_reserves(self) -> AmountTuple:
-        data = self.client.contract_query(self.contract_addr, {"pool": {}})["assets"]
+    async def _get_reserves(self) -> AmountTuple:
+        data = await self.client.contract_query(self.contract_addr, {"pool": {}})
         return (
-            self.tokens[0].to_amount(int_amount=data[0]["amount"]),
-            self.tokens[1].to_amount(int_amount=data[1]["amount"]),
+            self.tokens[0].to_amount(int_amount=data["assets"][0]["amount"]),
+            self.tokens[1].to_amount(int_amount=data["assets"][1]["amount"]),
         )
 
     @property
@@ -240,10 +256,10 @@ class LiquidityPair:
             return self.tokens[0], self.tokens[1]
         return self.tokens[1], self.tokens[0]
 
-    @contextmanager
-    def simulate_reserve_change(self, amounts: AmountTuple):
+    @asynccontextmanager
+    async def simulate_reserve_change(self, amounts: AmountTuple):
         amounts = self._fix_amounts_order(amounts)
-        reserves = copy(self.reserves[0]), copy(self.reserves[1])
+        reserves = deepcopy(self.reserves)
         stop_updates = self.stop_updates
         try:
             self.stop_updates = True
@@ -260,7 +276,7 @@ class LiquidityPair:
             return amounts
         raise Exception("Tokens in amounts do not match reserves")
 
-    def get_price(self, token_quote: TerraNativeToken) -> Decimal:
+    async def get_price(self, token_quote: TerraNativeToken) -> Decimal:
         if token_quote in self.tokens:
             reference_token = token_quote
             exchange_rate = Decimal(1)
@@ -271,39 +287,40 @@ class LiquidityPair:
                     break
             else:
                 raise NotImplementedError("not implemented for pools without a native token")
-            exchange_rate = self.client.oracle.get_exchange_rate(reference_token, token_quote)
+            exchange_rate = await self.client.oracle.get_exchange_rate(reference_token, token_quote)
+        supply = await self.lp_token.get_supply(self.client)
         for reserve in self.reserves:
             if reserve.token == reference_token:
-                amount_per_lp_token = reserve.amount / self.lp_token.get_supply(self.client).amount
+                amount_per_lp_token = reserve.amount / supply.amount
                 return amount_per_lp_token * exchange_rate * 2
         raise Exception  # Should never reach
 
-    def op_swap(
+    async def op_swap(
         self,
         sender: AccAddress,
         amount_in: TerraTokenAmount,
         max_slippage: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
         safety_margin: bool | int = True,
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
-        amount_out = self.get_swap_amount_out(amount_in, safety_margin)
+        amount_out = await self.get_swap_amount_out(amount_in, safety_margin)
         min_amount_out = (amount_out * (1 - max_slippage)).safe_margin(safety_margin)
         msg = self.build_swap_msg(sender, amount_in, min_amount_out)
 
         return amount_out, [msg]
 
-    def get_swap_amount_out(
+    async def get_swap_amount_out(
         self,
         amount_in: TerraTokenAmount,
         safety_margin: bool | int = False,
     ) -> TerraTokenAmount:
-        return self.get_swap_amounts(amount_in, safety_margin)["amounts_out"][1]
+        return (await self.get_swap_amounts(amount_in, safety_margin))["amounts_out"][1]
 
-    def get_swap_amounts(
+    async def get_swap_amounts(
         self,
         amount_in: TerraTokenAmount,
         safety_margin: bool | int = False,
     ) -> dict[str, AmountTuple]:
-        reserve_in, reserve_out = self._get_in_out_reserves(amount_in=amount_in)
+        reserve_in, reserve_out = await self._get_in_out_reserves(amount_in=amount_in)
 
         numerator = reserve_out.amount * amount_in.amount
         denominator = reserve_in.amount + amount_in.amount
@@ -320,7 +337,7 @@ class LiquidityPair:
             "pool_change": (amount_in, -amount_out - tax),
         }
 
-    def _get_in_out_reserves(
+    async def _get_in_out_reserves(
         self,
         amount_in: TerraTokenAmount = None,
         amount_out: TerraTokenAmount = None,
@@ -330,7 +347,8 @@ class LiquidityPair:
         assert amount_in is None or amount_in.token in self.tokens, "amount_in not in pair"
         assert amount_out is None or amount_out.token in self.tokens, "amount_out not in pair"
 
-        if self.reserves[0] == 0 or self.reserves[1] == 0:
+        reserves = self.reserves
+        if reserves[0] == 0 or reserves[1] == 0:
             raise InsufficientLiquidity
         if amount_in is not None:
             token_in = amount_in.token
@@ -340,9 +358,9 @@ class LiquidityPair:
             raise Exception("At least one of token_in or token_out must be passed")
 
         if token_in == self.tokens[0]:
-            reserve_in, reserve_out = self.reserves
+            reserve_in, reserve_out = reserves
         else:
-            reserve_out, reserve_in = self.reserves
+            reserve_out, reserve_in = reserves
         if amount_out is not None and amount_out >= reserve_out:
             raise InsufficientLiquidity
         return reserve_in, reserve_out
@@ -374,7 +392,7 @@ class LiquidityPair:
             sender=sender, contract=contract, execute_msg=execute_msg, coins=coins
         )
 
-    def op_remove_single_side(
+    async def op_remove_single_side(
         self,
         sender: AccAddress,
         amount_burn: TerraTokenAmount,
@@ -383,33 +401,36 @@ class LiquidityPair:
         safety_margin: bool | int = True,
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
         assert token_out in self.tokens
-        amounts = self.get_remove_liquidity_amounts(amount_burn, safety_margin)
+        amounts = await self.get_remove_liquidity_amounts(amount_burn, safety_margin)
         msg_remove_liquidity = self.build_remove_liquidity_msg(sender, amount_burn)
         if token_out == self.tokens[0]:
             amount_keep, amount_swap = amounts["amounts_out"]
         else:
             amount_swap, amount_keep = amounts["amounts_out"]
-        with self.simulate_reserve_change(amounts["pool_change"]):
-            amount_out, msgs_swap = self.op_swap(sender, amount_swap, max_slippage, safety_margin)
+        async with self.simulate_reserve_change(amounts["pool_change"]):
+            amount_out, msgs_swap = await self.op_swap(
+                sender, amount_swap, max_slippage, safety_margin
+            )
         return amount_keep + amount_out, [msg_remove_liquidity] + msgs_swap
 
-    def get_remove_liquidity_amounts_out(
+    async def get_remove_liquidity_amounts_out(
         self,
         amount_burn: TerraTokenAmount,
         safety_margin: bool | int = False,
     ) -> AmountTuple:
-        return self.get_remove_liquidity_amounts(amount_burn, safety_margin)["amounts_out"]
+        return (await self.get_remove_liquidity_amounts(amount_burn, safety_margin))["amounts_out"]
 
-    def get_remove_liquidity_amounts(
+    async def get_remove_liquidity_amounts(
         self,
         amount_burn: TerraTokenAmount,
         safety_margin: bool | int = False,
     ) -> dict[str, AmountTuple]:
         assert amount_burn.token == self.lp_token
 
-        total_supply = self.lp_token.get_supply(self.client)
+        reserves = self.reserves
+        total_supply = await self.lp_token.get_supply(self.client)
         share = amount_burn / total_supply
-        amounts = self.reserves[0] * share, self.reserves[1] * share
+        amounts = reserves[0] * share, reserves[1] * share
 
         amounts = amounts[0].safe_margin(safety_margin), amounts[1].safe_margin(safety_margin)
         taxes = (
@@ -442,24 +463,24 @@ class LiquidityPair:
             execute_msg=execute_msg,
         )
 
-    def op_remove_liquidity(
+    async def op_remove_liquidity(
         self,
         sender: AccAddress,
         amount_burn: TerraTokenAmount,
         safety_margin: bool | int = True,
     ) -> tuple[AmountTuple, list[MsgExecuteContract]]:
-        amounts = self.get_remove_liquidity_amounts_out(amount_burn, safety_margin)
+        amounts = await self.get_remove_liquidity_amounts_out(amount_burn, safety_margin)
         msg_remove_liquidity = self.build_remove_liquidity_msg(sender, amount_burn)
         return amounts, [msg_remove_liquidity]
 
-    def op_add_single_side(
+    async def op_add_single_side(
         self,
         sender: AccAddress,
         amount_in: TerraTokenAmount,
         slippage_tolerance: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
         safety_margin: bool | int = True,
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
-        reserve_in, reserve_out = self._get_in_out_reserves(amount_in)
+        reserve_in, reserve_out = await self._get_in_out_reserves(amount_in)
 
         # Calculate optimum ratio to swap before adding liquidity, excluding tax influence
         aux = FEE * (reserve_in.amount + amount_in.amount) - 2 * reserve_in.amount
@@ -468,11 +489,11 @@ class LiquidityPair:
         ratio_swap = numerator / denominator
 
         amount_in_swap = amount_in * ratio_swap
-        amounts_swap = self.get_swap_amounts(amount_in_swap)
+        amounts_swap = await self.get_swap_amounts(amount_in_swap)
 
         if (tax := amounts_swap["taxes"][1]) > 0:
             amount_in_swap += reserve_in * (tax / reserve_out / 2)
-            amounts_swap = self.get_swap_amounts(amount_in_swap)
+            amounts_swap = await self.get_swap_amounts(amount_in_swap)
 
         min_amount_out = amounts_swap["amounts_out"][1] * (1 - slippage_tolerance)
         min_amount_out = min_amount_out.safe_margin(safety_margin)
@@ -484,45 +505,47 @@ class LiquidityPair:
             amounts_swap["amounts_out"][1].safe_margin(safety_margin),
         )
 
-        with self.simulate_reserve_change(amounts_swap["pool_change"]):
-            amount_out, msgs_add_liquidity = self.op_add_liquidity(
+        async with self.simulate_reserve_change(amounts_swap["pool_change"]):
+            amount_out, msgs_add_liquidity = await self.op_add_liquidity(
                 sender, amounts_add, slippage_tolerance, safety_margin
             )
         return amount_out, [msg_swap] + msgs_add_liquidity
 
-    def op_add_liquidity(
+    async def op_add_liquidity(
         self,
         sender: AccAddress,
         amounts_in: AmountTuple,
         slippage_tolerance: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
         safety_margin: bool | int = True,
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
-        amount_out = self.get_add_liquidity_amount_out(
+        amount_out = await self.get_add_liquidity_amount_out(
             amounts_in, slippage_tolerance, safety_margin
         )
         msgs = self.build_add_liquity_msgs(sender, amounts_in, slippage_tolerance)
         return amount_out, msgs
 
-    def get_add_liquidity_amount_out(
+    async def get_add_liquidity_amount_out(
         self,
         amounts_in: AmountTuple,
         slippage_tolerance: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
         safety_margin: bool | int = False,
     ) -> TerraTokenAmount:
-        amounts_in = self._check_amounts_add_liquidity(amounts_in, slippage_tolerance)
-        add_ratio = min(amounts_in[0] / self.reserves[0], amounts_in[1] / self.reserves[1])
-        amount = self.lp_token.get_supply(self.client) * add_ratio
+        reserves = self.reserves
+        amounts_in = await self._check_amounts_add_liquidity(amounts_in, slippage_tolerance)
+        add_ratio = min(amounts_in[0] / reserves[0], amounts_in[1] / reserves[1])
+        amount = await self.lp_token.get_supply(self.client) * add_ratio
 
         return amount.safe_margin(safety_margin)
 
-    def _check_amounts_add_liquidity(
+    async def _check_amounts_add_liquidity(
         self,
         amounts_in: AmountTuple,
         slippage_tolerance: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
     ) -> AmountTuple:
+        reserves = self.reserves
         amounts_in = self._fix_amounts_order(amounts_in)
         amounts_ratio = amounts_in[0].amount / amounts_in[1].amount
-        current_ratio = self.reserves[0].amount / self.reserves[1].amount
+        current_ratio = reserves[0].amount / reserves[1].amount
         assert abs(amounts_ratio / current_ratio - 1) < slippage_tolerance
         return amounts_in
 
@@ -532,7 +555,6 @@ class LiquidityPair:
         amounts_in: AmountTuple,
         slippage_tolerance: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
     ) -> list[MsgExecuteContract]:
-        amounts_in = self._check_amounts_add_liquidity(amounts_in, slippage_tolerance)
         msgs = []
         for amount in amounts_in:
             if not amount.has_allowance(self.client, self.contract_addr, sender):
@@ -564,14 +586,14 @@ class LPToken(CW20Token):
     pair_tokens: tuple[TerraToken, TerraToken]
 
     @classmethod
-    def from_pool(cls, contract_addr: AccAddress, pool: LiquidityPair) -> LPToken:
-        self = super().from_contract(contract_addr, pool.client)
+    async def from_pool(cls, contract_addr: AccAddress, pool: LiquidityPair) -> LPToken:
+        self = await super().from_contract(contract_addr, pool.client)
         self.pair_tokens = pool.tokens
         return self
 
     @classmethod
-    def from_contract(cls, contract_addr: AccAddress, client: TerraClient) -> LPToken:
-        minter_addr = client.contract_query(contract_addr, {"minter": {}})["minter"]
+    async def from_contract(cls, contract_addr: AccAddress, client: TerraClient) -> LPToken:
+        minter_addr = (await client.contract_query(contract_addr, {"minter": {}}))["minter"]
         return LiquidityPair(minter_addr, client).lp_token
 
     @property

@@ -1,6 +1,5 @@
 from decimal import Decimal
 
-import utils
 from utils.cache import CacheGroup, ttl_cache
 
 from ..core import BaseTreasuryApi, TaxPayer, TerraNativeToken, TerraToken, TerraTokenAmount
@@ -12,12 +11,18 @@ class TreasuryApi(BaseTreasuryApi):
     @property
     @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=TERRA_TAX_CACHE_TTL)
     def tax_rate(self) -> Decimal:
-        return Decimal(str(self.client.lcd.treasury.tax_rate()))
+        return self.client.loop.run_until_complete(self.get_tax_rate())
+
+    async def get_tax_rate(self) -> Decimal:
+        return Decimal(str(await self.client.lcd.treasury.tax_rate()))
 
     @property
     @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=TERRA_TAX_CACHE_TTL)
     def tax_caps(self) -> dict[TerraToken, TerraTokenAmount]:
-        res = self.client.lcd_http_client.get("/terra/treasury/v1beta1/tax_caps")
+        return self.client.loop.run_until_complete(self.get_tax_caps())
+
+    async def get_tax_caps(self) -> dict[TerraToken, TerraTokenAmount]:
+        res = await self.client.lcd_http_client.get("/terra/treasury/v1beta1/tax_caps")
         caps = {}
         for cap in res.json()["tax_caps"]:
             token = TerraNativeToken(cap["denom"])

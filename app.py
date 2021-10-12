@@ -19,7 +19,7 @@ def main():
             log.info(f"Starting strategy {configs.STRATEGY}")
             strategy.run()  # type: ignore
         except NodeSyncing as e:
-            log.info(f"Node syncing to blockchain, latest block={e.latest_block}")
+            log.info(f"Node syncing to blockchain, latest height={e.latest_height}")
             log.info("Restarting strategy in 60 seconds")
             time.sleep(60)
         except Exception:

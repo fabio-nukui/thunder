@@ -10,14 +10,14 @@ log = logging.getLogger(__name__)
 
 
 class BlockchainClient(ABC):
-    block: int | Literal["latest"]
+    height: int | Literal["latest"]
 
     def __init__(self, raise_on_syncing: bool = False) -> None:
         if raise_on_syncing and self.syncing:
-            assert isinstance(self.block, int), f"Unexpected block={self.block}, expected int"
-            raise NodeSyncing(self.block)
+            assert isinstance(self.height, int), f"Unexpected height={self.height}, expected int"
+            raise NodeSyncing(self.height)
 
-        log.info(f"Initialized {self} at block={self.block}")
+        log.info(f"Initialized {self} at height={self.height}")
 
     @property
     @abstractclassmethod

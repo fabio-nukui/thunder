@@ -1,14 +1,14 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
 import logging
-import time
 from collections import defaultdict
 from decimal import Decimal
-from typing import Iterable
+from typing import AsyncIterable
 
-from terra_sdk.client.lcd import LCDClient
+from terra_sdk.client.lcd import AsyncLCDClient
 from terra_sdk.core import AccAddress, Coins
 from terra_sdk.core.auth import TxLog
 from terra_sdk.exceptions import LCDResponseError
@@ -22,6 +22,7 @@ from utils.cache import CacheGroup, ttl_cache
 
 from ..core import BaseTerraClient, TerraTokenAmount
 from ..denoms import UST
+from . import utils_rpc
 from .api_market import MarketApi
 from .api_mempool import MempoolApi
 from .api_oracle import OracleApi
@@ -42,6 +43,7 @@ def _get_code_ids(chain_id: str) -> dict[str, int]:
 class TerraClient(BaseTerraClient):
     market: MarketApi
     oracle: OracleApi
+    mempool: MempoolApi
     treasury: TreasuryApi
     tx: TxApi
 
@@ -58,14 +60,25 @@ class TerraClient(BaseTerraClient):
         gas_adjustment: Decimal = configs.TERRA_GAS_ADJUSTMENT,
         hd_wallet_index: int = 0,
         raise_on_syncing: bool = configs.RAISE_ON_SYNCING,
-        use_mempool_cache: bool = False,
     ):
-        self.lcd_http_client = utils.http.Client(base_url=lcd_uri)
-        self.fcd_client = utils.http.Client(base_url=fcd_uri)
-        self.rcp_http_client = utils.http.Client(base_url=rpc_http_uri)
+        self.loop = asyncio.get_event_loop()
+
+        self.lcd_http_client = utils.ahttp.AsyncClient(base_url=lcd_uri)
+        self.fcd_client = utils.ahttp.AsyncClient(base_url=fcd_uri)
+        self.rpc_http_client = utils.ahttp.AsyncClient(base_url=rpc_http_uri)
         self.rpc_websocket_uri = rpc_websocket_uri
         self.chain_id = chain_id
         self.fee_denom = fee_denom
+
+        self.code_ids = _get_code_ids(self.chain_id)
+        hd_wallet = auth_secrets.hd_wallet() if hd_wallet is None else hd_wallet
+        key = MnemonicKey(hd_wallet["mnemonic"], hd_wallet["account"], hd_wallet_index)
+        self.key = key  # Set key before get_gas_prices() to avoid error with cache debugging
+
+        self.lcd = AsyncLCDClient(lcd_uri, chain_id, gas_prices, gas_adjustment)
+        self.wallet = self.lcd.wallet(key)
+        self.address = self.wallet.key.acc_address
+        self.height = self.loop.run_until_complete(self.get_latest_height())
 
         self.market = MarketApi(self)
         self.mempool = MempoolApi(self)
@@ -73,20 +86,9 @@ class TerraClient(BaseTerraClient):
         self.treasury = TreasuryApi(self)
         self.tx = TxApi(self)
 
-        if use_mempool_cache:
-            self.mempool.start_cache()
+        if gas_prices is None:
+            self.lcd.gas_prices = self.loop.run_until_complete(self.tx.get_gas_prices())
 
-        hd_wallet = auth_secrets.hd_wallet() if hd_wallet is None else hd_wallet
-        key = MnemonicKey(hd_wallet["mnemonic"], hd_wallet["account"], hd_wallet_index)
-        self.key = key  # Set key before get_gas_prices() to avoid error with cache debugging
-
-        gas_prices = self.tx.get_gas_prices() if gas_prices is None else gas_prices
-        self.lcd = LCDClient(lcd_uri, chain_id, gas_prices, gas_adjustment)
-        self.wallet = self.lcd.wallet(key)
-        self.address = self.wallet.key.acc_address
-
-        self.code_ids = _get_code_ids(self.chain_id)
-        self.block = self.get_latest_block()
         super().__init__(raise_on_syncing)
 
     def __repr__(self) -> str:
@@ -97,24 +99,26 @@ class TerraClient(BaseTerraClient):
 
     @property
     def syncing(self) -> bool:
-        return self.lcd.tendermint.syncing()
+        return self.loop.run_until_complete(self.lcd.tendermint.syncing())
 
     @ttl_cache(CacheGroup.TERRA, TERRA_CONTRACT_QUERY_CACHE_SIZE)
-    def contract_query(self, contract_addr: AccAddress, query_msg: dict) -> dict:
-        return self.lcd.wasm.contract_query(contract_addr, query_msg)
+    async def contract_query(self, contract_addr: AccAddress, query_msg: dict) -> dict:
+        return await self.lcd.wasm.contract_query(contract_addr, query_msg)
 
     @ttl_cache(CacheGroup.TERRA, TERRA_CONTRACT_QUERY_CACHE_SIZE, CONTRACT_INFO_CACHE_TTL)
-    def contract_info(self, address: AccAddress) -> dict:
+    async def contract_info(self, address: AccAddress) -> dict:
         try:
-            return self.lcd.wasm.contract_info(address)
+            return await self.lcd.wasm.contract_info(address)
         except LCDResponseError as e:
             if e.response.status == 500:
                 raise NotContract
             raise e
 
-    def get_bank(self, denoms: list[str] = None, address: str = None) -> list[TerraTokenAmount]:
+    async def get_bank(
+        self, denoms: list[str] = None, address: str = None
+    ) -> list[TerraTokenAmount]:
         address = self.address if address is None else address
-        coins_balance = self.lcd.bank.balance(address)
+        coins_balance = await self.lcd.bank.balance(address)
         return [
             TerraTokenAmount.from_coin(c)
             for c in coins_balance
@@ -126,20 +130,13 @@ class TerraClient(BaseTerraClient):
         bytes_json = json.dumps(msg, separators=(",", ":")).encode("utf-8")
         return base64.b64encode(bytes_json).decode("ascii")
 
-    def get_latest_block(self) -> int:
-        return int(self.lcd.tendermint.block_info()["block"]["header"]["height"])
+    async def get_latest_height(self) -> int:
+        info = await self.lcd.tendermint.block_info()
+        return int(info["block"]["header"]["height"])
 
-    def wait_next_block(self) -> Iterable[int]:
-        while True:
-            new_block = self.get_latest_block()
-            block_diff = new_block - self.block
-            if block_diff > 0:
-                self.block = new_block
-                log.debug(f"New block: {self.block}")
-                if block_diff > 1:
-                    log.warning(f"More than one block passed since last iteration ({block_diff})")
-                yield self.block
-            time.sleep(configs.TERRA_POLL_INTERVAL)
+    async def loop_latest_height(self) -> AsyncIterable[int]:
+        async for height in utils_rpc.loop_latest_height(self.rpc_websocket_uri):
+            yield height
 
     @staticmethod
     def extract_log_events(logs: list[TxLog]) -> list[dict]:

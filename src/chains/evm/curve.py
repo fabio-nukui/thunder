@@ -37,7 +37,7 @@ class CurvePool:
         self.n_coins = len(self.tokens)
         self._rates: tuple[int, ...] = tuple(10 ** t.decimals for t in self.tokens)
 
-        self._raw_fee: int = self.contract.functions.fee().call(block_identifier=self.client.block)
+        self._raw_fee: int = self.contract.functions.fee().call(block_identifier=self.client.height)
         self.fee = Decimal(self._raw_fee) / FEE_DENOMINATOR
         self._reserves = tuple(EVMTokenAmount(token) for token in self.tokens)
         self._reserves = tuple(EVMTokenAmount(token) for token in self.tokens)
@@ -65,7 +65,7 @@ class CurvePool:
         while True:
             try:
                 coins_func = self.contract.functions.coins(i)
-                token_address = coins_func.call(block_identifier=self.client.block)
+                token_address = coins_func.call(block_identifier=self.client.height)
             except (BadFunctionCallOutput, ContractLogicError):
                 return tuple(tokens)
             if token_address == NATIVE_TOKEN_ADDRESS:
@@ -77,7 +77,7 @@ class CurvePool:
     @ttl_cache(CacheGroup.ETHEREUM, N_POOLS_CACHE)
     def _get_balances(self) -> list[int]:
         return [
-            self.contract.functions.balances(i).call(block_identifier=self.client.block)
+            self.contract.functions.balances(i).call(block_identifier=self.client.height)
             for i in range(self.n_coins)
         ]
 
@@ -87,7 +87,7 @@ class CurvePool:
     # _A should vary slowly over time, cache can have greater TTL
     @ttl_cache(CacheGroup.ETHEREUM, N_POOLS_CACHE, ttl=3600)
     def _A(self):
-        return self.contract.functions.A().call(block_identifier=self.client.block)
+        return self.contract.functions.A().call(block_identifier=self.client.height)
 
     def _xp(self) -> tuple[int, ...]:
         return tuple(
