@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import asyncio
 import base64
 import json
 import logging
 from collections import defaultdict
 from decimal import Decimal
-from typing import AsyncIterable, Awaitable, TypeVar
+from typing import AsyncIterable, TypeVar
 
 from terra_sdk.client.lcd import AsyncLCDClient
 from terra_sdk.core import AccAddress, Coins
@@ -49,8 +48,9 @@ class TerraClient(BaseTerraClient):
     treasury: TreasuryApi
     tx: TxApi
 
-    def __init__(
-        self,
+    @classmethod
+    async def new(
+        cls,
         hd_wallet: dict = None,
         lcd_uri: str = configs.TERRA_LCD_URI,
         fcd_uri: str = configs.TERRA_FCD_URI,
@@ -62,8 +62,8 @@ class TerraClient(BaseTerraClient):
         gas_adjustment: Decimal = configs.TERRA_GAS_ADJUSTMENT,
         hd_wallet_index: int = 0,
         raise_on_syncing: bool = configs.RAISE_ON_SYNCING,
-    ):
-        self.loop = asyncio.get_event_loop()
+    ) -> TerraClient:
+        self = super().__new__(cls)
 
         self.lcd_http_client = utils.ahttp.AsyncClient(base_url=lcd_uri)
         self.fcd_client = utils.ahttp.AsyncClient(base_url=fcd_uri)
@@ -80,7 +80,7 @@ class TerraClient(BaseTerraClient):
         self.lcd = AsyncLCDClient(lcd_uri, chain_id, gas_prices, gas_adjustment)
         self.wallet = self.lcd.wallet(key)
         self.address = self.wallet.key.acc_address
-        self.height = self.wait(self.get_latest_height())
+        self.height = await self.get_latest_height()
 
         self.market = MarketApi(self)
         self.mempool = MempoolApi(self)
@@ -89,9 +89,10 @@ class TerraClient(BaseTerraClient):
         self.tx = TxApi(self)
 
         if gas_prices is None:
-            self.lcd.gas_prices = self.wait(self.tx.get_gas_prices())
+            self.lcd.gas_prices = await self.tx.get_gas_prices()
 
-        super().__init__(raise_on_syncing)
+        await self.init(raise_on_syncing)
+        return self
 
     def __repr__(self) -> str:
         return (
@@ -99,12 +100,8 @@ class TerraClient(BaseTerraClient):
             f"account={self.key.acc_address})"
         )
 
-    @property
-    def syncing(self) -> bool:
-        return self.wait(self.lcd.tendermint.syncing())
-
-    def wait(self, coro: Awaitable[T]) -> T:
-        return self.loop.run_until_complete(coro)
+    async def is_syncing(self) -> bool:
+        return await self.lcd.tendermint.syncing()
 
     @ttl_cache(CacheGroup.TERRA, TERRA_CONTRACT_QUERY_CACHE_SIZE)
     async def contract_query(self, contract_addr: AccAddress, query_msg: dict) -> dict:

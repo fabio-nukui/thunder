@@ -10,7 +10,7 @@ from web3 import Web3
 from web3.contract import ContractFunction
 
 import configs
-from common import BlockchainClient, Token, TokenAmount
+from common import SyncBlockchainClient, Token, TokenAmount
 
 log = logging.getLogger(__name__)
 
@@ -150,7 +150,7 @@ class ERC20Token(Token[EVMTokenAmount]):
 EVMToken = Union[EVMNativeToken, ERC20Token]
 
 
-class BaseEVMClient(BlockchainClient, ABC):
+class BaseEVMClient(SyncBlockchainClient, ABC):
     endpoint_uri: str
     chain_id: int
     height: int | Literal["latest"]

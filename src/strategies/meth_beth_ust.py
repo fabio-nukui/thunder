@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 from dataclasses import dataclass
@@ -218,13 +219,14 @@ class MethBethUstStrategy(TerraSingleTxArbitrage):
 
 
 async def run():
-    client = TerraClient()
+    client = await TerraClient.new()
     pool_addresses = terraswap.get_addresses(client.chain_id)
 
-    meth_beth_pair = terraswap.LiquidityPair(pool_addresses["pools"]["meth_beth"], client)
-    beth_ust_pair = terraswap.LiquidityPair(pool_addresses["pools"]["beth_ust"], client)
-    ust_meth_pair = terraswap.LiquidityPair(pool_addresses["pools"]["ust_meth"], client)
-
+    meth_beth_pair, beth_ust_pair, ust_meth_pair = await asyncio.gather(
+        terraswap.LiquidityPair.new(pool_addresses["pools"]["meth_beth"], client),
+        terraswap.LiquidityPair.new(pool_addresses["pools"]["beth_ust"], client),
+        terraswap.LiquidityPair.new(pool_addresses["pools"]["ust_meth"], client),
+    )
     router = terraswap.Router([meth_beth_pair, beth_ust_pair, ust_meth_pair], client)
 
     strategy = MethBethUstStrategy(client, meth_beth_pair, beth_ust_pair, ust_meth_pair, router)

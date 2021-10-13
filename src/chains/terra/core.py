@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import asyncio
 from abc import ABC, abstractmethod
 from decimal import Decimal
 from enum import Enum
-from typing import Awaitable, Iterator, Type, TypeVar, Union
+from typing import Iterator, Type, TypeVar, Union
 
 from terra_sdk.client.lcd import AsyncLCDClient, AsyncWallet
 from terra_sdk.core import AccAddress, Coin, Coins
@@ -15,7 +14,7 @@ from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.key.mnemonic import MnemonicKey
 
 import utils
-from common import BlockchainClient, Token, TokenAmount
+from common import AsyncBlockchainClient, Token, TokenAmount
 
 
 class TerraTokenAmount(TokenAmount):
@@ -145,11 +144,9 @@ class CW20Token(BaseTerraToken):
 
 
 TerraToken = Union[TerraNativeToken, CW20Token]
-T = TypeVar("T")
 
 
-class BaseTerraClient(BlockchainClient, ABC):
-    loop: asyncio.AbstractEventLoop
+class BaseTerraClient(AsyncBlockchainClient, ABC):
     lcd_http_client: utils.ahttp.AsyncClient
     fcd_client: utils.ahttp.AsyncClient
     rpc_http_client: utils.ahttp.AsyncClient
@@ -168,10 +165,6 @@ class BaseTerraClient(BlockchainClient, ABC):
     oracle: BaseOracleApi
     treasury: BaseTreasuryApi
     tx: BaseTxApi
-
-    @abstractmethod
-    def wait(self, coro: Awaitable[T]) -> T:
-        ...
 
     @abstractmethod
     async def contract_query(self, contract_addr: AccAddress, query_msg: dict) -> dict:

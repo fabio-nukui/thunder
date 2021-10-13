@@ -207,9 +207,10 @@ class LunaUstMarketStrategy(TerraSingleTxArbitrage):
 
 
 async def run():
-    client = TerraClient()
+    client = await TerraClient.new()
     pool_addresses = terraswap.get_addresses(client.chain_id)
-    pairs = [terraswap.LiquidityPair(pool_addresses["pools"]["ust_luna"], client)]
+
+    pairs = [await terraswap.LiquidityPair.new(pool_addresses["pools"]["ust_luna"], client)]
     router = terraswap.Router(pairs, client)
 
     strategy = LunaUstMarketStrategy(client, router)

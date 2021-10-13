@@ -8,6 +8,7 @@ from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from copy import deepcopy
 from decimal import Decimal
+from typing import Type
 
 from terra_sdk.core import AccAddress
 from terra_sdk.core.wasm import MsgExecuteContract
@@ -160,7 +161,7 @@ class Router:
         assert route, "route cannot be empty"
 
         swap_operations: list[dict] = []
-        next_amount_in = self.client.treasury.deduct_tax(amount_in)
+        next_amount_in = await self.client.treasury.deduct_tax(amount_in)
         for step in route:
             if isinstance(step, RouteStepTerraswap):
                 if step.sorted_tokens not in self.pairs:
@@ -207,12 +208,21 @@ class Router:
 
 
 class LiquidityPair:
-    def __init__(self, contract_addr: AccAddress, client: TerraClient):
-        client.wait(self._init(contract_addr, client))
+    contract_addr: AccAddress
+    client: TerraClient
+    tokens: tuple[TerraToken, TerraToken]
+    lp_token: LPToken
 
-    async def _init(self, contract_addr: AccAddress, client: TerraClient):
+    @classmethod
+    async def new(
+        cls: Type[LiquidityPair],
+        contract_addr: AccAddress,
+        client: TerraClient,
+    ) -> LiquidityPair:
         if not await _is_terraswap_pool(contract_addr, client):
             raise NotTerraswapPair
+
+        self = super().__new__(cls)
         self.contract_addr = contract_addr
         self.client = client
 
@@ -222,6 +232,8 @@ class LiquidityPair:
 
         self.stop_updates = False
         self._reserves = self.tokens[0].to_amount(), self.tokens[1].to_amount()
+
+        return self
 
     def __repr__(self) -> str:
         return (
@@ -319,7 +331,7 @@ class LiquidityPair:
 
         amount_out = amount_out.safe_margin(safety_margin)
         amount_out = amount_out - (fee := amount_out * FEE)
-        amount_out = amount_out - (tax := self.client.treasury.calculate_tax(amount_out))
+        amount_out = amount_out - (tax := await self.client.treasury.calculate_tax(amount_out))
 
         return {
             "amounts_out": (amount_in * 0, amount_out),
@@ -425,8 +437,8 @@ class LiquidityPair:
 
         amounts = amounts[0].safe_margin(safety_margin), amounts[1].safe_margin(safety_margin)
         taxes = (
-            self.client.treasury.calculate_tax(amounts[0]),
-            self.client.treasury.calculate_tax(amounts[1]),
+            await self.client.treasury.calculate_tax(amounts[0]),
+            await self.client.treasury.calculate_tax(amounts[1]),
         )
         amounts_out = amounts[0] - taxes[0], amounts[1] - taxes[1]
         return {
@@ -585,7 +597,7 @@ class LPToken(CW20Token):
     @classmethod
     async def from_contract(cls, contract_addr: AccAddress, client: TerraClient) -> LPToken:
         minter_addr = (await client.contract_query(contract_addr, {"minter": {}}))["minter"]
-        return LiquidityPair(minter_addr, client).lp_token
+        return (await LiquidityPair.new(minter_addr, client)).lp_token
 
     @property
     def repr_symbol(self):

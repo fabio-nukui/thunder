@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from dataclasses import dataclass
@@ -277,11 +278,14 @@ class LPTowerStrategy(TerraSingleTxArbitrage):
 
 
 async def run():
-    client = TerraClient()
+    client = await TerraClient.new()
     addresses = terraswap.get_addresses(client.chain_id)["pools"]
-    pool_0 = terraswap.LiquidityPair(addresses["bluna_luna"], client)
-    pool_1 = terraswap.LiquidityPair(addresses["ust_luna"], client)
-    pool_tower = terraswap.LiquidityPair(addresses["bluna_luna_ust_luna"], client)
+
+    pool_0, pool_1, pool_tower = await asyncio.gather(
+        terraswap.LiquidityPair.new(addresses["bluna_luna"], client),
+        terraswap.LiquidityPair.new(addresses["ust_luna"], client),
+        terraswap.LiquidityPair.new(addresses["bluna_luna_ust_luna"], client),
+    )
     strategy = LPTowerStrategy(client, pool_0, pool_1, pool_tower)
     async for height in client.loop_latest_height():
         await strategy.run(height)
