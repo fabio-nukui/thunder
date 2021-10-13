@@ -22,7 +22,6 @@ MIN_PROFIT_UST = UST.to_amount(2)
 MIN_START_AMOUNT = UST.to_amount(200)
 OPTIMIZATION_TOLERANCE = UST.to_amount("0.01")
 MIN_UST_RESERVED_AMOUNT = 5
-MAX_SLIPPAGE = Decimal("0.001")
 
 
 class Direction(str, Enum):
@@ -211,7 +210,7 @@ class MethBethUstStrategy(TerraSingleTxArbitrage):
         safety_round: bool,
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
         return await self.router.op_route_swap(
-            self.client.address, initial_ust_amount, route, MAX_SLIPPAGE, safety_round
+            self.client.address, initial_ust_amount, route, initial_ust_amount, safety_round
         )
 
     async def _extract_returns_from_logs(

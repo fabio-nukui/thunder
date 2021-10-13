@@ -155,7 +155,7 @@ class Router:
         sender: AccAddress,
         amount_in: TerraTokenAmount,
         route: list[RouteStep],
-        max_slippage: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
+        min_amount_out: TerraTokenAmount,
         safety_margin: bool | int = True,
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
         assert route, "route cannot be empty"
@@ -176,7 +176,6 @@ class Router:
             swap_operations.append(step.to_data())
         amount_out: TerraTokenAmount = next_amount_in
 
-        min_amount_out = (amount_out * (1 - max_slippage)).safe_margin(safety_margin)
         swap_msg = {
             "execute_swap_operations": {
                 "offer_amount": str(amount_in.int_amount),
