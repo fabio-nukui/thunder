@@ -31,6 +31,18 @@ def setup_logger():
     logging.config.dictConfig(dict_config)
 
 
+def setup_ipython():
+    try:
+        get_ipython()
+    except NameError:
+        pass
+    else:
+        import nest_asyncio
+
+        nest_asyncio.apply()
+
+
 def setup():
     setup_warnings()
     setup_logger()
+    setup_ipython()

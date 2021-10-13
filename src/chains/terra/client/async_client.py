@@ -6,7 +6,7 @@ import json
 import logging
 from collections import defaultdict
 from decimal import Decimal
-from typing import AsyncIterable
+from typing import AsyncIterable, Awaitable, TypeVar
 
 from terra_sdk.client.lcd import AsyncLCDClient
 from terra_sdk.core import AccAddress, Coins
@@ -30,6 +30,8 @@ from .api_treasury import TreasuryApi
 from .api_tx import TxApi
 
 log = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 TERRA_CONTRACT_QUERY_CACHE_SIZE = 10_000
 CONTRACT_INFO_CACHE_TTL = 86400  # Contract info should not change; 24h ttl
@@ -78,7 +80,7 @@ class TerraClient(BaseTerraClient):
         self.lcd = AsyncLCDClient(lcd_uri, chain_id, gas_prices, gas_adjustment)
         self.wallet = self.lcd.wallet(key)
         self.address = self.wallet.key.acc_address
-        self.height = self.loop.run_until_complete(self.get_latest_height())
+        self.height = self.wait(self.get_latest_height())
 
         self.market = MarketApi(self)
         self.mempool = MempoolApi(self)
@@ -87,7 +89,7 @@ class TerraClient(BaseTerraClient):
         self.tx = TxApi(self)
 
         if gas_prices is None:
-            self.lcd.gas_prices = self.loop.run_until_complete(self.tx.get_gas_prices())
+            self.lcd.gas_prices = self.wait(self.tx.get_gas_prices())
 
         super().__init__(raise_on_syncing)
 
@@ -99,7 +101,10 @@ class TerraClient(BaseTerraClient):
 
     @property
     def syncing(self) -> bool:
-        return self.loop.run_until_complete(self.lcd.tendermint.syncing())
+        return self.wait(self.lcd.tendermint.syncing())
+
+    def wait(self, coro: Awaitable[T]) -> T:
+        return self.loop.run_until_complete(coro)
 
     @ttl_cache(CacheGroup.TERRA, TERRA_CONTRACT_QUERY_CACHE_SIZE)
     async def contract_query(self, contract_addr: AccAddress, query_msg: dict) -> dict:

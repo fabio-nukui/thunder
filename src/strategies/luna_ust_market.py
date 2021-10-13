@@ -126,7 +126,7 @@ class LunaUstMarketStrategy(TerraSingleTxArbitrage):
             prices=prices,
             terra_virtual_pools=await self.client.market.get_virtual_pools(),
             ust_balance=ust_balance,
-            pool_reserves=self.terraswap_pool.reserves,
+            pool_reserves=await self.terraswap_pool.get_reserves(),
             direction=direction,
             initial_amount=initial_amount,
             msgs=msgs,
@@ -136,7 +136,7 @@ class LunaUstMarketStrategy(TerraSingleTxArbitrage):
         )
 
     async def _get_prices(self) -> dict[str, Decimal]:
-        reserves = self.terraswap_pool.reserves
+        reserves = await self.terraswap_pool.get_reserves()
         terraswap_price = reserves[0].amount / reserves[1].amount
         market_price = await self.client.oracle.get_exchange_rate(LUNA, UST)
         return {

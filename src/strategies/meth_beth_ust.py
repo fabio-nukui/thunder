@@ -141,9 +141,9 @@ class MethBethUstStrategy(TerraSingleTxArbitrage):
         )
 
     async def _get_prices(self) -> dict[str, Decimal]:
-        meth_beth_pair_reserves = self.meth_beth_pair.reserves
-        beth_ust_pair_reserves = self.beth_ust_pair.reserves
-        ust_meth_pair_reserves = self.ust_meth_pair.reserves
+        meth_beth_pair_reserves = await self.meth_beth_pair.get_reserves()
+        beth_ust_pair_reserves = await self.beth_ust_pair.get_reserves()
+        ust_meth_pair_reserves = await self.ust_meth_pair.get_reserves()
 
         meth_beth = meth_beth_pair_reserves[1].amount / meth_beth_pair_reserves[0].amount
         beth_ust = beth_ust_pair_reserves[1].amount / beth_ust_pair_reserves[0].amount

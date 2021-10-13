@@ -208,7 +208,7 @@ class Router:
 
 class LiquidityPair:
     def __init__(self, contract_addr: AccAddress, client: TerraClient):
-        client.loop.run_until_complete(self._init(contract_addr, client))
+        client.wait(self._init(contract_addr, client))
 
     async def _init(self, contract_addr: AccAddress, client: TerraClient):
         if not await _is_terraswap_pool(contract_addr, client):
@@ -227,15 +227,6 @@ class LiquidityPair:
         return (
             f"{self.__class__.__name__}({self.tokens[0].repr_symbol}/{self.tokens[1].repr_symbol})"
         )
-
-    @property
-    def reserves(self) -> AmountTuple:
-        if not self.stop_updates:
-            try:
-                self._reserves = self.client.loop.run_until_complete(self._get_reserves())
-            except RuntimeError:
-                pass
-        return self._reserves
 
     async def get_reserves(self) -> AmountTuple:
         if not self.stop_updates:
@@ -259,7 +250,7 @@ class LiquidityPair:
     @asynccontextmanager
     async def simulate_reserve_change(self, amounts: AmountTuple):
         amounts = self._fix_amounts_order(amounts)
-        reserves = deepcopy(self.reserves)
+        reserves = deepcopy(await self.get_reserves())
         stop_updates = self.stop_updates
         try:
             self.stop_updates = True
@@ -289,7 +280,7 @@ class LiquidityPair:
                 raise NotImplementedError("not implemented for pools without a native token")
             exchange_rate = await self.client.oracle.get_exchange_rate(reference_token, token_quote)
         supply = await self.lp_token.get_supply(self.client)
-        for reserve in self.reserves:
+        for reserve in await self.get_reserves():
             if reserve.token == reference_token:
                 amount_per_lp_token = reserve.amount / supply.amount
                 return amount_per_lp_token * exchange_rate * 2
@@ -347,7 +338,7 @@ class LiquidityPair:
         assert amount_in is None or amount_in.token in self.tokens, "amount_in not in pair"
         assert amount_out is None or amount_out.token in self.tokens, "amount_out not in pair"
 
-        reserves = self.reserves
+        reserves = await self.get_reserves()
         if reserves[0] == 0 or reserves[1] == 0:
             raise InsufficientLiquidity
         if amount_in is not None:
@@ -427,7 +418,7 @@ class LiquidityPair:
     ) -> dict[str, AmountTuple]:
         assert amount_burn.token == self.lp_token
 
-        reserves = self.reserves
+        reserves = await self.get_reserves()
         total_supply = await self.lp_token.get_supply(self.client)
         share = amount_burn / total_supply
         amounts = reserves[0] * share, reserves[1] * share
@@ -521,7 +512,7 @@ class LiquidityPair:
         amount_out = await self.get_add_liquidity_amount_out(
             amounts_in, slippage_tolerance, safety_margin
         )
-        msgs = self.build_add_liquity_msgs(sender, amounts_in, slippage_tolerance)
+        msgs = await self.build_add_liquity_msgs(sender, amounts_in, slippage_tolerance)
         return amount_out, msgs
 
     async def get_add_liquidity_amount_out(
@@ -530,7 +521,7 @@ class LiquidityPair:
         slippage_tolerance: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
         safety_margin: bool | int = False,
     ) -> TerraTokenAmount:
-        reserves = self.reserves
+        reserves = await self.get_reserves()
         amounts_in = await self._check_amounts_add_liquidity(amounts_in, slippage_tolerance)
         add_ratio = min(amounts_in[0] / reserves[0], amounts_in[1] / reserves[1])
         amount = await self.lp_token.get_supply(self.client) * add_ratio
@@ -542,14 +533,14 @@ class LiquidityPair:
         amounts_in: AmountTuple,
         slippage_tolerance: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
     ) -> AmountTuple:
-        reserves = self.reserves
+        reserves = await self.get_reserves()
         amounts_in = self._fix_amounts_order(amounts_in)
         amounts_ratio = amounts_in[0].amount / amounts_in[1].amount
         current_ratio = reserves[0].amount / reserves[1].amount
         assert abs(amounts_ratio / current_ratio - 1) < slippage_tolerance
         return amounts_in
 
-    def build_add_liquity_msgs(
+    async def build_add_liquity_msgs(
         self,
         sender: AccAddress,
         amounts_in: AmountTuple,
@@ -557,7 +548,7 @@ class LiquidityPair:
     ) -> list[MsgExecuteContract]:
         msgs = []
         for amount in amounts_in:
-            if not amount.has_allowance(self.client, self.contract_addr, sender):
+            if not await amount.has_allowance(self.client, self.contract_addr, sender):
                 msgs.append(amount.build_msg_increase_allowance(self.contract_addr, sender))
         execute_msg = {
             "provide_liquidity": {

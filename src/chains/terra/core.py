@@ -4,7 +4,7 @@ import asyncio
 from abc import ABC, abstractmethod
 from decimal import Decimal
 from enum import Enum
-from typing import Iterator, Type, TypeVar, Union
+from typing import Awaitable, Iterator, Type, TypeVar, Union
 
 from terra_sdk.client.lcd import AsyncLCDClient, AsyncWallet
 from terra_sdk.core import AccAddress, Coin, Coins
@@ -30,7 +30,7 @@ class TerraTokenAmount(TokenAmount):
         assert isinstance(self.token, TerraNativeToken)
         return Coin(self.token.denom, self.int_amount)
 
-    def has_allowance(
+    async def has_allowance(
         self,
         client: BaseTerraClient,
         spender: AccAddress,
@@ -38,7 +38,7 @@ class TerraTokenAmount(TokenAmount):
     ) -> bool:
         if isinstance(self.token, TerraNativeToken):
             return True
-        allowance = self.token.get_allowance(client, spender, owner)
+        allowance = await self.token.get_allowance(client, spender, owner)
         return allowance >= self
 
     def build_msg_increase_allowance(
@@ -145,6 +145,7 @@ class CW20Token(BaseTerraToken):
 
 
 TerraToken = Union[TerraNativeToken, CW20Token]
+T = TypeVar("T")
 
 
 class BaseTerraClient(BlockchainClient, ABC):
@@ -167,6 +168,10 @@ class BaseTerraClient(BlockchainClient, ABC):
     oracle: BaseOracleApi
     treasury: BaseTreasuryApi
     tx: BaseTxApi
+
+    @abstractmethod
+    def wait(self, coro: Awaitable[T]) -> T:
+        ...
 
     @abstractmethod
     async def contract_query(self, contract_addr: AccAddress, query_msg: dict) -> dict:

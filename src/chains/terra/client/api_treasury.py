@@ -11,7 +11,7 @@ class TreasuryApi(BaseTreasuryApi):
     @property
     @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=TERRA_TAX_CACHE_TTL)
     def tax_rate(self) -> Decimal:
-        return self.client.loop.run_until_complete(self.get_tax_rate())
+        return self.client.wait(self.get_tax_rate())
 
     async def get_tax_rate(self) -> Decimal:
         return Decimal(str(await self.client.lcd.treasury.tax_rate()))
@@ -19,7 +19,7 @@ class TreasuryApi(BaseTreasuryApi):
     @property
     @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=TERRA_TAX_CACHE_TTL)
     def tax_caps(self) -> dict[TerraToken, TerraTokenAmount]:
-        return self.client.loop.run_until_complete(self.get_tax_caps())
+        return self.client.wait(self.get_tax_caps())
 
     async def get_tax_caps(self) -> dict[TerraToken, TerraTokenAmount]:
         res = await self.client.lcd_http_client.get("/terra/treasury/v1beta1/tax_caps")

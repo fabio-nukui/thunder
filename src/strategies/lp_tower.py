@@ -139,7 +139,7 @@ class LPTowerStrategy(TerraSingleTxArbitrage):
             block_found=height,
             prices=prices,
             prices_denom=LUNA,
-            lp_tower_reserves=self.pool_tower.reserves,
+            lp_tower_reserves=await self.pool_tower.get_reserves(),
             pool_0_lp_balance=pool_0_lp_balance,
             direction=direction,
             initial_amount=initial_amount,
@@ -150,8 +150,10 @@ class LPTowerStrategy(TerraSingleTxArbitrage):
         )
 
     async def _get_prices(self) -> dict[TerraToken, Decimal]:
-        bluna_price = self.pool_0.reserves[1].amount / self.pool_0.reserves[0].amount
-        ust_price = self.pool_1.reserves[1].amount / self.pool_1.reserves[0].amount
+        pool_0_reserves = await self.pool_0.get_reserves()
+        pool_1_reserves = await self.pool_1.get_reserves()
+        bluna_price = pool_0_reserves[1].amount / pool_0_reserves[0].amount
+        ust_price = pool_1_reserves[1].amount / pool_1_reserves[0].amount
         return {
             self.pool_0.lp_token: await self.pool_0.get_price(LUNA),
             self.pool_1.lp_token: await self.pool_1.get_price(LUNA),
@@ -164,7 +166,7 @@ class LPTowerStrategy(TerraSingleTxArbitrage):
         pool_0_lp_price: Decimal,
         pool_1_lp_price: Decimal,
     ) -> tuple[Decimal, Direction]:
-        pool_tower_reserves = self.pool_tower.reserves
+        pool_tower_reserves = await self.pool_tower.get_reserves()
         pool_0_reserve_value = pool_tower_reserves[0].amount * pool_0_lp_price
         pool_1_reserve_value = pool_tower_reserves[1].amount * pool_1_lp_price
         balance_ratio = pool_0_reserve_value / pool_1_reserve_value - 1
