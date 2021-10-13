@@ -31,8 +31,8 @@ _AsyncBlockchainClientT = TypeVar("_AsyncBlockchainClientT", bound="AsyncBlockch
 
 
 class AsyncBlockchainClient(BlockchainClient, ABC):
-    @abstractmethod
     @classmethod
+    @abstractmethod
     async def new(cls: Type[_AsyncBlockchainClientT], *args, **kwargs) -> _AsyncBlockchainClientT:
         ...
 
