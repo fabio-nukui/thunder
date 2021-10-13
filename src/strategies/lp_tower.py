@@ -151,13 +151,17 @@ class LPTowerStrategy(TerraSingleTxArbitrage):
         )
 
     async def _get_prices(self) -> dict[TerraToken, Decimal]:
-        pool_0_reserves = await self.pool_0.get_reserves()
-        pool_1_reserves = await self.pool_1.get_reserves()
+        pool_0_reserves, pool_1_reserves, pool_0_price, pool_1_price = await asyncio.gather(
+            self.pool_0.get_reserves(),
+            self.pool_1.get_reserves(),
+            self.pool_0.get_price(LUNA),
+            self.pool_1.get_price(LUNA),
+        )
         bluna_price = pool_0_reserves[1].amount / pool_0_reserves[0].amount
         ust_price = pool_1_reserves[1].amount / pool_1_reserves[0].amount
         return {
-            self.pool_0.lp_token: await self.pool_0.get_price(LUNA),
-            self.pool_1.lp_token: await self.pool_1.get_price(LUNA),
+            self.pool_0.lp_token: pool_0_price,
+            self.pool_1.lp_token: pool_1_price,
             self.pool_0.tokens[0]: bluna_price,
             self.pool_1.tokens[0]: ust_price,
         }
