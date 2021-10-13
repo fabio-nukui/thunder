@@ -9,7 +9,7 @@ from httpx._types import TimeoutTypes
 log = logging.getLogger(__name__)
 
 
-DEFAULT_N_TRIES = 4
+DEFAULT_N_TRIES = 3
 DEFAULT_BACKOFF_FACTOR = 0.5
 DEFAULT_STATUS_FORCELIST = (500, 502, 503, 504)
 
@@ -28,53 +28,44 @@ class AsyncClient(httpx.AsyncClient):
         self.backoff_factor = backoff_factor
         self.status_forcelist = status_forcelist
 
-    async def get(self, *args, **kwargs):
-        return await get(
-            *args,
-            n_tries=self.n_tries,
-            backoff_factor=self.backoff_factor,
-            status_forcelist=self.status_forcelist,
-            httpx_client=self,
-            **kwargs,
+    async def get(
+        self,
+        url: str,
+        *args,
+        timeout: TimeoutTypes = 5.0,
+        n_tries: int = DEFAULT_N_TRIES,
+        **kwargs,
+    ) -> httpx.Response:
+        """httpx GET with default retries"""
+        return await request(
+            "GET", url, *args, timeout=timeout, n_tries=n_tries, httpx_client=self, **kwargs
         )
 
-    async def post(self, *args, **kwargs):
-        return await post(
-            *args,
-            n_tries=self.n_tries,
-            backoff_factor=self.backoff_factor,
-            status_forcelist=self.status_forcelist,
-            httpx_client=self,
-            **kwargs,
+    async def post(
+        self,
+        url: str,
+        *args,
+        timeout: TimeoutTypes = 5.0,
+        n_tries: int = DEFAULT_N_TRIES,
+        **kwargs,
+    ) -> httpx.Response:
+        """httpx POST with default retries"""
+        return await request(
+            "POST", url, *args, timeout=timeout, n_tries=n_tries, httpx_client=self, **kwargs
         )
 
 
-async def get(
-    url: str,
-    *args,
-    timeout: TimeoutTypes = 5.0,
-    n_tries: int = DEFAULT_N_TRIES,
-    httpx_client: httpx.AsyncClient = None,
-    **kwargs,
-) -> httpx.Response:
+_DEFAULT_CLIENT = AsyncClient()
+
+
+async def get(url: str, *args, **kwargs) -> httpx.Response:
     """httpx GET with default retries"""
-    return await request(
-        "GET", url, *args, timeout=timeout, n_tries=n_tries, httpx_client=httpx_client, **kwargs
-    )
+    return await _DEFAULT_CLIENT.get(url, *args, **kwargs)
 
 
-async def post(
-    url: str,
-    *args,
-    timeout: TimeoutTypes = 5.0,
-    n_tries: int = DEFAULT_N_TRIES,
-    httpx_client: httpx.AsyncClient = None,
-    **kwargs,
-) -> httpx.Response:
+async def post(url: str, *args, **kwargs) -> httpx.Response:
     """httpx POST with default retries"""
-    return await request(
-        "POST", url, *args, timeout=timeout, n_tries=n_tries, httpx_client=httpx_client, **kwargs
-    )
+    return await _DEFAULT_CLIENT.post(url, *args, **kwargs)
 
 
 async def request(
