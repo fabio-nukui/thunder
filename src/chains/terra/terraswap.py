@@ -211,6 +211,8 @@ class LiquidityPair:
     client: TerraClient
     tokens: tuple[TerraToken, TerraToken]
     lp_token: LPToken
+    stop_updates: bool
+    _reserves: AmountTuple
 
     @classmethod
     async def new(
