@@ -12,6 +12,7 @@ from terra_sdk.exceptions import LCDResponseError
 
 import utils
 from chains.terra import UST, TerraClient, TerraTokenAmount, terraswap
+from chains.terra.tx_filter import FilterSingleSwapTerraswap
 from exceptions import TxError, UnprofitableArbitrage
 
 from .common.terra_single_tx_arbitrage import TerraArbParams, TerraSingleTxArbitrage
@@ -89,7 +90,11 @@ class MethBethUstStrategy(TerraSingleTxArbitrage):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(client={self.client}, state={self.state})"
 
-    async def _get_arbitrage_params(self, height: int, mempool: dict = None) -> ArbParams:
+    async def _get_arbitrage_params(
+        self,
+        height: int,
+        mempool: list[list[dict]] = None,
+    ) -> ArbParams:
         if mempool:
             raise NotImplementedError
         prices = await self._get_prices()
@@ -234,7 +239,10 @@ async def run():
     )
     router = terraswap.Router([meth_beth_pair, beth_ust_pair, ust_meth_pair], client)
 
+    mempool_filter = FilterSingleSwapTerraswap(  # noqa TODO: implement
+        [meth_beth_pair, beth_ust_pair, ust_meth_pair]
+    )
     strategy = MethBethUstStrategy(client, meth_beth_pair, beth_ust_pair, ust_meth_pair, router)
-    async for height in client.loop_latest_height():
-        await strategy.run(height)
+    async for height, mempool in client.mempool.loop_height_mempool():
+        await strategy.run(height, mempool)
         utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)

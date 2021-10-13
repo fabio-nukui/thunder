@@ -79,7 +79,11 @@ class LunaUstMarketStrategy(TerraSingleTxArbitrage):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(client={self.client}, state={self.state})"
 
-    async def _get_arbitrage_params(self, height: int, mempool: dict = None) -> ArbParams:
+    async def _get_arbitrage_params(
+        self,
+        height: int,
+        mempool: list[list[dict]] = None,
+    ) -> ArbParams:
         if mempool:
             raise NotImplementedError
         prices = await self._get_prices()

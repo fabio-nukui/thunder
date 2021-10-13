@@ -281,3 +281,9 @@ class BaseMempoolApi(Api, ABC):
     @abstractmethod
     async def loop_height_mempool(self, height: int) -> Iterator[tuple[int, dict[str, dict]]]:
         ...
+
+
+class BaseFilter(ABC):
+    @abstractmethod
+    def match_msgs(self, msgs: list[dict]) -> bool:
+        ...

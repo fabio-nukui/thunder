@@ -113,7 +113,7 @@ class SingleTxArbitrage(Generic[_BlockchainClientT], ABC):
             return State.waiting_confirmation
         return State.finished
 
-    async def run(self, height: int, mempool: dict = None):
+    async def run(self, height: int, mempool: list[list[dict]] = None):
         if self.state == State.start:
             log.debug("Generating execution configuration")
             try:
@@ -144,7 +144,11 @@ class SingleTxArbitrage(Generic[_BlockchainClientT], ABC):
                 self.data.reset()
 
     @abstractmethod
-    async def _get_arbitrage_params(self, height: int, mempool: dict = None) -> BaseArbParams:
+    async def _get_arbitrage_params(
+        self,
+        height: int,
+        mempool: list[list[dict]] = None,
+    ) -> BaseArbParams:
         ...
 
     @abstractmethod
