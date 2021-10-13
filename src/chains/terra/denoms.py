@@ -1,4 +1,4 @@
-from .core import TerraNativeToken
+from .token import TerraNativeToken
 
 UST = TerraNativeToken("uusd")
 SDT = TerraNativeToken("usdr")

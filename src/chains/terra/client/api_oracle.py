@@ -4,13 +4,14 @@ from decimal import Decimal
 
 from utils.cache import CacheGroup, ttl_cache
 
-from ..core import BaseOracleApi, TerraNativeToken
 from ..denoms import LUNA
+from ..interfaces import IOracleApi
+from ..token import TerraNativeToken
 
 MAX_PRECISION = 18
 
 
-class OracleApi(BaseOracleApi):
+class OracleApi(IOracleApi):
     @ttl_cache(CacheGroup.TERRA, maxsize=1)
     async def get_exchange_rates(self) -> dict[TerraNativeToken, Decimal]:
         oracle_rates = await self.client.lcd.oracle.exchange_rates()

@@ -17,7 +17,7 @@ from exceptions import InsufficientLiquidity, NotContract
 from utils.cache import CacheGroup, ttl_cache
 
 from .client import TerraClient
-from .core import CW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
+from .token import CW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
 
 __all__ = [
     "get_addresses",

@@ -4,13 +4,14 @@ from decimal import Decimal
 
 from utils.cache import CacheGroup, ttl_cache
 
-from ..core import BaseMarketApi, TerraNativeToken, TerraTokenAmount
 from ..denoms import LUNA, SDT
+from ..interfaces import IMarketApi
+from ..token import TerraNativeToken, TerraTokenAmount
 
 MARKET_PARAMETERS_TTL = 600
 
 
-class MarketApi(BaseMarketApi):
+class MarketApi(IMarketApi):
     async def get_amount_out(
         self,
         offer_amount: TerraTokenAmount,

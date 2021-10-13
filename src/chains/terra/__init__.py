@@ -1,7 +1,7 @@
 from . import terraswap
 from .client import TerraClient
-from .core import CW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
 from .denoms import LUNA, UST
+from .token import CW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
 
 __all__ = [
     "terraswap",

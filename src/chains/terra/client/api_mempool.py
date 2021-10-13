@@ -12,7 +12,7 @@ import configs
 import utils
 from exceptions import BlockchainNewState
 
-from ..core import BaseFilter, BaseMempoolApi, BaseTerraClient
+from ..interfaces import IFilter, IMempoolApi, ITerraClient
 from . import utils_rpc
 
 log = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ class MempoolCacheManager:
     async def get_new_height_mempool(
         self,
         height: int,
-        filter_: BaseFilter = None,
+        filter_: IFilter = None,
     ) -> tuple[int, list[list[dict]]]:
         if filter_ is None:
             return await self._get_new_height_messages(height)
@@ -116,8 +116,8 @@ class MempoolCacheManager:
         self._waiting_new_block = False
 
 
-class MempoolApi(BaseMempoolApi):
-    def __init__(self, client: BaseTerraClient):
+class MempoolApi(IMempoolApi):
+    def __init__(self, client: ITerraClient):
         super().__init__(client)
         self._cache_manager = MempoolCacheManager(
             client.height,
@@ -131,7 +131,7 @@ class MempoolApi(BaseMempoolApi):
 
     async def loop_height_mempool(
         self,
-        filter_: BaseFilter = None,
+        filter_: IFilter = None,
     ) -> AsyncIterator[tuple[int, list[list[dict]]]]:
         while True:
             try:

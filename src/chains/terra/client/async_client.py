@@ -19,8 +19,9 @@ import utils
 from exceptions import NotContract
 from utils.cache import CacheGroup, ttl_cache
 
-from ..core import BaseTerraClient, TerraTokenAmount
 from ..denoms import UST
+from ..interfaces import ITerraClient
+from ..token import TerraTokenAmount
 from . import utils_rpc
 from .api_market import MarketApi
 from .api_mempool import MempoolApi
@@ -41,7 +42,7 @@ def _get_code_ids(chain_id: str) -> dict[str, int]:
     return json.load(open(TERRA_CODE_IDS.format(chain_id=chain_id)))
 
 
-class TerraClient(BaseTerraClient):
+class TerraClient(ITerraClient):
     market: MarketApi
     oracle: OracleApi
     mempool: MempoolApi

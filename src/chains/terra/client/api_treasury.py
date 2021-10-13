@@ -2,12 +2,13 @@ from decimal import Decimal
 
 from utils.cache import CacheGroup, ttl_cache
 
-from ..core import BaseTreasuryApi, TaxPayer, TerraNativeToken, TerraToken, TerraTokenAmount
+from ..interfaces import ITreasuryApi, TaxPayer
+from ..token import TerraNativeToken, TerraToken, TerraTokenAmount
 
 TERRA_TAX_CACHE_TTL = 7200
 
 
-class TreasuryApi(BaseTreasuryApi):
+class TreasuryApi(ITreasuryApi):
     @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=TERRA_TAX_CACHE_TTL)
     async def get_tax_rate(self) -> Decimal:
         return Decimal(str(await self.client.lcd.treasury.tax_rate()))

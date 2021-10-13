@@ -7,14 +7,14 @@ from terra_sdk.core.msg import Msg
 
 from utils.cache import CacheGroup, ttl_cache
 
-from ..core import BaseTxApi
+from ..interfaces import ITxApi
 
 log = logging.getLogger(__name__)
 
 TERRA_GAS_PRICE_CACHE_TTL = 3600
 
 
-class TxApi(BaseTxApi):
+class TxApi(ITxApi):
     @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=TERRA_GAS_PRICE_CACHE_TTL)
     async def get_gas_prices(self) -> Coins:
         res = await self.client.fcd_client.get("v1/txs/gas_prices")

@@ -5,8 +5,9 @@ import json
 from enum import Enum
 from typing import Iterable
 
-from .core import BaseFilter, TerraNativeToken
+from .interfaces import IFilter
 from .terraswap import LiquidityPair
+from .token import TerraNativeToken
 
 
 class TerraswapAction(str, Enum):
@@ -19,7 +20,7 @@ def _decode_msg(raw_msg: str) -> dict:
     return json.loads(base64.b64decode(raw_msg))
 
 
-class Filter(BaseFilter):
+class Filter(IFilter):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}"
 
