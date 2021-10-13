@@ -21,10 +21,11 @@ from .token import CW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
 
 __all__ = [
     "get_addresses",
+    "RouteStep",
     "RouteStepNative",
     "RouteStepTerraswap",
-    "LiquidityPair",
     "Router",
+    "LiquidityPair",
 ]
 
 log = logging.getLogger(__name__)
