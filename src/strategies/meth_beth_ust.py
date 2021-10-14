@@ -12,9 +12,11 @@ from terra_sdk.exceptions import LCDResponseError
 
 import utils
 from chains.terra import UST, TerraClient, TerraTokenAmount, terraswap
-from chains.terra.tx_filter import FilterSingleSwapTerraswap
+
+# from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
 from exceptions import TxError, UnprofitableArbitrage
 
+# from .common.single_tx_arbitrage import State
 from .common.terra_single_tx_arbitrage import TerraArbParams, TerraSingleTxArbitrage
 
 log = logging.getLogger(__name__)
@@ -59,7 +61,7 @@ class ArbParams(TerraArbParams):
         }
 
 
-class MethBethUstStrategy(TerraSingleTxArbitrage):
+class MethBethUstArbitrage(TerraSingleTxArbitrage):
     def __init__(
         self,
         client: TerraClient,
@@ -72,6 +74,7 @@ class MethBethUstStrategy(TerraSingleTxArbitrage):
         self.meth_beth_pair = meth_beth_pair
         self.beth_ust_pair = beth_ust_pair
         self.ust_meth_pair = ust_meth_pair
+        self.pairs = [meth_beth_pair, beth_ust_pair, ust_meth_pair]
 
         mETH, bETH = meth_beth_pair.tokens
         self._route_meth_first: list[terraswap.RouteStep] = [
@@ -84,6 +87,9 @@ class MethBethUstStrategy(TerraSingleTxArbitrage):
             terraswap.RouteStepTerraswap(bETH, mETH),
             terraswap.RouteStepTerraswap(mETH, UST),
         ]
+        self._mempool_reserve_changes = {
+            pair: (pair.tokens[0].to_amount(0), pair.tokens[1].to_amount(0)) for pair in self.pairs
+        }
 
         super().__init__(client)
 
@@ -93,10 +99,8 @@ class MethBethUstStrategy(TerraSingleTxArbitrage):
     async def _get_arbitrage_params(
         self,
         height: int,
-        mempool: list[list[dict]] = None,
+        mempool: dict[terraswap.LiquidityPair, list[list[dict]]] = None,
     ) -> ArbParams:
-        if mempool:
-            raise NotImplementedError
         prices = await self._get_prices()
         meth_premium = prices["meth_beth"] / (prices["meth_ust"] / prices["beth_ust"]) - 1
         if meth_premium > 0:
@@ -239,10 +243,18 @@ async def run():
     )
     router = terraswap.Router([meth_beth_pair, beth_ust_pair, ust_meth_pair], client)
 
-    mempool_filter = FilterSingleSwapTerraswap(  # noqa TODO: implement
-        [meth_beth_pair, beth_ust_pair, ust_meth_pair]
-    )
-    strategy = MethBethUstStrategy(client, meth_beth_pair, beth_ust_pair, ust_meth_pair, router)
-    async for height, mempool in client.mempool.loop_height_mempool():
-        await strategy.run(height, mempool)
+    arb = MethBethUstArbitrage(client, meth_beth_pair, beth_ust_pair, ust_meth_pair, router)
+    async for height in client.loop_latest_height():
+        await arb.run(height)
         utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)
+
+    # mempool_filters = {
+    #     meth_beth_pair: FilterSingleSwapTerraswapPair(meth_beth_pair),
+    #     beth_ust_pair: FilterSingleSwapTerraswapPair(beth_ust_pair),
+    #     ust_meth_pair: FilterSingleSwapTerraswapPair(ust_meth_pair),
+    # }
+    # arb = MethBethUstArbitrage(client, meth_beth_pair, beth_ust_pair, ust_meth_pair, router)
+    # async for height, mempool in client.mempool.loop_filter_height_mempool(mempool_filters):
+    #     await arb.run(height, mempool)
+    #     client.mempool.new_block_only = arb.state == State.waiting_confirmation
+    #     utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)

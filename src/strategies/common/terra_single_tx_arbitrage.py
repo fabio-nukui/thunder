@@ -28,10 +28,10 @@ class TerraArbParams(BaseArbParams):
 
 
 class TerraSingleTxArbitrage(SingleTxArbitrage[TerraClient], ABC):
-    async def _broadcast_tx(self, execution_config: TerraArbParams, height: int) -> ArbTx:
+    async def _broadcast_tx(self, arb_params: TerraArbParams, height: int) -> ArbTx:
         if (latest_height := await self.client.get_latest_height()) != height:
             raise BlockchainNewState(f"{latest_height=} different from {height=}")
-        res = await self.client.tx.execute_msgs(execution_config.msgs, fee=execution_config.est_fee)
+        res = await self.client.tx.execute_msgs(arb_params.msgs, fee=arb_params.est_fee)
         return ArbTx(timestamp_sent=time.time(), tx_hash=res.txhash)
 
     async def _confirm_tx(self, height: int) -> ArbResult:

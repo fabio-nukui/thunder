@@ -104,14 +104,14 @@ class FilterFirstActionTerraswap(Filter):
         return False
 
 
-class FilterSingleSwapTerraswap(Filter):
-    def __init__(self, pairs: Iterable[LiquidityPair]):
-        self.pairs = list(pairs)
-        terraswap_filter = FilterFirstActionTerraswap(TerraswapAction.swap, self.pairs)
+class FilterSingleSwapTerraswapPair(Filter):
+    def __init__(self, pair: LiquidityPair):
+        self.pair = pair
+        terraswap_filter = FilterFirstActionTerraswap(TerraswapAction.swap, [self.pair])
         self.filter_ = FilterMsgsLength(1) & terraswap_filter
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self.pairs})"
+        return f"{self.__class__.__name__}({self.pair})"
 
     def match_msgs(self, msgs: list[dict]) -> bool:
         return self.filter_.match_msgs(msgs)

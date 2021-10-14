@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import math
@@ -39,6 +40,10 @@ AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
 
 
 class NotTerraswapPair(Exception):
+    pass
+
+
+class MaxSpreadAssertion(Exception):
     pass
 
 
@@ -317,23 +322,43 @@ class LiquidityPair:
         self,
         amount_in: TerraTokenAmount,
         safety_margin: bool | int = False,
+        max_spread: Decimal = None,
+        belief_price: Decimal = None,
     ) -> TerraTokenAmount:
-        return (await self.get_swap_amounts(amount_in, safety_margin))["amounts_out"][1]
+        amounts = await self.get_swap_amounts(amount_in, safety_margin, max_spread, belief_price)
+        return amounts["amounts_out"][1]
 
     async def get_swap_amounts(
         self,
         amount_in: TerraTokenAmount,
         safety_margin: bool | int = False,
+        max_spread: Decimal = None,
+        belief_price: Decimal = None,
     ) -> dict[str, AmountTuple]:
+        """Based on
+        https://github.com/terraswap/terraswap/blob/v2.4.1/contracts/terraswap_pair/src/contract.rs#L538  # noqa: E501
+        """
         reserve_in, reserve_out = await self._get_in_out_reserves(amount_in=amount_in)
 
         numerator = reserve_out.amount * amount_in.amount
         denominator = reserve_in.amount + amount_in.amount
-        amount_out = reserve_out.token.to_amount(numerator / denominator)
+        amount_out_before_fees = reserve_out.token.to_amount(numerator / denominator)
 
-        amount_out = amount_out.safe_margin(safety_margin)
-        amount_out = amount_out - (fee := amount_out * FEE)
-        amount_out = amount_out - (tax := await self.client.treasury.calculate_tax(amount_out))
+        amount_out_before_fees = amount_out_before_fees.safe_margin(safety_margin)
+        self._assert_max_spread(
+            amount_in.amount,
+            amount_out_before_fees.amount,
+            reserve_in.amount,
+            reserve_out.amount,
+            max_spread,
+            belief_price,
+        )
+
+        fee = amount_out_before_fees * FEE
+        amount_out_before_taxes = amount_out_before_fees - fee
+
+        tax = await self.client.treasury.calculate_tax(amount_out_before_taxes)
+        amount_out = amount_out_before_taxes - tax
 
         return {
             "amounts_out": (amount_in * 0, amount_out),
@@ -341,6 +366,34 @@ class LiquidityPair:
             "taxes": (amount_in * 0, tax),
             "pool_change": (amount_in, -amount_out - tax),
         }
+
+    def _assert_max_spread(
+        self,
+        amount_in: Decimal,
+        amount_out_before_fees: Decimal,
+        reserve_in_amount: Decimal,
+        reserve_out_amount: Decimal,
+        max_spread: Decimal = None,
+        belief_price: Decimal = None,
+    ):
+        """Based on
+        https://github.com/terraswap/terraswap/blob/v2.4.1/contracts/terraswap_pair/src/contract.rs#L615  # noqa: E501
+        """
+        if max_spread is None:
+            return
+        if belief_price is not None:
+            expected_return = amount_in / belief_price
+            amount_spread = max(0, expected_return - amount_out_before_fees)
+            if (
+                amount_out_before_fees < expected_return
+                and amount_spread / expected_return > max_spread
+            ):
+                raise MaxSpreadAssertion
+        else:
+            amount_out_without_spread = amount_in * reserve_out_amount / reserve_in_amount
+            amount_spread = amount_out_without_spread - amount_out_before_fees
+            if amount_spread / (amount_out_before_fees + amount_spread) > max_spread:
+                raise MaxSpreadAssertion
 
     async def _get_in_out_reserves(
         self,
@@ -586,6 +639,39 @@ class LiquidityPair:
         )
         return msgs
 
+    async def get_reserves_changes_from_msg(self, msg: dict) -> AmountTuple:
+        if msg["contract"] == self.contract_addr:
+            if "swap" in msg["execute_msg"]:
+                swap_msg: dict = msg["execute_msg"]["swap"]
+                offer_asset_data = swap_msg["offer_asset"]
+                token = await _token_from_data(offer_asset_data, self.client)
+                amount_in = token.to_amount(int_amount=offer_asset_data)
+            else:
+                raise NotImplementedError(f"Only swap messages implemented, received {msg}")
+        else:
+            cw20_token_addresses = [
+                token.contract_addr for token in self.tokens if isinstance(token, CW20Token)
+            ]
+            if msg["contract"] in cw20_token_addresses:
+                assert "send" in msg["execute_msg"], f"Expected CW20 send, received {msg}"
+                terraswap_msg = msg["execute_msg"]["send"]["msg"]
+                if "swap" in terraswap_msg:
+                    swap_msg = json.loads(base64.b64decode(terraswap_msg["swap"]))
+                else:
+                    swap_msg = {}
+                token = await CW20Token.from_contract(msg["contract"], self.client)
+                amount_in = token.to_amount(int_amount=msg["execute_msg"]["send"]["amount"])
+            else:
+                raise Exception(f"Unexpected msg contract={msg['contract']}")
+        max_spread = Decimal(swap_msg["max_spread"]) if "max_spread" in swap_msg else None
+        belief_price = Decimal(swap_msg["belief_price"]) if "belief_price" in swap_msg else None
+        amounts = await self.get_swap_amounts(
+            amount_in,
+            max_spread=max_spread,
+            belief_price=belief_price,
+        )
+        return amounts["pool_change"]
+
 
 class LPToken(CW20Token):
     pair_tokens: tuple[TerraToken, TerraToken]
@@ -598,7 +684,10 @@ class LPToken(CW20Token):
 
     @classmethod
     async def from_contract(cls, contract_addr: AccAddress, client: TerraClient) -> LPToken:
-        minter_addr = (await client.contract_query(contract_addr, {"minter": {}}))["minter"]
+        response = await client.contract_query(contract_addr, {"minter": {}})
+        if not response:
+            raise NotTerraswapPair
+        minter_addr = response["minter"]
         return (await LiquidityPair.new(minter_addr, client)).lp_token
 
     @property

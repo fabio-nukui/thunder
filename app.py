@@ -21,11 +21,11 @@ async def main():
         except NodeSyncing as e:
             log.info(f"Node syncing to blockchain, latest height={e.latest_height}")
             log.info("Restarting strategy in 60 seconds")
-            asyncio.sleep(60)
+            await asyncio.sleep(60)
         except Exception:
             log.error("Error during strategy execution", exc_info=True)
             log.info("Restarting strategy in 5 seconds")
-            asyncio.sleep(5)
+            await asyncio.sleep(5)
 
 
 if __name__ == "__main__":

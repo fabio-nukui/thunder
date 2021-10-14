@@ -5,7 +5,7 @@ import json
 import logging
 from collections import defaultdict
 from decimal import Decimal
-from typing import AsyncIterable, TypeVar
+from typing import AsyncIterable
 
 from terra_sdk.client.lcd import AsyncLCDClient
 from terra_sdk.core import AccAddress, Coins
@@ -31,7 +31,6 @@ from .api_tx import TxApi
 
 log = logging.getLogger(__name__)
 
-T = TypeVar("T")
 
 TERRA_CONTRACT_QUERY_CACHE_SIZE = 10_000
 CONTRACT_INFO_CACHE_TTL = 86400  # Contract info should not change; 24h ttl

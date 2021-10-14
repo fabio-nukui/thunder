@@ -5,13 +5,15 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
-from typing import Generic, Optional, TypeVar
+from typing import Any, Generic, Optional, TypeVar
 
-from common import BlockchainClient
-from common.token import TokenAmount
+from common import BlockchainClient, TokenAmount
 from exceptions import BlockchainNewState, IsBusy, TxError, UnprofitableArbitrage
 
 log = logging.getLogger(__name__)
+
+
+_BlockchainClientT = TypeVar("_BlockchainClientT", bound=BlockchainClient)
 
 
 class State(str, Enum):
@@ -94,9 +96,6 @@ class ArbitrageData:
         self.result = None
 
 
-_BlockchainClientT = TypeVar("_BlockchainClientT", bound=BlockchainClient)
-
-
 class SingleTxArbitrage(Generic[_BlockchainClientT], ABC):
     def __init__(self, client: _BlockchainClientT):
         self.client = client
@@ -113,9 +112,20 @@ class SingleTxArbitrage(Generic[_BlockchainClientT], ABC):
             return State.waiting_confirmation
         return State.finished
 
-    async def run(self, height: int, mempool: list[list[dict]] = None):
+    async def run(self, height: int, mempool: dict[Any, list[list[dict]]] = None):
+        if self.state == State.waiting_confirmation:
+            log.debug("Looking for tx confirmation(s)")
+            try:
+                self.data.result = await self._confirm_tx(height)
+                log.info(
+                    f"Arbitrage {self.data.result.tx_status}",
+                    extra={"data": self.data.to_data()},
+                )
+                self.data.reset()
+            except IsBusy:
+                return
         if self.state == State.start:
-            log.debug("Generating execution configuration")
+            log.debug("Generating arbitrage parameters")
             try:
                 self.data.params = await self._get_arbitrage_params(height, mempool)
             except (UnprofitableArbitrage, TxError) as e:
@@ -124,35 +134,24 @@ class SingleTxArbitrage(Generic[_BlockchainClientT], ABC):
         if self.state == State.ready_to_broadcast:
             log.info("Broadcasting transaction")
             try:
-                self.data.tx = await self._broadcast_tx(self.data.params, height)  # type: ignore
+                arb_params: BaseArbParams = self.data.params  # type: ignore
+                self.data.tx = await self._broadcast_tx(arb_params, height)
+                log.debug("Arbitrage broadcasted", extra={"data": self.data.to_data()})
             except BlockchainNewState as e:
                 log.warning(e)
                 self.data.reset()
-                return
-            else:
-                log.debug("Arbitrage broadcasted", extra={"data": self.data.to_data()})
-                return
-        if self.state == State.waiting_confirmation:
-            log.debug("Looking for tx confirmation(s)")
-            try:
-                self.data.result = await self._confirm_tx(height)
-            except IsBusy:
-                return
-            else:
-                status = self.data.result.tx_status
-                log.info(f"Arbitrage {status}", extra={"data": self.data.to_data()})
-                self.data.reset()
+            return
 
     @abstractmethod
     async def _get_arbitrage_params(
         self,
         height: int,
-        mempool: list[list[dict]] = None,
+        mempool: dict[Any, list[list[dict]]] = None,
     ) -> BaseArbParams:
         ...
 
     @abstractmethod
-    async def _broadcast_tx(self, execution_config: BaseArbParams, height: int) -> ArbTx:
+    async def _broadcast_tx(self, arb_params: BaseArbParams, height: int) -> ArbTx:
         ...
 
     @abstractmethod

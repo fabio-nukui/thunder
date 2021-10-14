@@ -73,7 +73,7 @@ class ArbParams(TerraArbParams):
         }
 
 
-class LPTowerStrategy(TerraSingleTxArbitrage):
+class LPTowerArbitrage(TerraSingleTxArbitrage):
     def __init__(
         self,
         client: TerraClient,
@@ -294,7 +294,7 @@ async def run():
         terraswap.LiquidityPair.new(addresses["ust_luna"], client),
         terraswap.LiquidityPair.new(addresses["bluna_luna_ust_luna"], client),
     )
-    strategy = LPTowerStrategy(client, pool_0, pool_1, pool_tower)
+    arb = LPTowerArbitrage(client, pool_0, pool_1, pool_tower)
     async for height in client.loop_latest_height():
-        await strategy.run(height)
+        await arb.run(height)
         utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)

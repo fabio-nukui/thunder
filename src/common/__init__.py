@@ -1,10 +1,11 @@
 from .blockchain_client import AsyncBlockchainClient, BlockchainClient, SyncBlockchainClient
-from .token import Token, TokenAmount
+from .token import DecInput, Token, TokenAmount
 
 __all__ = [
+    "AsyncBlockchainClient",
+    "BlockchainClient",
+    "SyncBlockchainClient",
+    "DecInput",
     "Token",
     "TokenAmount",
-    "SyncBlockchainClient",
-    "BlockchainClient",
-    "AsyncBlockchainClient",
 ]

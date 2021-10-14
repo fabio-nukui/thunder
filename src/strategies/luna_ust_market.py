@@ -61,7 +61,7 @@ class ArbParams(TerraArbParams):
         }
 
 
-class LunaUstMarketStrategy(TerraSingleTxArbitrage):
+class LunaUstMarketArbitrage(TerraSingleTxArbitrage):
     def __init__(self, client: TerraClient, router: terraswap.Router) -> None:
         self.router = router
         (self.terraswap_pool,) = router.pairs.values()
@@ -216,7 +216,7 @@ async def run():
     pairs = [await terraswap.LiquidityPair.new(pool_addresses["pools"]["ust_luna"], client)]
     router = terraswap.Router(pairs, client)
 
-    strategy = LunaUstMarketStrategy(client, router)
+    arb = LunaUstMarketArbitrage(client, router)
     async for height in client.loop_latest_height():
-        await strategy.run(height)
+        await arb.run(height)
         utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)
