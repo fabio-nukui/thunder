@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from decimal import Decimal
 
-from terra_sdk.core.auth import StdFee, TxLog
+from terra_sdk.core.auth import StdFee, TxInfo
 from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.exceptions import LCDResponseError
 
@@ -58,7 +58,7 @@ class TerraSingleTxArbitrage(SingleTxArbitrage[TerraClient], ABC):
         else:
             status = TxStatus.succeeded
             tx_err_log = None
-            final_amount, net_profit_ust = await self._extract_returns_from_logs(info.logs)
+            final_amount, net_profit_ust = await self._extract_returns_from_info(info)
         return ArbResult(
             tx_status=status,
             tx_err_log=tx_err_log,
@@ -72,8 +72,8 @@ class TerraSingleTxArbitrage(SingleTxArbitrage[TerraClient], ABC):
         )
 
     @abstractmethod
-    async def _extract_returns_from_logs(
+    async def _extract_returns_from_info(
         self,
-        logs: list[TxLog],
+        logs: TxInfo,
     ) -> tuple[TerraTokenAmount, Decimal]:
         ...

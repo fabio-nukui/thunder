@@ -9,7 +9,7 @@ from enum import Enum
 from functools import partial
 from typing import Any
 
-from terra_sdk.core.auth import StdFee, TxLog
+from terra_sdk.core.auth import StdFee, TxInfo
 from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.exceptions import LCDResponseError
 
@@ -262,11 +262,11 @@ class LPTowerArbitrage(TerraSingleTxArbitrage):
             msgs = msgs_tower_swap + msgs_remove_single_side + msgs_add_single_side
         return final_lp_amount, msgs
 
-    async def _extract_returns_from_logs(
+    async def _extract_returns_from_info(
         self,
-        logs: list[TxLog],
+        info: TxInfo,
     ) -> tuple[TerraTokenAmount, Decimal]:
-        tx_events = TerraClient.extract_log_events(logs)
+        tx_events = TerraClient.extract_log_events(info.logs)
         logs_from_contract = TerraClient.parse_from_contract_events(tx_events)
         first_event = logs_from_contract[0][self.pool_0.lp_token.contract_addr][0]
         last_event = logs_from_contract[-1][self.pool_0.lp_token.contract_addr][-1]

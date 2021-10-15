@@ -2,18 +2,11 @@ from __future__ import annotations
 
 import base64
 import json
-from enum import Enum
 from typing import Iterable
 
+from . import terraswap
 from .interfaces import IFilter
-from .terraswap import LiquidityPair
 from .token import TerraNativeToken
-
-
-class TerraswapAction(str, Enum):
-    swap = "swap"
-    remove_liquidity = "remove_liquidity"
-    add_liquidity = "add_liquidity"
 
 
 def _decode_msg(raw_msg: str) -> dict:
@@ -73,7 +66,7 @@ class FilterMsgsLength(Filter):
 
 
 class FilterFirstActionTerraswap(Filter):
-    def __init__(self, action: TerraswapAction, pairs: Iterable[LiquidityPair]):
+    def __init__(self, action: terraswap.Action, pairs: Iterable[terraswap.LiquidityPair]):
         self.action = action
         self.pairs = list(pairs)
 
@@ -106,9 +99,9 @@ class FilterFirstActionTerraswap(Filter):
 
 
 class FilterSingleSwapTerraswapPair(Filter):
-    def __init__(self, pair: LiquidityPair):
+    def __init__(self, pair: terraswap.LiquidityPair):
         self.pair = pair
-        terraswap_filter = FilterFirstActionTerraswap(TerraswapAction.swap, [self.pair])
+        terraswap_filter = FilterFirstActionTerraswap(terraswap.Action.swap, [self.pair])
         self._filter = FilterMsgsLength(1) & terraswap_filter
 
     def __repr__(self) -> str:

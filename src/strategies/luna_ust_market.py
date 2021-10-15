@@ -6,7 +6,7 @@ from enum import Enum
 from functools import partial
 from typing import Any
 
-from terra_sdk.core.auth import StdFee, TxLog
+from terra_sdk.core.auth import StdFee, TxInfo
 from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.exceptions import LCDResponseError
 
@@ -203,11 +203,11 @@ class LunaUstMarketArbitrage(TerraSingleTxArbitrage):
             self.client.address, initial_ust_amount, route, initial_ust_amount, safety_round
         )
 
-    async def _extract_returns_from_logs(
+    async def _extract_returns_from_info(
         self,
-        logs: list[TxLog],
+        info: TxInfo,
     ) -> tuple[TerraTokenAmount, Decimal]:
-        tx_events = TerraClient.extract_log_events(logs)
+        tx_events = TerraClient.extract_log_events(info.logs)
         logs_from_contract = TerraClient.parse_from_contract_events(tx_events)
         log.debug(logs_from_contract)
         return UST.to_amount(), Decimal(0)  # TODO: implement

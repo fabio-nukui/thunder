@@ -8,6 +8,7 @@ import math
 from contextlib import asynccontextmanager
 from copy import deepcopy
 from decimal import Decimal
+from enum import Enum
 
 from terra_sdk.core import AccAddress
 from terra_sdk.core.wasm import MsgExecuteContract
@@ -24,6 +25,12 @@ log = logging.getLogger(__name__)
 FEE = Decimal("0.003")
 DEFAULT_MAX_SLIPPAGE_TOLERANCE = Decimal("0.001")
 AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
+
+
+class Action(str, Enum):
+    swap = "swap"
+    withdraw_liquidity = "withdraw_liquidity"
+    provide_liquidity = "provide_liquidity"
 
 
 class NotTerraswapPair(Exception):
@@ -278,13 +285,15 @@ class LiquidityPair:
                 "send": {
                     "contract": self.contract_addr,
                     "amount": str(amount_in.int_amount),
-                    "msg": TerraClient.encode_msg({"swap": swap_msg}),
+                    "msg": TerraClient.encode_msg({Action.swap: swap_msg}),
                 }
             }
             coins = []
         else:
             contract = self.contract_addr
-            execute_msg = {"swap": {"offer_asset": _token_amount_to_data(amount_in), **swap_msg}}
+            execute_msg = {
+                Action.swap: {"offer_asset": _token_amount_to_data(amount_in), **swap_msg}
+            }
             coins = [amount_in.to_coin()]
 
         return MsgExecuteContract(
@@ -353,7 +362,7 @@ class LiquidityPair:
             "send": {
                 "amount": str(amount_burn.int_amount),
                 "contract": self.contract_addr,
-                "msg": TerraClient.encode_msg({"withdraw_liquidity": {}}),
+                "msg": TerraClient.encode_msg({Action.withdraw_liquidity: {}}),
             }
         }
         return MsgExecuteContract(
@@ -459,7 +468,7 @@ class LiquidityPair:
             if not await amount.has_allowance(self.client, self.contract_addr, sender):
                 msgs.append(amount.build_msg_increase_allowance(self.contract_addr, sender))
         execute_msg = {
-            "provide_liquidity": {
+            Action.provide_liquidity: {
                 "assets": [
                     _token_amount_to_data(amounts_in[0]),
                     _token_amount_to_data(amounts_in[1]),
@@ -482,8 +491,8 @@ class LiquidityPair:
 
     async def get_reserves_changes_from_msg(self, msg: dict) -> AmountTuple:
         if msg["contract"] == self.contract_addr:
-            if "swap" in msg["execute_msg"]:
-                swap_msg: dict = msg["execute_msg"]["swap"]
+            if Action.swap in msg["execute_msg"]:
+                swap_msg: dict = msg["execute_msg"][Action.swap]
                 offer_asset_data = swap_msg["offer_asset"]
                 token = await _token_from_data(offer_asset_data["info"], self.client)
                 amount_in = token.to_amount(int_amount=offer_asset_data["amount"])
@@ -496,8 +505,8 @@ class LiquidityPair:
             if msg["contract"] in cw20_token_addresses:
                 assert "send" in msg["execute_msg"], f"Expected CW20 send, received {msg}"
                 terraswap_msg = msg["execute_msg"]["send"]["msg"]
-                if "swap" in terraswap_msg:
-                    swap_msg = json.loads(base64.b64decode(terraswap_msg["swap"]))
+                if Action.swap in terraswap_msg:
+                    swap_msg = json.loads(base64.b64decode(terraswap_msg[Action.swap]))
                 else:
                     swap_msg = {}
                 token = await CW20Token.from_contract(msg["contract"], self.client)

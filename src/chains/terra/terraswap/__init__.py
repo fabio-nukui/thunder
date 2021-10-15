@@ -4,10 +4,11 @@ import json
 
 from ..client import TerraClient
 from .factory import Factory
-from .liquidity_pair import LiquidityPair
+from .liquidity_pair import Action, LiquidityPair
 from .router import Router, RouteStep, RouteStepNative, RouteStepTerraswap
 
 __all__ = [
+    "Action",
     "LiquidityPair",
     "RouteStep",
     "RouteStepNative",

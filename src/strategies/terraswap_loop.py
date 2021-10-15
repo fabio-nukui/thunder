@@ -7,7 +7,7 @@ from decimal import Decimal
 from enum import Enum
 from functools import partial
 
-from terra_sdk.core.auth import StdFee, TxLog
+from terra_sdk.core.auth import StdFee, TxInfo
 from terra_sdk.core.coins import Coins
 from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.exceptions import LCDResponseError
@@ -268,14 +268,27 @@ class TerraswapLoopArbitrage(TerraSingleTxArbitrage):
         msgs = msgs_0 + msgs_1
         return amount_out, msgs
 
-    async def _extract_returns_from_logs(
+    async def _extract_returns_from_info(
         self,
-        logs: list[TxLog],
+        info: TxInfo,
     ) -> tuple[TerraTokenAmount, Decimal]:
-        tx_events = TerraClient.extract_log_events(logs)
+        tx_events = TerraClient.extract_log_events(info.logs)
         logs_from_contract = TerraClient.parse_from_contract_events(tx_events)
-        log.debug(logs_from_contract)
-        return UST.to_amount(), Decimal(0)  # TODO: implement
+
+        (first_msg,) = list(logs_from_contract[0].values())[0]
+        assert first_msg["action"] == terraswap.Action.swap
+        assert first_msg["sender"] == self.client.address
+        assert first_msg["offer_asset"] == UST.denom
+        amount_sent = UST.to_amount(int_amount=first_msg["offer_amount"])
+
+        (last_msg,) = list(logs_from_contract[-1].values())[-1]
+        assert last_msg["action"] == terraswap.Action.swap
+        assert last_msg["receiver"] == self.client.address
+        assert last_msg["ask_asset"] == UST.denom
+        amount_received = UST.to_amount(
+            int_amount=int(last_msg["return_amount"]) - int(last_msg["tax_amount"])
+        )
+        return amount_received, (amount_received - amount_sent).amount
 
 
 async def run():
