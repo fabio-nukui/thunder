@@ -75,7 +75,7 @@ class FilterFirstActionTerraswap(Filter):
 
     def match_msgs(self, msgs: list[dict]) -> bool:
         msg = msgs[0]
-        if msg["type"] != "wasm/MsgExecuteContract":
+        if "MsgExecuteContract" not in msg["type"]:
             return False
         value = msg["value"]
 
