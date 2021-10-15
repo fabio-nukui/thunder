@@ -191,6 +191,8 @@ class MethBethUstArbitrage(TerraSingleTxArbitrage):
     ):
         if filtered_mempool is None:
             yield
+        elif not any(msg for list_msgs in filtered_mempool.values() for msg in list_msgs):
+            yield
         else:
             for pair, list_msgs in filtered_mempool.items():
                 for (msg,) in list_msgs:  # Only txs with one message were filtered
