@@ -123,9 +123,10 @@ def _send_request(
             return res
         except httpx.HTTPStatusError as e:
             status_code = e.response.status_code
+            url = e.request.url
             if status_code not in status_forcelist:
                 raise
-            log.debug(f"Error on http {method}, {status_code=}", exc_info=True)
+            log.debug(f"Error on http {method}, {url=}, {status_code=}", exc_info=True)
         except Exception as e:
             log.debug(f"Error on http {method} ({e})", exc_info=True)
         time.sleep((1 + backoff_factor) ** i - 1)
