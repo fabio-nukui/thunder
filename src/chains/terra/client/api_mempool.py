@@ -104,13 +104,12 @@ class MempoolCacheManager:
     async def _fetch_mempool_txs(self) -> dict[str, dict]:
         n_txs = len(self._txs_cache)
         while True:
-            data = await self._get_rpc_data("num_unconfirmed_txs")
-            if n_txs != int(data["n_txs"]):
+            data = await self._get_rpc_data("unconfirmed_txs")
+            raw_txs: list[str] = data["txs"]
+            if n_txs != len(raw_txs):
                 break
             await asyncio.sleep(configs.TERRA_POLL_INTERVAL)
 
-        data = await self._get_rpc_data("unconfirmed_txs")
-        raw_txs: list[str] = data["txs"]
         if not self._read_txs.issubset(raw_txs):
             # Some txs were removed from mempool, a new block has arrived
             self._new_blockchain_state = True
@@ -121,7 +120,11 @@ class MempoolCacheManager:
             raw_tx: self._decode_tx(raw_tx) for raw_tx in raw_txs if raw_tx not in self._txs_cache
         }
         async with asyncio.Semaphore(MAX_CONCURRENT_DECODE_REQUESTS):
-            txs = await asyncio.gather(*tasks.values())
+            try:
+                txs = await asyncio.gather(*tasks.values())
+            except Exception as e:
+                e.args = (*e.args, f"{len(tasks)=}")
+                raise e
         new_txs = {raw_tx: tx for raw_tx, tx in zip(tasks, txs) if tx}
         return self._txs_cache | new_txs
 
@@ -132,11 +135,13 @@ class MempoolCacheManager:
 
     async def _decode_tx(self, raw_tx: str) -> dict:
         try:
-            response = await self._lcd_client.post("txs/decode", json={"tx": raw_tx}, n_tries=1)
+            response = await self._lcd_client.post(
+                "txs/decode", json={"tx": raw_tx}, timeout=1, n_tries=1
+            )
         except httpx.HTTPError:
             self._decoder_error_counter += 1
             if self._decoder_error_counter > MAX_DECODER_ERRORS_PER_BLOCK:
-                raise Exception(f"Over {self._decoder_error_counter} decoder errors last block")
+                raise Exception(f"{self._decoder_error_counter} decoder errors last block")
             return {}
         else:
             return response.json()["result"]

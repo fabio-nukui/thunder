@@ -93,7 +93,7 @@ class LiquidityPair:
             self._reserves = await self._get_reserves()
         return self._reserves
 
-    @ttl_cache(CacheGroup.TERRA, maxsize=1)
+    @ttl_cache(CacheGroup.TERRA)
     async def _get_reserves(self) -> AmountTuple:
         data = await self.client.contract_query(self.contract_addr, {"pool": {}})
         return (
