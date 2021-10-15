@@ -25,14 +25,15 @@ from chains.terra import (
 )
 from exceptions import TxError, UnprofitableArbitrage
 
+from .common.default_params import (
+    MAX_SLIPPAGE,
+    MIN_PROFIT_UST,
+    MIN_START_AMOUNT,
+    OPTIMIZATION_TOLERANCE,
+)
 from .common.terra_single_tx_arbitrage import TerraArbParams, TerraSingleTxArbitrage
 
 log = logging.getLogger(__name__)
-
-MIN_PROFIT_UST = UST.to_amount(2)
-MIN_START_AMOUNT = UST.to_amount(10)
-OPTIMIZATION_TOLERANCE = UST.to_amount("0.01")
-MAX_SLIPPAGE = Decimal("0.001")
 
 
 class Direction(str, Enum):

@@ -17,15 +17,13 @@ from chains.terra import UST, TerraClient, TerraTokenAmount, terraswap
 from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
 from exceptions import MaxSpreadAssertion, TxError, UnprofitableArbitrage
 
+from .common.default_params import MIN_PROFIT_UST, MIN_UST_RESERVED_AMOUNT, OPTIMIZATION_TOLERANCE
 from .common.single_tx_arbitrage import State
 from .common.terra_single_tx_arbitrage import TerraArbParams, TerraSingleTxArbitrage
 
 log = logging.getLogger(__name__)
 
-MIN_PROFIT_UST = UST.to_amount(2)
 MIN_START_AMOUNT = UST.to_amount(200)
-OPTIMIZATION_TOLERANCE = UST.to_amount("0.01")
-MIN_UST_RESERVED_AMOUNT = 5
 FALLBACK_FEE = StdFee(gas=2150947, amount=Coins("2392410uusd"))
 
 

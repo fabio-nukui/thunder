@@ -17,17 +17,19 @@ from chains.terra import UST, TerraClient, TerraTokenAmount, terraswap
 from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
 from exceptions import MaxSpreadAssertion, TxError, UnprofitableArbitrage
 
+from .common.default_params import (
+    MAX_SLIPPAGE,
+    MIN_PROFIT_UST,
+    MIN_START_AMOUNT,
+    MIN_UST_RESERVED_AMOUNT,
+    OPTIMIZATION_TOLERANCE,
+)
 from .common.terra_single_tx_arbitrage import TerraArbParams, TerraSingleTxArbitrage
 
 log = logging.getLogger(__name__)
 
-MIN_PROFIT_UST = UST.to_amount(2)
-MIN_START_AMOUNT = UST.to_amount(50)
-OPTIMIZATION_TOLERANCE = UST.to_amount("0.01")
-MIN_UST_RESERVED_AMOUNT = 5
 FALLBACK_FEE = StdFee(gas=2150947, amount=Coins("2392410uusd"))
 TOKEN_SYMBOLS: list[str] = ["TWD", "SPEC", "MIR", "STT", "MINE", "ANC", "LOTA", "ALTE"]
-MAX_SLIPPAGE = Decimal("0.001")
 
 
 class Direction(str, Enum):

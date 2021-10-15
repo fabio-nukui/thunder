@@ -14,14 +14,12 @@ import utils
 from chains.terra import LUNA, UST, TerraClient, TerraTokenAmount, terraswap
 from exceptions import TxError, UnprofitableArbitrage
 
+from .common.default_params import MIN_PROFIT_UST, MIN_UST_RESERVED_AMOUNT, OPTIMIZATION_TOLERANCE
 from .common.terra_single_tx_arbitrage import TerraArbParams, TerraSingleTxArbitrage
 
 log = logging.getLogger(__name__)
 
-MIN_PROFIT_UST = UST.to_amount(2)
 MIN_START_AMOUNT = UST.to_amount(200)
-OPTIMIZATION_TOLERANCE = UST.to_amount("0.01")
-MIN_UST_RESERVED_AMOUNT = 5
 
 
 class Direction(str, Enum):
