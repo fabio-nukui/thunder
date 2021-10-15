@@ -485,8 +485,8 @@ class LiquidityPair:
             if "swap" in msg["execute_msg"]:
                 swap_msg: dict = msg["execute_msg"]["swap"]
                 offer_asset_data = swap_msg["offer_asset"]
-                token = await _token_from_data(offer_asset_data, self.client)
-                amount_in = token.to_amount(int_amount=offer_asset_data)
+                token = await _token_from_data(offer_asset_data["info"], self.client)
+                amount_in = token.to_amount(int_amount=offer_asset_data["amount"])
             else:
                 raise NotImplementedError(f"Only swap messages implemented, received {msg}")
         else:
