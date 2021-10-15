@@ -195,7 +195,7 @@ class MethBethUstArbitrage(TerraSingleTxArbitrage):
             for pair, list_msgs in filtered_mempool.items():
                 for (msg,) in list_msgs:  # Only txs with one message were filtered
                     try:
-                        changes = await pair.get_reserves_changes_from_msg(msg)
+                        changes = await pair.get_reserves_changes_from_msg(msg["value"])
                     except MaxSpreadAssertion:
                         continue
                     self._mempool_reserve_changes[pair] = (
