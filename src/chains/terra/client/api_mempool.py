@@ -17,7 +17,8 @@ from . import utils_rpc
 
 log = logging.getLogger(__name__)
 
-MAX_CONCURRENT_DECODE_REQUESTS = 10
+MAX_CONCURRENT_DECODE_REQUESTS = 5
+MAX_DECODER_ERRORS_PER_BLOCK = 10
 _T = TypeVar("_T")
 
 
@@ -38,6 +39,7 @@ class MempoolCacheManager:
         self._read_txs: set[str] = set()
         self._running_thread_update_height = False
         self._new_blockchain_state = False
+        self._decoder_error_counter = 0
 
     @property
     def height(self) -> int:
@@ -47,6 +49,7 @@ class MempoolCacheManager:
     def height(self, value: int):
         self._height = value
         self._new_blockchain_state = False
+        self._decoder_error_counter = 0
 
     async def filter_new_height_mempool(
         self,
@@ -131,6 +134,9 @@ class MempoolCacheManager:
         try:
             response = await self._lcd_client.post("txs/decode", json={"tx": raw_tx}, n_tries=1)
         except httpx.HTTPError:
+            self._decoder_error_counter += 1
+            if self._decoder_error_counter > MAX_DECODER_ERRORS_PER_BLOCK:
+                raise Exception(f"Over {self._decoder_error_counter} decoder errors last block")
             return {}
         else:
             return response.json()["result"]
