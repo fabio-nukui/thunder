@@ -185,10 +185,11 @@ class TerraswapLoopArbitrage(TerraSingleTxArbitrage):
                         changes = await pair.get_reserves_changes_from_msg(msg["value"])
                     except MaxSpreadAssertion:
                         continue
-                    self._mempool_reserve_changes[pair] = (
+                    self._mempool_reserve_changes[pair] = pair_changes = (
                         self._mempool_reserve_changes[pair][0] + changes[0],
                         self._mempool_reserve_changes[pair][1] + changes[1],
                     )
+                    log.debug(f"{self}: Simulation of reserve changes: {pair}: {pair_changes}")
             simulating_reserve_changes = self._simulating_reserve_changes
             self._simulating_reserve_changes = True
             terraswap_changes = self.terraswap_pair.simulate_reserve_change(
