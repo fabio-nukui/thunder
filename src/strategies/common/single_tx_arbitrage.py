@@ -118,6 +118,7 @@ class SingleTxArbitrage(Generic[_BlockchainClientT], ABC):
         return State.finished
 
     async def run(self, height: int, filtered_mempool: dict[Any, list[list[dict]]] = None):
+        log.debug(f"{self}: Run on {height=}")
         if height > self.last_height_run:
             self._reset_mempool_params()
         try:
