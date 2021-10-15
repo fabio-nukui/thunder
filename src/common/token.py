@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from decimal import Decimal, getcontext
-from typing import Generic, Optional, Type, TypeVar, Union, overload
+from typing import Generic, Optional, TypeVar, Union, overload
 
 DecInput = Union[str, int, float, Decimal]
 ROUNDING_SAFETY_MARGIN = 2
@@ -18,7 +18,7 @@ _TokenAmountT = TypeVar("_TokenAmountT", bound="TokenAmount")
 class Token(Generic[_TokenAmountT], ABC):
     symbol: str
     decimals: int
-    amount_class: Type[_TokenAmountT]
+    amount_class: type[_TokenAmountT]
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.repr_symbol})"

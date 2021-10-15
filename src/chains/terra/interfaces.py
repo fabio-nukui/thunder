@@ -5,11 +5,11 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from decimal import Decimal
 from enum import Enum
-from typing import Iterator, Type, TypeVar
+from typing import TYPE_CHECKING, AsyncIterable, Iterator, TypeVar
 
 from terra_sdk.client.lcd import AsyncLCDClient, AsyncWallet
 from terra_sdk.core import AccAddress, Coin, Coins
-from terra_sdk.core.auth import StdFee
+from terra_sdk.core.auth import StdFee, TxLog
 from terra_sdk.core.broadcast import AsyncTxBroadcastResult
 from terra_sdk.core.msg import Msg
 from terra_sdk.core.wasm import MsgExecuteContract
@@ -18,12 +18,16 @@ from terra_sdk.key.mnemonic import MnemonicKey
 import utils
 from common import AsyncBlockchainClient, Token, TokenAmount
 
+if TYPE_CHECKING:
+    from .token import TerraNativeToken, TerraTokenAmount
+
+
 _ITerraTokenAmountT = TypeVar("_ITerraTokenAmountT", bound="ITerraTokenAmount")
 _ICW20TokenT = TypeVar("_ICW20TokenT", bound="ICW20Token")
 
 
 class BaseTerraToken(Token[_ITerraTokenAmountT], ABC):
-    amount_class: Type[_ITerraTokenAmountT]
+    amount_class: type[_ITerraTokenAmountT]
 
     @abstractmethod
     async def get_balance(
@@ -49,7 +53,7 @@ class ICW20Token(BaseTerraToken[_ITerraTokenAmountT], ABC):
     @classmethod
     @abstractmethod
     async def from_contract(
-        cls: Type[_ICW20TokenT],
+        cls: type[_ICW20TokenT],
         contract_addr: AccAddress,
         client: ITerraClient,
     ) -> _ICW20TokenT:
@@ -118,7 +122,6 @@ class ITerraClient(AsyncBlockchainClient, ABC):
     lcd: AsyncLCDClient
     wallet: AsyncWallet
     address: AccAddress
-    code_ids: dict[str, int]
     fee_denom: str
     height: int
 
@@ -133,11 +136,38 @@ class ITerraClient(AsyncBlockchainClient, ABC):
         ...
 
     @abstractmethod
+    async def contract_info(self, address: AccAddress) -> dict:
+        ...
+
+    @abstractmethod
     async def get_bank(
         self,
         denoms: list[str] = None,
-        address: AccAddress = None,
-    ) -> list[ITerraTokenAmount]:
+        address: str = None,
+    ) -> list[TerraTokenAmount]:
+        ...
+
+    @staticmethod
+    @abstractmethod
+    def encode_msg(msg: dict) -> str:
+        ...
+
+    @abstractmethod
+    async def get_latest_height(self) -> int:
+        ...
+
+    @abstractmethod
+    async def loop_latest_height(self) -> AsyncIterable[int]:
+        ...
+
+    @staticmethod
+    @abstractmethod
+    def extract_log_events(logs: list[TxLog]) -> list[dict]:
+        ...
+
+    @staticmethod
+    @abstractmethod
+    def parse_from_contract_events(events: list[dict]) -> list[dict[str, list[dict[str, str]]]]:
         ...
 
 
@@ -150,9 +180,10 @@ class IMarketApi(IApi, ABC):
     @abstractmethod
     async def get_amount_out(
         self,
-        offer_amount: ITerraTokenAmount,
-        ask_denom: ITerraNativeToken,
-    ) -> ITerraTokenAmount:
+        offer_amount: _ITerraTokenAmountT,
+        ask_denom: TerraNativeToken,
+        safety_margin: bool | int = False,
+    ) -> _ITerraTokenAmountT:
         ...
 
     @abstractmethod
@@ -174,14 +205,14 @@ class IMarketApi(IApi, ABC):
 
 class IOracleApi(IApi, ABC):
     @abstractmethod
-    async def get_exchange_rates(self) -> dict[ITerraNativeToken, Decimal]:
+    async def get_exchange_rates(self) -> dict[TerraNativeToken, Decimal]:
         ...
 
     @abstractmethod
     async def get_exchange_rate(
         self,
-        from_coin: ITerraNativeToken | str,
-        to_coin: ITerraNativeToken | str,
+        from_coin: TerraNativeToken | str,
+        to_coin: TerraNativeToken | str,
     ) -> Decimal:
         ...
 
@@ -197,23 +228,23 @@ class ITreasuryApi(IApi, ABC):
         ...
 
     @abstractmethod
-    async def get_tax_caps(self) -> dict[BaseTerraToken, ITerraTokenAmount]:
+    async def get_tax_caps(self) -> dict[BaseTerraToken, TerraTokenAmount]:
         ...
 
     @abstractmethod
-    def calculate_tax(
+    async def calculate_tax(
         self,
-        amount: ITerraTokenAmount,
+        amount: _ITerraTokenAmountT,
         payer: TaxPayer = TaxPayer.contract,
-    ) -> ITerraTokenAmount:
+    ) -> _ITerraTokenAmountT:
         ...
 
     @abstractmethod
-    def deduct_tax(
+    async def deduct_tax(
         self,
-        amount: ITerraTokenAmount,
+        amount: _ITerraTokenAmountT,
         payer: TaxPayer = TaxPayer.contract,
-    ) -> ITerraTokenAmount:
+    ) -> _ITerraTokenAmountT:
         ...
 
 

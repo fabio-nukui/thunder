@@ -34,11 +34,6 @@ log = logging.getLogger(__name__)
 
 TERRA_CONTRACT_QUERY_CACHE_SIZE = 10_000
 CONTRACT_INFO_CACHE_TTL = 86400  # Contract info should not change; 24h ttl
-TERRA_CODE_IDS = "resources/contracts/terra/{chain_id}/code_ids.json"
-
-
-def _get_code_ids(chain_id: str) -> dict[str, int]:
-    return json.load(open(TERRA_CODE_IDS.format(chain_id=chain_id)))
 
 
 class TerraClient(ITerraClient):
@@ -72,7 +67,6 @@ class TerraClient(ITerraClient):
         self.chain_id = chain_id
         self.fee_denom = fee_denom
 
-        self.code_ids = _get_code_ids(self.chain_id)
         hd_wallet = auth_secrets.hd_wallet() if hd_wallet is None else hd_wallet
         key = MnemonicKey(hd_wallet["mnemonic"], hd_wallet["account"], hd_wallet_index)
         self.key = key  # Set key before get_gas_prices() to avoid error with cache debugging

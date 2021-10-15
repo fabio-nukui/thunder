@@ -234,14 +234,12 @@ class MethBethUstArbitrage(TerraSingleTxArbitrage):
 
 async def run():
     client = await TerraClient.new()
-    pool_addresses = terraswap.get_addresses(client.chain_id)
+    factory = await terraswap.TerraswapFactory.new(client)
 
-    meth_beth_pair, beth_ust_pair, ust_meth_pair = await asyncio.gather(
-        terraswap.LiquidityPair.new(pool_addresses["pools"]["meth_beth"], client),
-        terraswap.LiquidityPair.new(pool_addresses["pools"]["beth_ust"], client),
-        terraswap.LiquidityPair.new(pool_addresses["pools"]["ust_meth"], client),
+    pairs = (meth_beth_pair, beth_ust_pair, ust_meth_pair) = await factory.get_pairs(
+        ["METH_BETH", "BETH_UST", "UST_METH"]
     )
-    router = terraswap.Router([meth_beth_pair, beth_ust_pair, ust_meth_pair], client)
+    router = factory.get_router(pairs)
 
     arb = MethBethUstArbitrage(client, meth_beth_pair, beth_ust_pair, ust_meth_pair, router)
     async for height in client.loop_latest_height():

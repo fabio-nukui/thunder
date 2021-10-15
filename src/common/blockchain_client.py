@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Literal, Type, TypeVar
+from typing import Literal, TypeVar
 
 from exceptions import NodeSyncing
 
@@ -33,7 +33,7 @@ _AsyncBlockchainClientT = TypeVar("_AsyncBlockchainClientT", bound="AsyncBlockch
 class AsyncBlockchainClient(BlockchainClient, ABC):
     @classmethod
     @abstractmethod
-    async def new(cls: Type[_AsyncBlockchainClientT], *args, **kwargs) -> _AsyncBlockchainClientT:
+    async def new(cls: type[_AsyncBlockchainClientT], *args, **kwargs) -> _AsyncBlockchainClientT:
         ...
 
     async def init(self, raise_on_syncing: bool = False):

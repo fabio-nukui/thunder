@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Type, TypeVar, Union
+from typing import TypeVar, Union
 
 from terra_sdk.core import AccAddress, Coin
 from terra_sdk.core.wasm import MsgExecuteContract
@@ -82,7 +82,7 @@ class CW20Token(ICW20Token[TerraTokenAmount]):
 
     @classmethod
     async def from_contract(
-        cls: Type[_CW20TokenT],
+        cls: type[_CW20TokenT],
         contract_addr: AccAddress,
         client: ITerraClient,
     ) -> _CW20TokenT:

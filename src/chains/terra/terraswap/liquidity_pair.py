@@ -5,37 +5,24 @@ import base64
 import json
 import logging
 import math
-from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from copy import deepcopy
 from decimal import Decimal
-from typing import Type
 
 from terra_sdk.core import AccAddress
 from terra_sdk.core.wasm import MsgExecuteContract
 
-from exceptions import InsufficientLiquidity, NotContract
+from exceptions import InsufficientLiquidity
 from utils.cache import CacheGroup, ttl_cache
 
-from .client import TerraClient
-from .token import CW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
-
-__all__ = [
-    "get_addresses",
-    "RouteStep",
-    "RouteStepNative",
-    "RouteStepTerraswap",
-    "Router",
-    "LiquidityPair",
-]
+from ..client import TerraClient
+from ..token import CW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
+from .utils import token_to_data
 
 log = logging.getLogger(__name__)
 
 FEE = Decimal("0.003")
-TERRASWAP_CODE_ID_KEY = "terraswap_pair"
 DEFAULT_MAX_SLIPPAGE_TOLERANCE = Decimal("0.001")
-ADDRESSES_FILE = "resources/addresses/terra/{chain_id}/terraswap.json"
-
 AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
 
 
@@ -47,25 +34,11 @@ class MaxSpreadAssertion(Exception):
     pass
 
 
-def _token_to_data(token: TerraToken) -> dict[str, dict[str, str]]:
-    if isinstance(token, TerraNativeToken):
-        return {"native_token": {"denom": token.denom}}
-    return {"token": {"contract_addr": token.contract_addr}}
-
-
 def _token_amount_to_data(token_amount: TerraTokenAmount) -> dict:
     return {
-        "info": _token_to_data(token_amount.token),
+        "info": token_to_data(token_amount.token),
         "amount": str(token_amount.int_amount),
     }
-
-
-async def _is_terraswap_pool(contract_addr: AccAddress, client: TerraClient) -> bool:
-    try:
-        info = await client.contract_info(contract_addr)
-    except NotContract:
-        return False
-    return int(info["code_id"]) == client.code_ids[TERRASWAP_CODE_ID_KEY]
 
 
 async def _pair_tokens_from_data(
@@ -84,132 +57,8 @@ async def _token_from_data(asset_info: dict, client: TerraClient) -> TerraToken:
         return TerraNativeToken(asset_info["native_token"]["denom"])
     if "token" in asset_info:
         contract_addr: AccAddress = asset_info["token"]["contract_addr"]
-        try:
-            return await LPToken.from_contract(contract_addr, client)
-        except NotTerraswapPair:
-            return await CW20Token.from_contract(contract_addr, client)
+        return await CW20Token.from_contract(contract_addr, client)
     raise TypeError(f"Unexpected data format: {asset_info}")
-
-
-def get_addresses(chain_id: str) -> dict:
-    return json.load(open(ADDRESSES_FILE.format(chain_id=chain_id)))
-
-
-class RouteStep(ABC):
-    def __init__(
-        self,
-        token_in: TerraToken,
-        token_out: TerraToken,
-    ) -> None:
-        self.token_in = token_in
-        self.token_out = token_out
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(token_in={self.token_in}, token_out={self.token_out})"
-
-    @property
-    def sorted_tokens(self) -> tuple[TerraToken, TerraToken]:
-        if self.token_in < self.token_out:
-            return self.token_in, self.token_out
-        return self.token_out, self.token_in
-
-    @abstractmethod
-    def to_data(self) -> dict:
-        ...
-
-
-class RouteStepTerraswap(RouteStep):
-    def to_data(self) -> dict:
-        return {
-            "terra_swap": {
-                "offer_asset_info": _token_to_data(self.token_in),
-                "ask_asset_info": _token_to_data(self.token_out),
-            }
-        }
-
-
-class RouteStepNative(RouteStep):
-    def __init__(
-        self,
-        token_in: TerraNativeToken,
-        token_out: TerraNativeToken,
-    ):
-        self.token_in = token_in
-        self.token_out = token_out
-
-    def to_data(self) -> dict:
-        return {
-            "native_swap": {
-                "offer_denom": self.token_in.denom,
-                "ask_denom": self.token_out.denom,
-            }
-        }
-
-
-class Router:
-    def __init__(
-        self,
-        liquidity_pairs: list[LiquidityPair],
-        client: TerraClient,
-    ):
-        self.contract_addr = get_addresses(client.chain_id)["router"]
-        self.pairs = {pair.sorted_tokens: pair for pair in liquidity_pairs}
-        self.client = client
-
-    async def op_route_swap(
-        self,
-        sender: AccAddress,
-        amount_in: TerraTokenAmount,
-        route: list[RouteStep],
-        min_amount_out: TerraTokenAmount,
-        safety_margin: bool | int = True,
-    ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
-        assert route, "route cannot be empty"
-
-        swap_operations: list[dict] = []
-        next_amount_in = await self.client.treasury.deduct_tax(amount_in)
-        for step in route:
-            if isinstance(step, RouteStepTerraswap):
-                if step.sorted_tokens not in self.pairs:
-                    raise Exception(f"No liquidity pair found for {step.sorted_tokens}")
-                pair = self.pairs[step.sorted_tokens]
-                next_amount_in = await pair.get_swap_amount_out(next_amount_in, safety_margin)
-            else:
-                assert isinstance(step.token_out, TerraNativeToken)
-                next_amount_in = await self.client.market.get_amount_out(
-                    next_amount_in, step.token_out, safety_margin
-                )
-            swap_operations.append(step.to_data())
-        amount_out: TerraTokenAmount = next_amount_in
-
-        swap_msg = {
-            "execute_swap_operations": {
-                "offer_amount": str(amount_in.int_amount),
-                "minimum_receive": str(min_amount_out.int_amount),
-                "operations": swap_operations,
-            }
-        }
-        if isinstance(amount_in.token, CW20Token):
-            contract = amount_in.token.contract_addr
-            execute_msg = {
-                "send": {
-                    "contract": self.contract_addr,
-                    "amount": str(amount_in.int_amount),
-                    "msg": self.client.encode_msg(swap_msg),
-                }
-            }
-            coins = []
-        else:
-            contract = self.contract_addr
-            execute_msg = swap_msg
-            coins = [amount_in.to_coin()]
-        msg = MsgExecuteContract(
-            sender=sender,
-            contract=contract,
-            execute_msg=execute_msg,
-            coins=coins,
-        )
-        return amount_out, [msg]
 
 
 class LiquidityPair:
@@ -222,20 +71,16 @@ class LiquidityPair:
 
     @classmethod
     async def new(
-        cls: Type[LiquidityPair],
+        cls: type[LiquidityPair],
         contract_addr: AccAddress,
         client: TerraClient,
     ) -> LiquidityPair:
-        if not await _is_terraswap_pool(contract_addr, client):
-            raise NotTerraswapPair
-
         self = super().__new__(cls)
         self.contract_addr = contract_addr
         self.client = client
 
-        pair_data = await self.client.contract_query(self.contract_addr, {"pair": {}})
-        self.tokens = await _pair_tokens_from_data(pair_data["asset_infos"], self.client)
-        self.lp_token = await LPToken.from_pool(pair_data["liquidity_token"], self)
+        self.lp_token = await LPToken.from_pool_contract(self.contract_addr, self.client)
+        self.tokens = self.lp_token.pair_tokens
 
         self.stop_updates = False
         self._reserves = self.tokens[0].to_amount(), self.tokens[1].to_amount()
@@ -677,18 +522,26 @@ class LPToken(CW20Token):
     pair_tokens: tuple[TerraToken, TerraToken]
 
     @classmethod
-    async def from_pool(cls, contract_addr: AccAddress, pool: LiquidityPair) -> LPToken:
-        self = await super().from_contract(contract_addr, pool.client)
-        self.pair_tokens = pool.tokens
+    async def from_contract(
+        cls,
+        contract_addr: AccAddress,
+        client: TerraClient,
+        pair_tokens: tuple[TerraToken, TerraToken] = None,
+    ) -> LPToken:
+        self = await super().from_contract(contract_addr, client)
+        if pair_tokens is None:
+            minter_addr = (await client.contract_query(contract_addr, {"minter": {}}))["minter"]
+            pair_data = await client.contract_query(minter_addr, {"pair": {}})
+            pair_tokens = await _pair_tokens_from_data(pair_data["asset_infos"], client)
+        self.pair_tokens = pair_tokens
         return self
 
     @classmethod
-    async def from_contract(cls, contract_addr: AccAddress, client: TerraClient) -> LPToken:
-        response = await client.contract_query(contract_addr, {"minter": {}})
-        if not response:
-            raise NotTerraswapPair
-        minter_addr = response["minter"]
-        return (await LiquidityPair.new(minter_addr, client)).lp_token
+    async def from_pool_contract(cls, pool_addr: AccAddress, client: TerraClient) -> LPToken:
+        pair_data = await client.contract_query(pool_addr, {"pair": {}})
+        contract_addr = pair_data["liquidity_token"]
+        pair_tokens = await _pair_tokens_from_data(pair_data["asset_infos"], client)
+        return await cls.from_contract(contract_addr, client, pair_tokens)
 
     @property
     def repr_symbol(self):
