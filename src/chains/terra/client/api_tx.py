@@ -1,9 +1,11 @@
 import logging
+import re
 
 from terra_sdk.core import Coins
 from terra_sdk.core.auth import StdFee
 from terra_sdk.core.broadcast import AsyncTxBroadcastResult
 from terra_sdk.core.msg import Msg
+from terra_sdk.exceptions import LCDResponseError
 
 from utils.cache import CacheGroup, ttl_cache
 
@@ -12,6 +14,8 @@ from ..interfaces import ITxApi
 log = logging.getLogger(__name__)
 
 TERRA_GAS_PRICE_CACHE_TTL = 3600
+
+_pat_sequence_error = re.compile(r"account sequence mismatch, expected (\d+)")
 
 
 class TxApi(ITxApi):
@@ -39,14 +43,18 @@ class TxApi(ITxApi):
         if "fee" not in kwargs:
             kwargs["fee"] = self.estimate_fee(msgs)
 
-        signed_tx = await self.client.wallet.create_and_sign_tx(
-            msgs,
-            fee_denoms=[self.client.fee_denom],
-            **kwargs,
-        )
-
-        payload = {"tx": signed_tx.to_data()["value"], "mode": "async"}
-        res = (await self.client.lcd_http_client.post("txs", json=payload)).json()
-
+        while True:
+            signed_tx = await self.client.wallet.create_and_sign_tx(
+                msgs,
+                fee_denoms=[self.client.fee_denom],
+                **kwargs,
+            )
+            payload = {"tx": signed_tx.to_data()["value"], "mode": "async"}
+            try:
+                res = (await self.client.lcd_http_client.post("txs", json=payload)).json()
+                break
+            except LCDResponseError as e:
+                if match := _pat_sequence_error.search(e.message):
+                    kwargs["sequence"] = int(match.group(1))
         log.debug(f"Tx executed: {res['txhash']}")
         return AsyncTxBroadcastResult(txhash=res["txhash"], height=self.client.height)

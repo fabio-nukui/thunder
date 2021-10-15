@@ -17,21 +17,22 @@ from chains.terra import UST, TerraClient, TerraTokenAmount, terraswap
 from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
 from exceptions import MaxSpreadAssertion, TxError, UnprofitableArbitrage
 
-from .common.single_tx_arbitrage import State
 from .common.terra_single_tx_arbitrage import TerraArbParams, TerraSingleTxArbitrage
 
 log = logging.getLogger(__name__)
 
 MIN_PROFIT_UST = UST.to_amount(2)
-MIN_START_AMOUNT = UST.to_amount(200)
+MIN_START_AMOUNT = UST.to_amount(50)
 OPTIMIZATION_TOLERANCE = UST.to_amount("0.01")
 MIN_UST_RESERVED_AMOUNT = 5
 FALLBACK_FEE = StdFee(gas=2150947, amount=Coins("2392410uusd"))
+TOKEN_SYMBOLS: list[str] = ["TWD", "SPEC", "MIR", "STT", "MINE", "ANC", "LOTA", "ALTE"]
+MAX_SLIPPAGE = Decimal("0.001")
 
 
 class Direction(str, Enum):
-    beth_first = "beth_first"
-    meth_first = "meth_first"
+    terraswap_first = "terraswap_first"
+    loop_first = "loop_first"
 
 
 @dataclass
@@ -63,32 +64,20 @@ class ArbParams(TerraArbParams):
         }
 
 
-class MethBethUstArbitrage(TerraSingleTxArbitrage):
+class TerraswapLoopArbitrage(TerraSingleTxArbitrage):
     def __init__(
         self,
         client: TerraClient,
-        meth_beth_pair: terraswap.LiquidityPair,
-        beth_ust_pair: terraswap.LiquidityPair,
-        ust_meth_pair: terraswap.LiquidityPair,
-        router: terraswap.Router,
+        terraswap_pair: terraswap.LiquidityPair,
+        loop_pair: terraswap.LiquidityPair,
     ):
-        self.router = router
-        self.meth_beth_pair = meth_beth_pair
-        self.beth_ust_pair = beth_ust_pair
-        self.ust_meth_pair = ust_meth_pair
-        self.pairs = [meth_beth_pair, beth_ust_pair, ust_meth_pair]
+        self.terraswap_pair = terraswap_pair
+        self.loop_pair = loop_pair
+        self.pairs = [terraswap_pair, loop_pair]
 
-        mETH, bETH = meth_beth_pair.tokens
-        self._route_meth_first: list[terraswap.RouteStep] = [
-            terraswap.RouteStepTerraswap(UST, mETH),
-            terraswap.RouteStepTerraswap(mETH, bETH),
-            terraswap.RouteStepTerraswap(bETH, UST),
-        ]
-        self._route_beth_first: list[terraswap.RouteStep] = [
-            terraswap.RouteStepTerraswap(UST, bETH),
-            terraswap.RouteStepTerraswap(bETH, mETH),
-            terraswap.RouteStepTerraswap(mETH, UST),
-        ]
+        self.tokens = self.terraswap_pair.tokens
+        self.non_ust_token = self.tokens[0] if self.tokens[1] == UST else self.tokens[1]
+
         self._mempool_reserve_changes = {
             pair: (pair.tokens[0].to_amount(0), pair.tokens[1].to_amount(0)) for pair in self.pairs
         }
@@ -97,7 +86,7 @@ class MethBethUstArbitrage(TerraSingleTxArbitrage):
         super().__init__(client)
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(client={self.client}, state={self.state})"
+        return f"{self.__class__.__name__}(tokens={self.tokens})"
 
     def _reset_mempool_params(self):
         self._mempool_reserve_changes = {
@@ -110,31 +99,31 @@ class MethBethUstArbitrage(TerraSingleTxArbitrage):
         filtered_mempool: dict[terraswap.LiquidityPair, list[list[dict]]] = None,
     ) -> ArbParams:
         prices = await self._get_prices()
-        meth_premium = prices["meth_beth"] / (prices["meth_ust"] / prices["beth_ust"]) - 1
-        if meth_premium > 0:
-            direction = Direction.meth_first
-            route = self._route_meth_first
+        loop_premium = prices["loop"] / prices["terraswap"] - 1
+        if loop_premium > 0:
+            direction = Direction.loop_first
         else:
-            direction = Direction.beth_first
-            route = self._route_beth_first
+            direction = Direction.terraswap_first
         ust_balance = (await UST.get_balance(self.client)).amount
 
         async with self._simulate_reserve_changes(filtered_mempool):
             initial_amount = await self._get_optimal_argitrage_amount(
-                route, meth_premium, ust_balance
+                direction, loop_premium, ust_balance
             )
-            final_amount, msgs = await self._op_arbitrage(initial_amount, route, safety_round=True)
+            final_amount, msgs = await self._op_arbitrage(
+                initial_amount, direction, safety_round=True
+            )
             try:
                 fee = await self.client.tx.estimate_fee(msgs)
             except LCDResponseError as e:
-                if self._simulating_reserve_changes:
+                if self._simulating_reserve_changes or "account sequence mismatch" in e.message:
                     fee = FALLBACK_FEE
                 else:
                     log.debug(
                         "Error when estimating fee",
                         extra={
                             "data": {
-                                "meth_premium": f"{meth_premium:.3%}",
+                                "loop_premium": f"{loop_premium:.3%}",
                                 "direction": direction,
                                 "msgs": [msg.to_data() for msg in msgs],
                             },
@@ -147,7 +136,7 @@ class MethBethUstArbitrage(TerraSingleTxArbitrage):
         net_profit_ust = (final_amount - initial_amount).amount - gas_cost_raw
         if net_profit_ust < MIN_PROFIT_UST:
             raise UnprofitableArbitrage(
-                f"Low profitability: USD {net_profit_ust:.2f}, {meth_premium=:0.3%}"
+                f"Low profitability: USD {net_profit_ust:.2f}, {loop_premium=:0.3%}"
             )
 
         return ArbParams(
@@ -164,25 +153,21 @@ class MethBethUstArbitrage(TerraSingleTxArbitrage):
         )
 
     async def _get_prices(self) -> dict[str, Decimal]:
-        (
-            meth_beth_pair_reserves,
-            beth_ust_pair_reserves,
-            ust_meth_pair_reserves,
-        ) = await asyncio.gather(
-            self.meth_beth_pair.get_reserves(),
-            self.beth_ust_pair.get_reserves(),
-            self.ust_meth_pair.get_reserves(),
+        (terraswap_reserves, loop_reserves) = await asyncio.gather(
+            self.terraswap_pair.get_reserves(),
+            self.loop_pair.get_reserves(),
         )
+        if self.terraswap_pair.tokens[0] == UST:
+            terraswap = terraswap_reserves[1].amount / terraswap_reserves[0].amount
+        else:
+            terraswap = terraswap_reserves[0].amount / terraswap_reserves[1].amount
 
-        meth_beth = meth_beth_pair_reserves[1].amount / meth_beth_pair_reserves[0].amount
-        beth_ust = beth_ust_pair_reserves[1].amount / beth_ust_pair_reserves[0].amount
-        meth_ust = ust_meth_pair_reserves[0].amount / ust_meth_pair_reserves[1].amount
+        if self.loop_pair.tokens[0] == UST:
+            loop = loop_reserves[1].amount / loop_reserves[0].amount
+        else:
+            loop = loop_reserves[0].amount / loop_reserves[1].amount
 
-        return {
-            "meth_beth": meth_beth,
-            "beth_ust": beth_ust,
-            "meth_ust": meth_ust,
-        }
+        return {"terraswap": terraswap, "loop": loop}
 
     @asynccontextmanager
     async def _simulate_reserve_changes(
@@ -206,31 +191,28 @@ class MethBethUstArbitrage(TerraSingleTxArbitrage):
                     )
             simulating_reserve_changes = self._simulating_reserve_changes
             self._simulating_reserve_changes = True
-            meth_beth_changes = self.meth_beth_pair.simulate_reserve_change(
-                self._mempool_reserve_changes[self.meth_beth_pair]
+            terraswap_changes = self.terraswap_pair.simulate_reserve_change(
+                self._mempool_reserve_changes[self.terraswap_pair]
             )
-            beth_ust_changes = self.beth_ust_pair.simulate_reserve_change(
-                self._mempool_reserve_changes[self.beth_ust_pair]
-            )
-            ust_meth_changes = self.ust_meth_pair.simulate_reserve_change(
-                self._mempool_reserve_changes[self.ust_meth_pair]
+            loop_changes = self.loop_pair.simulate_reserve_change(
+                self._mempool_reserve_changes[self.loop_pair]
             )
             try:
-                async with meth_beth_changes, beth_ust_changes, ust_meth_changes:
+                async with terraswap_changes, loop_changes:
                     yield
             finally:
                 self._simulating_reserve_changes = simulating_reserve_changes
 
     async def _get_optimal_argitrage_amount(
         self,
-        route: list[terraswap.RouteStep],
-        meth_premium: Decimal,
+        direction: Direction,
+        loop_premium: Decimal,
         ust_balance: Decimal,
     ) -> TerraTokenAmount:
-        profit = await self._get_gross_profit(MIN_START_AMOUNT, route)
+        profit = await self._get_gross_profit(MIN_START_AMOUNT, direction)
         if profit < 0:
-            raise UnprofitableArbitrage(f"No profitability, {meth_premium=:0.3%}")
-        func = partial(self._get_gross_profit_dec, route=route)
+            raise UnprofitableArbitrage(f"No profitability, {loop_premium=:0.3%}")
+        func = partial(self._get_gross_profit_dec, direction=direction)
         ust_amount, _ = await utils.aoptimization.optimize(
             func,
             x0=MIN_START_AMOUNT.amount,
@@ -247,31 +229,44 @@ class MethBethUstArbitrage(TerraSingleTxArbitrage):
 
     async def _get_gross_profit(
         self,
-        initial_lp_amount: TerraTokenAmount,
-        route: list[terraswap.RouteStep],
+        ust_amount: TerraTokenAmount,
+        direction: Direction,
         safety_round: bool = False,
     ) -> TerraTokenAmount:
-        amount_out, _ = await self._op_arbitrage(initial_lp_amount, route, safety_round)
-        return amount_out - initial_lp_amount
+        amount_out, _ = await self._op_arbitrage(ust_amount, direction, safety_round)
+        return amount_out - ust_amount
 
     async def _get_gross_profit_dec(
         self,
         amount: Decimal,
-        route: list[terraswap.RouteStep],
+        direction: Direction,
         safety_round: bool = False,
     ) -> Decimal:
-        token_amount = UST.to_amount(amount)
-        return (await self._get_gross_profit(token_amount, route, safety_round)).amount
+        ust_amount = UST.to_amount(amount)
+        return (await self._get_gross_profit(ust_amount, direction, safety_round)).amount
 
     async def _op_arbitrage(
         self,
-        initial_ust_amount: TerraTokenAmount,
-        route: list[terraswap.RouteStep],
+        ust_amount: TerraTokenAmount,
+        direction: Direction,
         safety_round: bool,
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
-        return await self.router.op_route_swap(
-            self.client.address, initial_ust_amount, route, initial_ust_amount, safety_round
-        )
+        if direction == Direction.terraswap_first:
+            token_amount, msgs_0 = await self.terraswap_pair.op_swap(
+                self.client.address, ust_amount, MAX_SLIPPAGE, safety_round
+            )
+            amount_out, msgs_1 = await self.loop_pair.op_swap(
+                self.client.address, token_amount, MAX_SLIPPAGE, safety_round
+            )
+        else:
+            token_amount, msgs_0 = await self.loop_pair.op_swap(
+                self.client.address, ust_amount, MAX_SLIPPAGE, safety_round
+            )
+            amount_out, msgs_1 = await self.terraswap_pair.op_swap(
+                self.client.address, token_amount, MAX_SLIPPAGE, safety_round
+            )
+        msgs = msgs_0 + msgs_1
+        return amount_out, msgs
 
     async def _extract_returns_from_logs(
         self,
@@ -285,20 +280,38 @@ class MethBethUstArbitrage(TerraSingleTxArbitrage):
 
 async def run():
     client = await TerraClient.new()
-    factory = await terraswap.TerraswapFactory.new(client)
+    terraswap_factory = await terraswap.TerraswapFactory.new(client)
+    loop_factory = await terraswap.LoopFactory.new(client)
 
-    pairs = (meth_beth_pair, beth_ust_pair, ust_meth_pair) = await factory.get_pairs(
-        ["METH_BETH", "BETH_UST", "UST_METH"]
-    )
-    router = factory.get_router(pairs)
+    arb_routes: list[TerraswapLoopArbitrage] = []
+    for symbol in TOKEN_SYMBOLS:
+        name = f"{symbol}_UST"
+        name_reversed = f"UST_{symbol}"
+        if name in terraswap_factory.addresses["pairs"]:
+            terraswap_pair = terraswap_factory.get_pair(name)
+        else:
+            terraswap_pair = terraswap_factory.get_pair(name_reversed)
+        if name in loop_factory.addresses["pairs"]:
+            loop_pair = loop_factory.get_pair(name)
+        else:
+            loop_pair = loop_factory.get_pair(name_reversed)
+        arb_pair = await asyncio.gather(terraswap_pair, loop_pair)
+        arb_routes.append(TerraswapLoopArbitrage(client, *arb_pair))
+
     mempool_filters = {
-        meth_beth_pair: FilterSingleSwapTerraswapPair(meth_beth_pair),
-        beth_ust_pair: FilterSingleSwapTerraswapPair(beth_ust_pair),
-        ust_meth_pair: FilterSingleSwapTerraswapPair(ust_meth_pair),
+        pair: FilterSingleSwapTerraswapPair(pair)
+        for arb_route in arb_routes
+        for pair in arb_route.pairs
     }
-    arb = MethBethUstArbitrage(client, meth_beth_pair, beth_ust_pair, ust_meth_pair, router)
     async for height, filtered_mempool in client.mempool.iter_height_mempool(mempool_filters):
-        if height > arb.last_height_run:
+        if any(height > arb_route.last_height_run for arb_route in arb_routes):
             utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)
-        await arb.run(height, filtered_mempool)
-        client.mempool.new_block_only = arb.state == State.waiting_confirmation
+        for arb_route in arb_routes:
+            fitered_route_mempool = {
+                pair: filter_
+                for pair, filter_ in filtered_mempool.items()
+                if pair in arb_route.pairs
+            }
+            any_new_mempool_msg = any(list_msgs for list_msgs in fitered_route_mempool.values())
+            if height > arb_route.last_height_run or any_new_mempool_msg:
+                await arb_route.run(height, fitered_route_mempool)
