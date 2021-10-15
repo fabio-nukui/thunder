@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
 from functools import partial
+from typing import Any
 
 from terra_sdk.core.auth import StdFee, TxLog
 from terra_sdk.core.wasm import MsgExecuteContract
@@ -79,12 +80,15 @@ class LunaUstMarketArbitrage(TerraSingleTxArbitrage):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(client={self.client}, state={self.state})"
 
+    def _reset_mempool_params(self):
+        pass
+
     async def _get_arbitrage_params(
         self,
         height: int,
-        mempool: list[list[dict]] = None,
+        filtered_mempool: dict[Any, list[list[dict]]] = None,
     ) -> ArbParams:
-        if mempool:
+        if filtered_mempool:
             raise NotImplementedError
         prices = await self._get_prices()
         terraswap_premium = prices["terraswap"] / prices["market"] - 1

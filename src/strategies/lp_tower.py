@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
 from functools import partial
+from typing import Any
 
 from terra_sdk.core.auth import StdFee, TxLog
 from terra_sdk.core.wasm import MsgExecuteContract
@@ -93,12 +94,15 @@ class LPTowerArbitrage(TerraSingleTxArbitrage):
             f"pool_tower={self.pool_tower}, state={self.state})"
         )
 
+    def _reset_mempool_params(self):
+        pass
+
     async def _get_arbitrage_params(
         self,
         height: int,
-        mempool: list[list[dict]] = None,
+        filtered_mempool: dict[Any, list[list[dict]]] = None,
     ) -> ArbParams:
-        if mempool:
+        if filtered_mempool:
             raise NotImplementedError
         prices = await self._get_prices()
         balance_ratio, direction = await self._get_pool_balance_ratio(

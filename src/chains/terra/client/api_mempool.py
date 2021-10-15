@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 from asyncio.futures import Future
-from typing import AsyncIterator, Mapping, TypeVar, overload
+from typing import AsyncIterable, Mapping, TypeVar
 
 import httpx
 
@@ -156,28 +156,15 @@ class MempoolApi(IMempoolApi):
     async def get_height_mempool(self, height: int) -> tuple[int, list[list[dict]]]:
         return await self._cache_manager.get_new_height_mempool(height, new_block_only=False)
 
-    @overload
-    async def loop_height_mempool(self) -> AsyncIterator[tuple[int, list[list[dict]]]]:
-        ...
-
-    @overload
-    async def loop_height_mempool(
+    async def iter_height_mempool(
         self,
         filters: Mapping[_T, IFilter],
-    ) -> AsyncIterator[tuple[int, dict[_T, list[list[dict]]]]]:
-        ...
-
-    async def loop_height_mempool(self, filters=None):
+    ) -> AsyncIterable[tuple[int, dict[_T, list[list[dict]]]]]:
         while True:
             try:
-                if filters is None:
-                    last_height, mempool = await self._cache_manager.get_new_height_mempool(
-                        self.client.height, self.new_block_only
-                    )
-                else:
-                    last_height, mempool = await self._cache_manager.filter_new_height_mempool(
-                        self.client.height, filters, self.new_block_only
-                    )
+                last_height, mempool = await self._cache_manager.filter_new_height_mempool(
+                    self.client.height, filters, self.new_block_only
+                )
             except BlockchainNewState:
                 continue
             if last_height > self.client.height:

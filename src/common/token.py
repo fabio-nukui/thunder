@@ -134,6 +134,9 @@ class TokenAmount:
     def __eq__(self, other) -> bool:
         return self.amount == self._to_decimal(other)
 
+    def __ne__(self, other) -> bool:
+        return self.amount != self._to_decimal(other)
+
     def __lt__(self, other) -> bool:
         return self.amount < self._to_decimal(other)
 

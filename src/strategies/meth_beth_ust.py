@@ -1,22 +1,23 @@
 import asyncio
 import logging
 import time
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
 from functools import partial
 
 from terra_sdk.core.auth import StdFee, TxLog
+from terra_sdk.core.coins import Coins
 from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.exceptions import LCDResponseError
 
 import utils
 from chains.terra import UST, TerraClient, TerraTokenAmount, terraswap
+from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
+from exceptions import MaxSpreadAssertion, TxError, UnprofitableArbitrage
 
-# from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
-from exceptions import TxError, UnprofitableArbitrage
-
-# from .common.single_tx_arbitrage import State
+from .common.single_tx_arbitrage import State
 from .common.terra_single_tx_arbitrage import TerraArbParams, TerraSingleTxArbitrage
 
 log = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ MIN_PROFIT_UST = UST.to_amount(2)
 MIN_START_AMOUNT = UST.to_amount(200)
 OPTIMIZATION_TOLERANCE = UST.to_amount("0.01")
 MIN_UST_RESERVED_AMOUNT = 5
+FALLBACK_FEE = StdFee(gas=2150947, amount=Coins("2392410uusd"))
 
 
 class Direction(str, Enum):
@@ -90,16 +92,22 @@ class MethBethUstArbitrage(TerraSingleTxArbitrage):
         self._mempool_reserve_changes = {
             pair: (pair.tokens[0].to_amount(0), pair.tokens[1].to_amount(0)) for pair in self.pairs
         }
+        self._simulating_reserve_changes = False
 
         super().__init__(client)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(client={self.client}, state={self.state})"
 
+    def _reset_mempool_params(self):
+        self._mempool_reserve_changes = {
+            pair: (pair.tokens[0].to_amount(0), pair.tokens[1].to_amount(0)) for pair in self.pairs
+        }
+
     async def _get_arbitrage_params(
         self,
         height: int,
-        mempool: dict[terraswap.LiquidityPair, list[list[dict]]] = None,
+        filtered_mempool: dict[terraswap.LiquidityPair, list[list[dict]]] = None,
     ) -> ArbParams:
         prices = await self._get_prices()
         meth_premium = prices["meth_beth"] / (prices["meth_ust"] / prices["beth_ust"]) - 1
@@ -111,23 +119,29 @@ class MethBethUstArbitrage(TerraSingleTxArbitrage):
             route = self._route_beth_first
         ust_balance = (await UST.get_balance(self.client)).amount
 
-        initial_amount = await self._get_optimal_argitrage_amount(route, meth_premium, ust_balance)
-        final_amount, msgs = await self._op_arbitrage(initial_amount, route, safety_round=True)
-        try:
-            fee = await self.client.tx.estimate_fee(msgs)
-        except LCDResponseError as e:
-            log.debug(
-                "Error when estimating fee",
-                extra={
-                    "data": {
-                        "meth_premium": f"{meth_premium:.3%}",
-                        "direction": direction,
-                        "msgs": [msg.to_data() for msg in msgs],
-                    },
-                },
-                exc_info=True,
+        async with self._simulate_reserve_changes(filtered_mempool):
+            initial_amount = await self._get_optimal_argitrage_amount(
+                route, meth_premium, ust_balance
             )
-            raise TxError(e)
+            final_amount, msgs = await self._op_arbitrage(initial_amount, route, safety_round=True)
+            try:
+                fee = await self.client.tx.estimate_fee(msgs)
+            except LCDResponseError as e:
+                if self._simulating_reserve_changes:
+                    fee = FALLBACK_FEE
+                else:
+                    log.debug(
+                        "Error when estimating fee",
+                        extra={
+                            "data": {
+                                "meth_premium": f"{meth_premium:.3%}",
+                                "direction": direction,
+                                "msgs": [msg.to_data() for msg in msgs],
+                            },
+                        },
+                        exc_info=True,
+                    )
+                    raise TxError(e)
         gas_cost = TerraTokenAmount.from_coin(*fee.amount)
         gas_cost_raw = gas_cost.amount / self.client.lcd.gas_adjustment
         net_profit_ust = (final_amount - initial_amount).amount - gas_cost_raw
@@ -169,6 +183,41 @@ class MethBethUstArbitrage(TerraSingleTxArbitrage):
             "beth_ust": beth_ust,
             "meth_ust": meth_ust,
         }
+
+    @asynccontextmanager
+    async def _simulate_reserve_changes(
+        self,
+        filtered_mempool: dict[terraswap.LiquidityPair, list[list[dict]]] = None,
+    ):
+        if filtered_mempool is None:
+            yield
+        else:
+            for pair, list_msgs in filtered_mempool.items():
+                for (msg,) in list_msgs:  # Only txs with one message were filtered
+                    try:
+                        changes = await pair.get_reserves_changes_from_msg(msg)
+                    except MaxSpreadAssertion:
+                        continue
+                    self._mempool_reserve_changes[pair] = (
+                        self._mempool_reserve_changes[pair][0] + changes[0],
+                        self._mempool_reserve_changes[pair][1] + changes[1],
+                    )
+            simulating_reserve_changes = self._simulating_reserve_changes
+            self._simulating_reserve_changes = True
+            meth_beth_changes = self.meth_beth_pair.simulate_reserve_change(
+                self._mempool_reserve_changes[self.meth_beth_pair]
+            )
+            beth_ust_changes = self.beth_ust_pair.simulate_reserve_change(
+                self._mempool_reserve_changes[self.beth_ust_pair]
+            )
+            ust_meth_changes = self.ust_meth_pair.simulate_reserve_change(
+                self._mempool_reserve_changes[self.ust_meth_pair]
+            )
+            try:
+                async with meth_beth_changes, beth_ust_changes, ust_meth_changes:
+                    yield
+            finally:
+                self._simulating_reserve_changes = simulating_reserve_changes
 
     async def _get_optimal_argitrage_amount(
         self,
@@ -240,19 +289,13 @@ async def run():
         ["METH_BETH", "BETH_UST", "UST_METH"]
     )
     router = factory.get_router(pairs)
-
+    mempool_filters = {
+        meth_beth_pair: FilterSingleSwapTerraswapPair(meth_beth_pair),
+        beth_ust_pair: FilterSingleSwapTerraswapPair(beth_ust_pair),
+        ust_meth_pair: FilterSingleSwapTerraswapPair(ust_meth_pair),
+    }
     arb = MethBethUstArbitrage(client, meth_beth_pair, beth_ust_pair, ust_meth_pair, router)
-    async for height in client.loop_latest_height():
-        await arb.run(height)
+    async for height, filtered_mempool in client.mempool.iter_height_mempool(mempool_filters):
+        await arb.run(height, filtered_mempool)
+        client.mempool.new_block_only = arb.state == State.waiting_confirmation
         utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)
-
-    # mempool_filters = {
-    #     meth_beth_pair: FilterSingleSwapTerraswapPair(meth_beth_pair),
-    #     beth_ust_pair: FilterSingleSwapTerraswapPair(beth_ust_pair),
-    #     ust_meth_pair: FilterSingleSwapTerraswapPair(ust_meth_pair),
-    # }
-    # arb = MethBethUstArbitrage(client, meth_beth_pair, beth_ust_pair, ust_meth_pair, router)
-    # async for height, mempool in client.mempool.loop_filter_height_mempool(mempool_filters):
-    #     await arb.run(height, mempool)
-    #     client.mempool.new_block_only = arb.state == State.waiting_confirmation
-    #     utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)

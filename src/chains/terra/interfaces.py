@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from decimal import Decimal
 from enum import Enum
-from typing import TYPE_CHECKING, AsyncIterable, Iterator, TypeVar
+from typing import TYPE_CHECKING, AsyncIterable, Mapping, TypeVar
 
 from terra_sdk.client.lcd import AsyncLCDClient, AsyncWallet
 from terra_sdk.core import AccAddress, Coin, Coins
@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 
 _ITerraTokenAmountT = TypeVar("_ITerraTokenAmountT", bound="ITerraTokenAmount")
 _ICW20TokenT = TypeVar("_ICW20TokenT", bound="ICW20Token")
+_T = TypeVar("_T")
 
 
 class BaseTerraToken(Token[_ITerraTokenAmountT], ABC):
@@ -272,7 +273,10 @@ class IMempoolApi(IApi, ABC):
         ...
 
     @abstractmethod
-    async def loop_height_mempool(self, height: int) -> Iterator[tuple[int, dict[str, dict]]]:
+    async def iter_height_mempool(
+        self,
+        filters: Mapping[_T, IFilter],
+    ) -> AsyncIterable[tuple[int, dict[_T, list[list[dict]]]]]:
         ...
 
 

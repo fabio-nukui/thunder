@@ -10,6 +10,10 @@ class IsBusy(Exception):
     pass
 
 
+class MaxSpreadAssertion(Exception):
+    pass
+
+
 class NodeSyncing(Exception):
     def __init__(self, latest_height: int, *args) -> None:
         self.latest_height = latest_height

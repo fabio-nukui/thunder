@@ -12,7 +12,7 @@ from decimal import Decimal
 from terra_sdk.core import AccAddress
 from terra_sdk.core.wasm import MsgExecuteContract
 
-from exceptions import InsufficientLiquidity
+from exceptions import InsufficientLiquidity, MaxSpreadAssertion
 from utils.cache import CacheGroup, ttl_cache
 
 from ..client import TerraClient
@@ -27,10 +27,6 @@ AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
 
 
 class NotTerraswapPair(Exception):
-    pass
-
-
-class MaxSpreadAssertion(Exception):
     pass
 
 
@@ -515,7 +511,10 @@ class LiquidityPair:
             max_spread=max_spread,
             belief_price=belief_price,
         )
-        return amounts["pool_change"]
+        amounts_pool_change = amounts["pool_change"]
+        if amounts_pool_change[0].token == self.tokens[0]:
+            return amounts_pool_change
+        return amounts_pool_change[1], amounts_pool_change[0]
 
 
 class LPToken(CW20Token):
