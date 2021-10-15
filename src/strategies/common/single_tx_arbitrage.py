@@ -118,12 +118,11 @@ class SingleTxArbitrage(Generic[_BlockchainClientT], ABC):
         return State.finished
 
     async def run(self, height: int, filtered_mempool: dict[Any, list[list[dict]]] = None):
-        log.debug(f"{self}: Run on {height=}")
         if height > self.last_height_run:
             self._reset_mempool_params()
         try:
             if self.state == State.waiting_confirmation:
-                log.debug("Looking for tx confirmation(s)")
+                log.debug(f"({height=}) Looking for tx confirmation(s)")
                 try:
                     self.data.result = await self._confirm_tx(height)
                     log.info(
@@ -134,14 +133,14 @@ class SingleTxArbitrage(Generic[_BlockchainClientT], ABC):
                 except IsBusy:
                     return
             if self.state == State.start:
-                log.debug("Generating arbitrage parameters")
+                log.debug(f"({height=}) Generating arbitrage parameters")
                 try:
                     self.data.params = await self._get_arbitrage_params(height, filtered_mempool)
                 except (UnprofitableArbitrage, TxError) as e:
                     log.debug(e)
                     return
             if self.state == State.ready_to_broadcast:
-                log.info("Broadcasting transaction")
+                log.info(f"({height=}) Broadcasting transaction")
                 try:
                     arb_params: BaseArbParams = self.data.params  # type: ignore
                     self.data.tx = await self._broadcast_tx(arb_params, height)
