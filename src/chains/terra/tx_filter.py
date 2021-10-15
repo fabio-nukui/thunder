@@ -98,6 +98,7 @@ class FilterFirstActionTerraswap(Filter):
                     value["contract"] == token.contract_addr
                     and "send" in (execute_msg := value["execute_msg"])
                     and "msg" in (send := execute_msg["send"])
+                    and send["contract"] == pair.contract_addr
                     and self.action in _decode_msg(send["msg"])
                 ):
                     return True
@@ -108,10 +109,10 @@ class FilterSingleSwapTerraswapPair(Filter):
     def __init__(self, pair: LiquidityPair):
         self.pair = pair
         terraswap_filter = FilterFirstActionTerraswap(TerraswapAction.swap, [self.pair])
-        self.filter_ = FilterMsgsLength(1) & terraswap_filter
+        self._filter = FilterMsgsLength(1) & terraswap_filter
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.pair})"
 
     def match_msgs(self, msgs: list[dict]) -> bool:
-        return self.filter_.match_msgs(msgs)
+        return self._filter.match_msgs(msgs)
