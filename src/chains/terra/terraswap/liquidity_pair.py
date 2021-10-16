@@ -46,6 +46,7 @@ def _token_amount_to_data(token_amount: TerraTokenAmount) -> dict:
 class LiquidityPair:
     contract_addr: AccAddress
     client: TerraClient
+    fee_rate: Decimal
     factory_name: str | None
     tokens: tuple[TerraToken, TerraToken]
     lp_token: LPToken
@@ -57,11 +58,13 @@ class LiquidityPair:
         cls: type[LiquidityPair],
         contract_addr: AccAddress,
         client: TerraClient,
+        fee_rate: Decimal = None,
         factory_name: str = None,
     ) -> LiquidityPair:
         self = super().__new__(cls)
         self.contract_addr = contract_addr
         self.client = client
+        self.fee_rate = FEE if fee_rate is None else fee_rate
         self.factory_name = factory_name
 
         self.lp_token = await LPToken.from_pool_contract(self.contract_addr, self.client)
@@ -187,7 +190,7 @@ class LiquidityPair:
             belief_price,
         )
 
-        fee = amount_out_before_fees * FEE
+        fee = amount_out_before_fees * self.fee_rate
         amount_out_before_taxes = amount_out_before_fees - fee
 
         tax = await self.client.treasury.calculate_tax(amount_out_before_taxes)
@@ -379,7 +382,7 @@ class LiquidityPair:
         )
 
         # Calculate optimum ratio to swap before adding liquidity, excluding tax influence
-        aux = FEE * (reserve_in.amount + amount_in.amount) - 2 * reserve_in.amount
+        aux = self.fee_rate * (reserve_in.amount + amount_in.amount) - 2 * reserve_in.amount
         numerator = Decimal(math.sqrt(aux ** 2 + 4 * reserve_in.amount * amount_in.amount)) + aux
         denominator = 2 * amount_in.amount
         ratio_swap = numerator / denominator

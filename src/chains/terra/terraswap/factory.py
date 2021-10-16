@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from decimal import Decimal
 from typing import Any, Iterable, Tuple, TypeVar
 
 from terra_sdk.core.strings import AccAddress
@@ -17,6 +18,12 @@ from .utils import pair_tokens_from_data
 _FactoryT = TypeVar("_FactoryT", bound="Factory")
 
 log = logging.getLogger(__name__)
+
+_FEES = {"terra154jt8ppucvvakvqa5fyfjdflsu6v83j4ckjfq3": Decimal("0.00300001")}  # LOOP_LOOPR
+
+
+def _get_fee_rate(contract_addr: str) -> Decimal | None:
+    return _FEES.get(contract_addr)
 
 
 class Factory:
@@ -88,7 +95,12 @@ class Factory:
             contract_addr = self.addresses["pairs"][pair_name]
         except KeyError:
             raise Exception(f"{self}: {pair_name} not in pairs addresses")
-        return await LiquidityPair.new(contract_addr, self.client, self.name)
+        return await LiquidityPair.new(
+            contract_addr,
+            self.client,
+            fee_rate=_get_fee_rate(contract_addr),
+            factory_name=self.name,
+        )
 
     def get_router(self, liquidity_pairs: Iterable[LiquidityPair]) -> Router:
         if "router" not in self.addresses:
