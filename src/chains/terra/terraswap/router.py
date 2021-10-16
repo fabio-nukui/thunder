@@ -9,7 +9,7 @@ from terra_sdk.core.wasm import MsgExecuteContract
 from ..client import TerraClient
 from ..token import CW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
 from .liquidity_pair import LiquidityPair
-from .utils import token_to_data
+from .utils import Operation, token_to_data
 
 
 class RouteStep(ABC):
@@ -81,7 +81,7 @@ class Router:
         route: list[RouteStep],
         min_amount_out: TerraTokenAmount,
         safety_margin: bool | int = True,
-    ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
+    ) -> Operation:
         assert route, "route cannot be empty"
 
         swap_operations: list[dict] = []

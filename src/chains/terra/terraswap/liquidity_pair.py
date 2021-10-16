@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import base64
 import json
 import logging
@@ -18,12 +17,12 @@ from utils.cache import CacheGroup, ttl_cache
 
 from ..client import TerraClient
 from ..token import CW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
-from .utils import token_to_data
+from .utils import Operation, pair_tokens_from_data, token_from_data, token_to_data
 
 log = logging.getLogger(__name__)
 
 FEE = Decimal("0.003")
-DEFAULT_MAX_SLIPPAGE_TOLERANCE = Decimal("0.001")
+MAX_SLIPPAGE_TOLERANCE = Decimal("0.001")
 AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
 
 
@@ -44,29 +43,10 @@ def _token_amount_to_data(token_amount: TerraTokenAmount) -> dict:
     }
 
 
-async def _pair_tokens_from_data(
-    asset_infos: list[dict],
-    client: TerraClient,
-) -> tuple[TerraToken, TerraToken]:
-    token_0, token_1 = await asyncio.gather(
-        _token_from_data(asset_infos[0], client),
-        _token_from_data(asset_infos[1], client),
-    )
-    return token_0, token_1
-
-
-async def _token_from_data(asset_info: dict, client: TerraClient) -> TerraToken:
-    if "native_token" in asset_info:
-        return TerraNativeToken(asset_info["native_token"]["denom"])
-    if "token" in asset_info:
-        contract_addr: AccAddress = asset_info["token"]["contract_addr"]
-        return await CW20Token.from_contract(contract_addr, client)
-    raise TypeError(f"Unexpected data format: {asset_info}")
-
-
 class LiquidityPair:
     contract_addr: AccAddress
     client: TerraClient
+    factory_name: str | None
     tokens: tuple[TerraToken, TerraToken]
     lp_token: LPToken
     stop_updates: bool
@@ -77,10 +57,12 @@ class LiquidityPair:
         cls: type[LiquidityPair],
         contract_addr: AccAddress,
         client: TerraClient,
+        factory_name: str = None,
     ) -> LiquidityPair:
         self = super().__new__(cls)
         self.contract_addr = contract_addr
         self.client = client
+        self.factory_name = factory_name
 
         self.lp_token = await LPToken.from_pool_contract(self.contract_addr, self.client)
         self.tokens = self.lp_token.pair_tokens
@@ -91,8 +73,10 @@ class LiquidityPair:
         return self
 
     def __repr__(self) -> str:
+        factory_name_str = "" if self.factory_name is None else f", factory={self.factory_name!r}"
         return (
-            f"{self.__class__.__name__}({self.tokens[0].repr_symbol}/{self.tokens[1].repr_symbol})"
+            f"{self.__class__.__name__}"
+            f"({self.tokens[0].repr_symbol}/{self.tokens[1].repr_symbol}{factory_name_str})"
         )
 
     async def get_reserves(self) -> AmountTuple:
@@ -157,9 +141,10 @@ class LiquidityPair:
         self,
         sender: AccAddress,
         amount_in: TerraTokenAmount,
-        max_slippage: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
+        max_slippage: Decimal = None,
         safety_margin: bool | int = True,
-    ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
+    ) -> Operation:
+        max_slippage = MAX_SLIPPAGE_TOLERANCE if max_slippage is None else max_slippage
         amount_out = await self.get_swap_amount_out(amount_in, safety_margin)
         min_amount_out = (amount_out * (1 - max_slippage)).safe_margin(safety_margin)
         msg = self.build_swap_msg(sender, amount_in, min_amount_out)
@@ -305,9 +290,9 @@ class LiquidityPair:
         sender: AccAddress,
         amount_burn: TerraTokenAmount,
         token_out: TerraToken,
-        max_slippage: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
+        max_slippage: Decimal = None,
         safety_margin: bool | int = True,
-    ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
+    ) -> Operation:
         assert token_out in self.tokens
         amounts = await self.get_remove_liquidity_amounts(amount_burn, safety_margin)
         msg_remove_liquidity = self.build_remove_liquidity_msg(sender, amount_burn)
@@ -385,10 +370,13 @@ class LiquidityPair:
         self,
         sender: AccAddress,
         amount_in: TerraTokenAmount,
-        slippage_tolerance: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
+        slippage_tolerance: Decimal = None,
         safety_margin: bool | int = True,
-    ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
+    ) -> Operation:
         reserve_in, reserve_out = await self._get_in_out_reserves(amount_in)
+        slippage_tolerance = (
+            MAX_SLIPPAGE_TOLERANCE if slippage_tolerance is None else slippage_tolerance
+        )
 
         # Calculate optimum ratio to swap before adding liquidity, excluding tax influence
         aux = FEE * (reserve_in.amount + amount_in.amount) - 2 * reserve_in.amount
@@ -423,9 +411,9 @@ class LiquidityPair:
         self,
         sender: AccAddress,
         amounts_in: AmountTuple,
-        slippage_tolerance: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
+        slippage_tolerance: Decimal = None,
         safety_margin: bool | int = True,
-    ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
+    ) -> Operation:
         amount_out = await self.get_add_liquidity_amount_out(
             amounts_in, slippage_tolerance, safety_margin
         )
@@ -435,7 +423,7 @@ class LiquidityPair:
     async def get_add_liquidity_amount_out(
         self,
         amounts_in: AmountTuple,
-        slippage_tolerance: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
+        slippage_tolerance: Decimal = None,
         safety_margin: bool | int = False,
     ) -> TerraTokenAmount:
         reserves = await self.get_reserves()
@@ -448,8 +436,11 @@ class LiquidityPair:
     async def _check_amounts_add_liquidity(
         self,
         amounts_in: AmountTuple,
-        slippage_tolerance: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
+        slippage_tolerance: Decimal = None,
     ) -> AmountTuple:
+        slippage_tolerance = (
+            MAX_SLIPPAGE_TOLERANCE if slippage_tolerance is None else slippage_tolerance
+        )
         reserves = await self.get_reserves()
         amounts_in = self._fix_amounts_order(amounts_in)
         amounts_ratio = amounts_in[0].amount / amounts_in[1].amount
@@ -461,8 +452,11 @@ class LiquidityPair:
         self,
         sender: AccAddress,
         amounts_in: AmountTuple,
-        slippage_tolerance: Decimal = DEFAULT_MAX_SLIPPAGE_TOLERANCE,
+        slippage_tolerance: Decimal = None,
     ) -> list[MsgExecuteContract]:
+        slippage_tolerance = (
+            MAX_SLIPPAGE_TOLERANCE if slippage_tolerance is None else slippage_tolerance
+        )
         msgs = []
         for amount in amounts_in:
             if not await amount.has_allowance(self.client, self.contract_addr, sender):
@@ -489,12 +483,12 @@ class LiquidityPair:
         )
         return msgs
 
-    async def get_reserves_changes_from_msg(self, msg: dict) -> AmountTuple:
+    async def get_reserve_changes_from_msg(self, msg: dict) -> AmountTuple:
         if msg["contract"] == self.contract_addr:
             if Action.swap in msg["execute_msg"]:
                 swap_msg: dict = msg["execute_msg"][Action.swap]
                 offer_asset_data = swap_msg["offer_asset"]
-                token = await _token_from_data(offer_asset_data["info"], self.client)
+                token = await token_from_data(offer_asset_data["info"], self.client)
                 amount_in = token.to_amount(int_amount=offer_asset_data["amount"])
             else:
                 raise NotImplementedError(f"Only swap messages implemented, received {msg}")
@@ -540,7 +534,7 @@ class LPToken(CW20Token):
         if pair_tokens is None:
             minter_addr = (await client.contract_query(contract_addr, {"minter": {}}))["minter"]
             pair_data = await client.contract_query(minter_addr, {"pair": {}})
-            pair_tokens = await _pair_tokens_from_data(pair_data["asset_infos"], client)
+            pair_tokens = await pair_tokens_from_data(pair_data["asset_infos"], client)
         self.pair_tokens = pair_tokens
         return self
 
@@ -548,7 +542,7 @@ class LPToken(CW20Token):
     async def from_pool_contract(cls, pool_addr: AccAddress, client: TerraClient) -> LPToken:
         pair_data = await client.contract_query(pool_addr, {"pair": {}})
         contract_addr = pair_data["liquidity_token"]
-        pair_tokens = await _pair_tokens_from_data(pair_data["asset_infos"], client)
+        pair_tokens = await pair_tokens_from_data(pair_data["asset_infos"], client)
         return await cls.from_contract(contract_addr, client, pair_tokens)
 
     @property

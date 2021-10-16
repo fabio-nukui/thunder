@@ -122,6 +122,8 @@ class SingleTxArbitrage(Generic[_BlockchainClientT], ABC):
             self._reset_mempool_params()
         try:
             if self.state == State.waiting_confirmation:
+                if self.last_height_run >= height:
+                    return
                 log.debug(f"{self} ({height=}) Looking for tx confirmation(s)")
                 try:
                     self.data.result = await self._confirm_tx(height)

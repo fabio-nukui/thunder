@@ -183,3 +183,6 @@ class TokenAmount:
 
     def __pos__(self: _TokenAmountT) -> _TokenAmountT:
         return self.__class__(self.token, +self.amount)
+
+    def __bool__(self) -> bool:
+        return bool(self.amount)
