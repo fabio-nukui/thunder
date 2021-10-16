@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -29,7 +30,6 @@ from .common.terra_single_tx_arbitrage import TerraArbParams, TerraSingleTxArbit
 log = logging.getLogger(__name__)
 
 FALLBACK_FEE = StdFee(gas=2150947, amount=Coins("2392410uusd"))
-TOKEN_SYMBOLS: list[str] = ["TWD", "SPEC", "MIR", "STT", "MINE", "ANC", "LOTA", "ALTE"]
 
 
 class Direction(str, Enum):
@@ -57,6 +57,7 @@ class ArbParams(TerraArbParams):
             "timestamp_found": self.timestamp_found,
             "block_found": self.block_found,
             "prices": {key: float(price) for key, price in self.prices.items()},
+            "ust_balance": self.ust_balance,
             "direction": self.direction,
             "initial_amount": self.initial_amount.to_data(),
             "msgs": [msg.to_data() for msg in self.msgs],
@@ -299,18 +300,22 @@ async def run():
     terraswap_factory = await terraswap.TerraswapFactory.new(client)
     loop_factory = await terraswap.LoopFactory.new(client)
 
+    pat_token_symbol = re.compile(r"([A-Z]+)_UST|UST_([A-Z]+)")
+    pair_symbol: str
     arb_routes: list[TerraswapLoopArbitrage] = []
-    for symbol in TOKEN_SYMBOLS:
-        name = f"{symbol}_UST"
-        name_reversed = f"UST_{symbol}"
-        if name in terraswap_factory.addresses["pairs"]:
-            terraswap_pair = terraswap_factory.get_pair(name)
+    for pair_symbol in loop_factory.addresses["pairs"]:
+        if not (match := pat_token_symbol.match(pair_symbol)):
+            continue
+        reversed_symbol = (
+            f"{match.group(1)}_UST" if pair_symbol.startswith("UST") else f"UST_{match.group(1)}"
+        )
+        if pair_symbol in terraswap_factory.addresses["pairs"]:
+            terraswap_pair = terraswap_factory.get_pair(pair_symbol)
+        elif reversed_symbol in terraswap_factory.addresses["pairs"]:
+            terraswap_pair = terraswap_factory.get_pair(reversed_symbol)
         else:
-            terraswap_pair = terraswap_factory.get_pair(name_reversed)
-        if name in loop_factory.addresses["pairs"]:
-            loop_pair = loop_factory.get_pair(name)
-        else:
-            loop_pair = loop_factory.get_pair(name_reversed)
+            continue
+        loop_pair = loop_factory.get_pair(pair_symbol)
         arb_pair = await asyncio.gather(terraswap_pair, loop_pair)
         arb_routes.append(TerraswapLoopArbitrage(client, *arb_pair))
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import re
 from collections import defaultdict
 from decimal import Decimal
 from typing import AsyncIterable
@@ -34,6 +35,7 @@ log = logging.getLogger(__name__)
 
 TERRA_CONTRACT_QUERY_CACHE_SIZE = 10_000
 CONTRACT_INFO_CACHE_TTL = 86400  # Contract info should not change; 24h ttl
+_pat_contract_not_found = re.compile(r"contract terra1\w+: not found")
 
 
 class TerraClient(ITerraClient):
@@ -66,12 +68,13 @@ class TerraClient(ITerraClient):
         self.rpc_websocket_uri = rpc_websocket_uri
         self.chain_id = chain_id
         self.fee_denom = fee_denom
+        self.gas_adjustment = Decimal(gas_adjustment)
 
         hd_wallet = auth_secrets.hd_wallet() if hd_wallet is None else hd_wallet
         key = MnemonicKey(hd_wallet["mnemonic"], hd_wallet["account"], hd_wallet_index)
         self.key = key  # Set key before get_gas_prices() to avoid error with cache debugging
 
-        self.lcd = AsyncLCDClient(lcd_uri, chain_id, gas_prices, gas_adjustment)
+        self.lcd = AsyncLCDClient(lcd_uri, chain_id, gas_prices, self.gas_adjustment)
         self.wallet = self.lcd.wallet(key)
         self.address = self.wallet.key.acc_address
         self.height = await self.get_latest_height()
@@ -99,7 +102,13 @@ class TerraClient(ITerraClient):
 
     @ttl_cache(CacheGroup.TERRA, TERRA_CONTRACT_QUERY_CACHE_SIZE)
     async def contract_query(self, contract_addr: AccAddress, query_msg: dict) -> dict:
-        return await self.lcd.wasm.contract_query(contract_addr, query_msg)
+        try:
+            return await self.lcd.wasm.contract_query(contract_addr, query_msg)
+        except LCDResponseError as e:
+            if e.response.status == 500 and _pat_contract_not_found.search(e.message):
+                raise NotContract
+            else:
+                raise e
 
     @ttl_cache(CacheGroup.TERRA, TERRA_CONTRACT_QUERY_CACHE_SIZE, CONTRACT_INFO_CACHE_TTL)
     async def contract_info(self, address: AccAddress) -> dict:

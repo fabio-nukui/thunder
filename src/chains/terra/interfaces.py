@@ -124,6 +124,7 @@ class ITerraClient(AsyncBlockchainClient, ABC):
     wallet: AsyncWallet
     address: AccAddress
     fee_denom: str
+    gas_adjustment: Decimal
     height: int
 
     market: IMarketApi

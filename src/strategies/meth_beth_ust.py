@@ -290,7 +290,7 @@ async def run():
     factory = await terraswap.TerraswapFactory.new(client)
 
     pairs = (meth_beth_pair, beth_ust_pair, ust_meth_pair) = await factory.get_pairs(
-        ["METH_BETH", "BETH_UST", "UST_METH"]
+        ["mETH_BETH", "BETH_UST", "UST_mETH"]
     )
     router = factory.get_router(pairs)
     mempool_filters = {

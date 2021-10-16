@@ -295,7 +295,7 @@ async def run():
     factory = await terraswap.TerraswapFactory.new(client)
 
     pool_0, pool_1, pool_tower = await factory.get_pairs(
-        ["BLUNA_LUNA", "UST_LUNA", "BLUNA_LUNA__UST_LUNA"]
+        ["BLUNA_LUNA", "UST_LUNA", "BLUNA-LUNA_UST-LUNA"]
     )
     arb = LPTowerArbitrage(client, pool_0, pool_1, pool_tower)
     async for height in client.loop_latest_height():
