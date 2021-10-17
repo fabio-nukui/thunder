@@ -102,7 +102,7 @@ class TerraClient(ITerraClient):
         return self
 
     async def __aexit__(self, *args):
-        return self.close()
+        return await self.close()
 
     async def is_syncing(self) -> bool:
         return await self.lcd.tendermint.syncing()
