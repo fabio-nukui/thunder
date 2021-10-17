@@ -2,6 +2,10 @@ class BlockchainNewState(Exception):
     pass
 
 
+class EstimateFeeError(Exception):
+    pass
+
+
 class InsufficientLiquidity(Exception):
     pass
 

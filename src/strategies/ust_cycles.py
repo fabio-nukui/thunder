@@ -10,7 +10,6 @@ from decimal import Decimal
 from functools import partial
 
 from terra_sdk.core.auth import StdFee, TxInfo
-from terra_sdk.core.coins import Coins
 from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.exceptions import LCDResponseError
 
@@ -30,10 +29,12 @@ from .common.terra_single_tx_arbitrage import TerraArbParams, TerraSingleTxArbit
 
 log = logging.getLogger(__name__)
 
-FALLBACK_FEE = StdFee(gas=2150947, amount=Coins("2392410uusd"))
+
+def _estimated_gas_use(n_steps: int) -> int:
+    return 486_319 + (n_steps - 2) * 341_002
 
 
-async def _get_loop_3cycle_routes(
+async def _get_ust_loop_3cycle_routes(
     client: TerraClient,
     loop_factory: terraswap.LoopFactory,
     terraswap_factory: terraswap.TerraswapFactory,
@@ -57,8 +58,31 @@ async def _get_loop_3cycle_routes(
         loop_token_pair = await loop_factory.get_pair(pair_symbol)
         list_steps = [ust_pairs, [loop_token_pair], [loop_ust_pair]]
 
-        route = terraswap.MultiRoutes(client, UST, list_steps)
-        routes.append(route)
+        routes.append(terraswap.MultiRoutes(client, UST, list_steps))
+    return routes
+
+
+async def _get_ust_2cycle_routes(
+    client: TerraClient,
+    loop_factory: terraswap.LoopFactory,
+    terraswap_factory: terraswap.TerraswapFactory,
+) -> list[terraswap.MultiRoutes]:
+    pat_token_symbol = re.compile(r"([A-Z]+)_UST|UST_([A-Z]+)")
+    pair_symbol: str
+
+    routes: list[terraswap.MultiRoutes] = []
+    for pair_symbol in loop_factory.addresses["pairs"]:
+        if not (match := pat_token_symbol.match(pair_symbol)):
+            continue
+        reversed_symbol = f"{match.group(2)}_UST" if match.group(2) else f"UST_{match.group(1)}"
+        if pair_symbol in terraswap_factory.addresses["pairs"]:
+            terraswap_pair = await terraswap_factory.get_pair(pair_symbol)
+        elif reversed_symbol in terraswap_factory.addresses["pairs"]:
+            terraswap_pair = await terraswap_factory.get_pair(reversed_symbol)
+        else:
+            continue
+        loop_pair = await loop_factory.get_pair(pair_symbol)
+        routes.append(terraswap.MultiRoutes(client, UST, [[terraswap_pair], [loop_pair]]))
     return routes
 
 
@@ -101,6 +125,7 @@ class UstCyclesArbitrage(TerraSingleTxArbitrage):
         self.routes = multi_routes.routes
         self.pairs = multi_routes.pairs
         self.tokens = multi_routes.tokens[1:-1]
+        self.estimated_gas_use = _estimated_gas_use(multi_routes.n_steps)
 
         self._mempool_reserve_changes = {
             pair: (pair.tokens[0].to_amount(0), pair.tokens[1].to_amount(0)) for pair in self.pairs
@@ -163,17 +188,18 @@ class UstCyclesArbitrage(TerraSingleTxArbitrage):
             initial_amount, reverse, MAX_SLIPPAGE, safety_margin=True
         )
         try:
-            fee = await self.client.tx.estimate_fee(msgs)
+            fee = await self.client.tx.estimate_fee(
+                msgs,
+                use_fallback_estimate=self._simulating_reserve_changes,
+                estimated_gas_use=self.estimated_gas_use,
+            )
         except LCDResponseError as e:
-            if self._simulating_reserve_changes or "account sequence mismatch" in e.message:
-                fee = FALLBACK_FEE
-            else:
-                log.debug(
-                    "Error when estimating fee",
-                    extra={"data": {"msgs": [msg.to_data() for msg in msgs]}},
-                    exc_info=True,
-                )
-                raise TxError(e)
+            log.debug(
+                "Error when estimating fee",
+                extra={"data": {"msgs": [msg.to_data() for msg in msgs]}},
+                exc_info=True,
+            )
+            raise TxError(e)
         gas_cost = TerraTokenAmount.from_coin(*fee.amount)
         gas_cost_raw = gas_cost.amount / self.client.gas_adjustment
         net_profit_ust = (final_amount - initial_amount).amount - gas_cost_raw
@@ -295,8 +321,10 @@ async def run():
         terraswap.TerraswapFactory.new(client), terraswap.LoopFactory.new(client)
     )
 
-    loop_routes = await _get_loop_3cycle_routes(client, loop_factory, terraswap_factory)
-    arb_routes = [UstCyclesArbitrage(client, multi_routes) for multi_routes in loop_routes]
+    loop_routes = await _get_ust_loop_3cycle_routes(client, loop_factory, terraswap_factory)
+    ust_routes = await _get_ust_2cycle_routes(client, loop_factory, terraswap_factory)
+    routes = loop_routes + ust_routes
+    arb_routes = [UstCyclesArbitrage(client, multi_routes) for multi_routes in routes]
 
     mempool_filters = {
         pair: FilterSingleSwapTerraswapPair(pair)

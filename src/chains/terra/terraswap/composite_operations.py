@@ -46,6 +46,7 @@ class MultiRoutes:
         self.list_steps = list_steps
         self.pairs = [pair for step in list_steps for pair in step]
         self.tokens = _extract_tokens_from_routes(start_token, list_steps)
+        self.n_steps = len(list_steps)
 
         self.is_cycle = self.tokens[0] == self.tokens[-1]
         self.routes = [
