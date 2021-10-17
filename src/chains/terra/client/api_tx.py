@@ -6,8 +6,7 @@ from decimal import Decimal
 
 from terra_sdk.core import Coins
 from terra_sdk.core.auth import StdFee
-from terra_sdk.core.broadcast import AsyncTxBroadcastResult
-from terra_sdk.core.coin import Coin
+from terra_sdk.core.broadcast import SyncTxBroadcastResult
 from terra_sdk.core.msg import Msg
 from terra_sdk.exceptions import LCDResponseError
 
@@ -88,31 +87,41 @@ class TxApi(ITxApi):
             if coin.denom == self.client.fee_denom
         )
         gas_fee = int(gas_price.amount * adjusted_gas_use)
-        amount = Coins([Coin(denom=self.client.fee_denom, amount=tax.int_amount + gas_fee)])
+        amount = Coins({self.client.fee_denom: tax.int_amount + gas_fee})
 
         fee = StdFee(gas=adjusted_gas_use, amount=amount)
         log.debug(f"Fallback gas fee estimation: {fee}")
         return fee
 
-    async def execute_msgs(self, msgs: list[Msg], **kwargs) -> AsyncTxBroadcastResult:
+    async def execute_msgs(self, msgs: list[Msg], **kwargs) -> SyncTxBroadcastResult:
         log.debug(f"Sending tx: {msgs}")
 
         # Fixes bug in terraswap_sdk==1.0.0b2
         if "fee" not in kwargs:
             kwargs["fee"] = self.estimate_fee(msgs)
-
         while True:
             signed_tx = await self.client.wallet.create_and_sign_tx(
                 msgs,
                 fee_denoms=[self.client.fee_denom],
                 **kwargs,
             )
-            payload = {"tx": signed_tx.to_data()["value"], "mode": "async"}
+            payload = {"tx": signed_tx.to_data()["value"], "mode": "sync"}
             try:
-                res = (await self.client.lcd_http_client.post("txs", json=payload)).json()
+                res: dict = (await self.client.lcd_http_client.post("txs", json=payload)).json()
                 break
             except LCDResponseError as e:
                 if match := _pat_sequence_error.search(e.message):
                     kwargs["sequence"] = int(match.group(1))
+                    log.debug(f"Retrying with updated sequence={kwargs['sequence']}")
+
+        if res.get("logs") is None:
+            raise Exception(f'Error when broadcasting messages: raw_log="{res.get("raw_log")}"')
+
         log.debug(f"Tx executed: {res['txhash']}")
-        return AsyncTxBroadcastResult(txhash=res["txhash"], height=self.client.height)
+        return SyncTxBroadcastResult(
+            height=res.get("height", self.client.height),
+            txhash=res["txhash"],
+            raw_log=res.get("raw_log"),
+            code=res.get("code"),
+            codespace=res.get("codespace"),
+        )
