@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from asyncio.futures import Future
 from typing import AsyncIterable, Mapping, TypeVar
@@ -33,7 +32,7 @@ class MempoolCacheManager:
         self._height = height
         self._rpc_websocket_uri = rpc_websocket_uri
         self._rpc_client = utils.ahttp.AsyncClient(base_url=rpc_http_uri)
-        self._lcd_client = utils.ahttp.AsyncClient(base_url=lcd_uri)
+        self._lcd_client = utils.ahttp.AsyncClient(base_url=lcd_uri, n_tries=1)
 
         self._txs_cache: dict[str, dict] = {}
         self._read_txs: set[str] = set()
@@ -110,8 +109,8 @@ class MempoolCacheManager:
     async def _fetch_mempool_txs(self) -> dict[str, dict]:
         n_txs = len(self._txs_cache)
         while True:
-            data = await self._get_rpc_data("unconfirmed_txs")
-            raw_txs: list[str] = data["txs"]
+            res = await self._rpc_client.get("unconfirmed_txs")
+            raw_txs: list[str] = res.json()["result"]["txs"]
             if n_txs != len(raw_txs):
                 break
             await asyncio.sleep(configs.TERRA_POLL_INTERVAL)
@@ -134,16 +133,9 @@ class MempoolCacheManager:
         new_txs = {raw_tx: tx for raw_tx, tx in zip(tasks, txs) if tx}
         return self._txs_cache | new_txs
 
-    async def _get_rpc_data(self, endpoint: str) -> dict:
-        res = await self._rpc_client.get(endpoint)
-        data = json.loads(await res.aread())
-        return data["result"]
-
     async def _decode_tx(self, raw_tx: str) -> dict:
         try:
-            response = await self._lcd_client.post(
-                "txs/decode", json={"tx": raw_tx}, timeout=1, n_tries=1
-            )
+            response = await self._lcd_client.post("txs/decode", json={"tx": raw_tx}, timeout=1)
         except httpx.HTTPError:
             self._decoder_error_counter += 1
             if self._decoder_error_counter > MAX_DECODER_ERRORS_PER_BLOCK:
