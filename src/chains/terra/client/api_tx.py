@@ -93,7 +93,12 @@ class TxApi(ITxApi):
         log.debug(f"Fallback gas fee estimation: {fee}")
         return fee
 
-    async def execute_msgs(self, msgs: list[Msg], **kwargs) -> SyncTxBroadcastResult:
+    async def execute_msgs(
+        self,
+        msgs: list[Msg],
+        expect_logs_: bool = True,
+        **kwargs,
+    ) -> SyncTxBroadcastResult:
         log.debug(f"Sending tx: {msgs}")
 
         # Fixes bug in terraswap_sdk==1.0.0b2
@@ -114,7 +119,7 @@ class TxApi(ITxApi):
                     kwargs["sequence"] = int(match.group(1))
                     log.debug(f"Retrying with updated sequence={kwargs['sequence']}")
 
-        if res.get("logs") is None:
+        if expect_logs_ and res.get("logs") is None:
             raise Exception(f'Error when broadcasting messages: raw_log="{res.get("raw_log")}"')
 
         log.debug(f"Tx executed: {res['txhash']}")
