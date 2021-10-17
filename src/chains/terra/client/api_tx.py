@@ -63,7 +63,7 @@ class TxApi(ITxApi):
                 if coins_send:
                     if not len(coins_send) == 1:
                         raise NotImplementedError
-                    native_amount = TerraTokenAmount.from_coin(coins_send.to_list[0])
+                    native_amount = TerraTokenAmount.from_coin(coins_send.to_list()[0])
                 else:
                     raise EstimateFeeError("Could not get native_amount from msg", e)
         return await self.fallback_fee_estimation(estimated_gas_use, native_amount, gas_adjustment)
