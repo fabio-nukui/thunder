@@ -1,0 +1,20 @@
+# git
+.git
+
+# caches
+/*_cache
+.cache
+
+# environment variables
+env/
+.env*
+
+# Logs
+*.log
+/logs
+
+# IDEs/editors
+.idea
+*.iml
+.vscode*
+*~
