@@ -119,6 +119,7 @@ class TerraClient(ITerraClient):
                 raise NotContract
             raise e
 
+    @ttl_cache(CacheGroup.TERRA)
     async def get_bank(
         self, denoms: list[str] = None, address: str = None
     ) -> list[TerraTokenAmount]:
