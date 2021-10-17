@@ -41,6 +41,12 @@ class MempoolCacheManager:
         self._new_blockchain_state = False
         self._decoder_error_counter = 0
 
+    async def close(self):
+        await asyncio.gather(
+            self._lcd_client.aclose(),
+            self._rpc_client.aclose(),
+        )
+
     @property
     def height(self) -> int:
         return self._height
@@ -163,6 +169,9 @@ class MempoolApi(IMempoolApi):
             self._rpc_websocket_uri,
             str(client.lcd_http_client.base_url),
         )
+
+    async def close(self):
+        await self._cache_manager.close()
 
     async def get_height_mempool(self, height: int) -> tuple[int, list[list[dict]]]:
         return await self._cache_manager.get_new_height_mempool(height, new_block_only=False)

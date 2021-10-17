@@ -291,13 +291,13 @@ class LPTowerArbitrage(TerraSingleTxArbitrage):
 
 
 async def run():
-    client = await TerraClient.new()
-    factory = await terraswap.TerraswapFactory.new(client)
+    async with await TerraClient.new() as client:
+        factory = await terraswap.TerraswapFactory.new(client)
 
-    pool_0, pool_1, pool_tower = await factory.get_pairs(
-        ["BLUNA_LUNA", "UST_LUNA", "BLUNA-LUNA_UST-LUNA"]
-    )
-    arb = LPTowerArbitrage(client, pool_0, pool_1, pool_tower)
-    async for height in client.loop_latest_height():
-        await arb.run(height)
-        utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)
+        pool_0, pool_1, pool_tower = await factory.get_pairs(
+            ["BLUNA_LUNA", "UST_LUNA", "BLUNA-LUNA_UST-LUNA"]
+        )
+        arb = LPTowerArbitrage(client, pool_0, pool_1, pool_tower)
+        async for height in client.loop_latest_height():
+            await arb.run(height)
+            utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)

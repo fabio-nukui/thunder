@@ -34,6 +34,19 @@ def _estimated_gas_use(n_steps: int) -> int:
     return 486_319 + (n_steps - 2) * 341_002
 
 
+async def _get_aribtrages(client: TerraClient) -> list[UstCyclesArbitrage]:
+    terraswap_factory, loop_factory = await asyncio.gather(
+        terraswap.TerraswapFactory.new(client), terraswap.LoopFactory.new(client)
+    )
+    loop_routes = await _get_ust_loop_3cycle_routes(client, loop_factory, terraswap_factory)
+    ust_routes = await _get_ust_2cycle_routes(client, loop_factory, terraswap_factory)
+    terraswap_routes = await _get_ust_terraswap_3cycle_routes(client, terraswap_factory)
+    routes = loop_routes + ust_routes + terraswap_routes
+    arb_routes = [UstCyclesArbitrage(client, multi_routes) for multi_routes in routes]
+
+    return arb_routes
+
+
 async def _get_ust_loop_3cycle_routes(
     client: TerraClient,
     loop_factory: terraswap.LoopFactory,
@@ -327,36 +340,33 @@ class UstCyclesArbitrage(TerraSingleTxArbitrage):
         return amount_received, (amount_received - amount_sent).amount
 
 
+async def _run_arbitrages(
+    arb_routes: list[UstCyclesArbitrage],
+    height: int,
+    mempool: dict[terraswap.LiquidityPair, list[list[dict]]],
+):
+    if any(height > arb_route.last_height_run for arb_route in arb_routes):
+        utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)
+    for arb_route in arb_routes:
+        mempool_route = {
+            pair: filter_ for pair, filter_ in mempool.items() if pair in arb_route.pairs
+        }
+        any_new_mempool_msg = any(list_msgs for list_msgs in mempool_route.values())
+        if height > arb_route.last_height_run or any_new_mempool_msg:
+            await arb_route.run(height, mempool_route)
+
+
 async def run(max_n_blocks: int = None):
-    client = await TerraClient.new()
-    terraswap_factory, loop_factory = await asyncio.gather(
-        terraswap.TerraswapFactory.new(client), terraswap.LoopFactory.new(client)
-    )
-
-    loop_routes = await _get_ust_loop_3cycle_routes(client, loop_factory, terraswap_factory)
-    ust_routes = await _get_ust_2cycle_routes(client, loop_factory, terraswap_factory)
-    terraswap_routes = await _get_ust_terraswap_3cycle_routes(client, terraswap_factory)
-    routes = loop_routes + ust_routes + terraswap_routes
-    arb_routes = [UstCyclesArbitrage(client, multi_routes) for multi_routes in routes]
-
-    mempool_filters = {
-        pair: FilterSingleSwapTerraswapPair(pair)
-        for arb_route in arb_routes
-        for pair in arb_route.pairs
-    }
-    start_height = client.height
-    async for height, filtered_mempool in client.mempool.iter_height_mempool(mempool_filters):
-        if any(height > arb_route.last_height_run for arb_route in arb_routes):
-            utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)
-        for arb_route in arb_routes:
-            fitered_route_mempool = {
-                pair: filter_
-                for pair, filter_ in filtered_mempool.items()
-                if pair in arb_route.pairs
-            }
-            any_new_mempool_msg = any(list_msgs for list_msgs in fitered_route_mempool.values())
-            if height > arb_route.last_height_run or any_new_mempool_msg:
-                await arb_route.run(height, fitered_route_mempool)
-        if max_n_blocks is not None and (n_blocks := height - start_height) >= max_n_blocks:
-            break
-    log.info(f"Stopped execution after {n_blocks=}")
+    async with await TerraClient.new() as client:
+        arb_routes = await _get_aribtrages(client)
+        mempool_filters = {
+            pair: FilterSingleSwapTerraswapPair(pair)
+            for arb_route in arb_routes
+            for pair in arb_route.pairs
+        }
+        start_height = client.height
+        async for height, mempool in client.mempool.iter_height_mempool(mempool_filters):
+            await _run_arbitrages(arb_routes, height, mempool)
+            if max_n_blocks is not None and (n_blocks := height - start_height) >= max_n_blocks:
+                break
+        log.info(f"Stopped execution after {n_blocks=}")

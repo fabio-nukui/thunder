@@ -21,6 +21,10 @@ class SyncBlockchainClient(BlockchainClient, ABC):
 
         log.info(f"Initialized {self} at height={self.height}")
 
+    @abstractmethod
+    def close():
+        pass
+
     @property
     @abstractmethod
     def syncing(self) -> bool:
@@ -35,6 +39,10 @@ class AsyncBlockchainClient(BlockchainClient, ABC):
     @abstractmethod
     async def new(cls: type[_AsyncBlockchainClientT], *args, **kwargs) -> _AsyncBlockchainClientT:
         ...
+
+    @abstractmethod
+    async def close():
+        pass
 
     async def init(self, raise_on_syncing: bool = False):
         if raise_on_syncing and await self.is_syncing():

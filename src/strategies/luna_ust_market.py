@@ -212,13 +212,13 @@ class LunaUstMarketArbitrage(TerraSingleTxArbitrage):
 
 
 async def run():
-    client = await TerraClient.new()
-    factory = await terraswap.TerraswapFactory.new(client)
+    async with await TerraClient.new() as client:
+        factory = await terraswap.TerraswapFactory.new(client)
 
-    pair = await factory.get_pair("UST_LUNA")
-    router = factory.get_router([pair])
+        pair = await factory.get_pair("UST_LUNA")
+        router = factory.get_router([pair])
 
-    arb = LunaUstMarketArbitrage(client, router)
-    async for height in client.loop_latest_height():
-        await arb.run(height)
-        utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)
+        arb = LunaUstMarketArbitrage(client, router)
+        async for height in client.loop_latest_height():
+            await arb.run(height)
+            utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)

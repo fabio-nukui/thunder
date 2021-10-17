@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
 import logging
@@ -97,8 +98,23 @@ class TerraClient(ITerraClient):
             f"account={self.key.acc_address})"
         )
 
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        return self.close()
+
     async def is_syncing(self) -> bool:
         return await self.lcd.tendermint.syncing()
+
+    async def close(self):
+        await asyncio.gather(
+            self.lcd.session.close(),
+            self.lcd_http_client.aclose(),
+            self.fcd_client.aclose(),
+            self.rpc_http_client.aclose(),
+            self.mempool.close(),
+        )
 
     @ttl_cache(CacheGroup.TERRA, TERRA_CONTRACT_QUERY_CACHE_SIZE)
     async def contract_query(self, contract_addr: AccAddress, query_msg: dict) -> dict:

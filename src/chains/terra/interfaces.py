@@ -270,6 +270,10 @@ class ITxApi(IApi, ABC):
 
 class IMempoolApi(IApi, ABC):
     @abstractmethod
+    async def close(self):
+        ...
+
+    @abstractmethod
     async def get_height_mempool(self, height: int) -> tuple[int, dict[str, dict]]:
         ...
 
