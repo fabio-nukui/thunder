@@ -112,21 +112,23 @@ class TxApi(ITxApi):
             )
             payload = {"tx": signed_tx.to_data()["value"], "mode": "sync"}
             try:
-                res: dict = (await self.client.lcd_http_client.post("txs", json=payload)).json()
+                res = await self.client.lcd_http_client.post("txs", json=payload)
+                data: dict = res.json()
+                if expect_logs_ and data.get("logs") is None:
+                    raise LCDResponseError(data.get("raw_log", ""), res)
                 break
             except LCDResponseError as e:
                 if match := _pat_sequence_error.search(e.message):
                     kwargs["sequence"] = int(match.group(1))
                     log.debug(f"Retrying with updated sequence={kwargs['sequence']}")
+                else:
+                    raise e
 
-        if expect_logs_ and res.get("logs") is None:
-            raise Exception(f'Error when broadcasting messages: raw_log="{res.get("raw_log")}"')
-
-        log.debug(f"Tx executed: {res['txhash']}")
+        log.debug(f"Tx executed: {data['txhash']}")
         return SyncTxBroadcastResult(
-            height=res.get("height", self.client.height),
-            txhash=res["txhash"],
-            raw_log=res.get("raw_log"),
-            code=res.get("code"),
-            codespace=res.get("codespace"),
+            height=data.get("height", self.client.height),
+            txhash=data["txhash"],
+            raw_log=data.get("raw_log"),
+            code=data.get("code"),
+            codespace=data.get("codespace"),
         )
