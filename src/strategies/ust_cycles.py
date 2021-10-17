@@ -86,6 +86,18 @@ async def _get_ust_2cycle_routes(
     return routes
 
 
+async def _get_ust_terraswap_3cycle_routes(
+    client: TerraClient,
+    terraswap_factory: terraswap.TerraswapFactory,
+) -> list[terraswap.MultiRoutes]:
+    beth_ust_pair, meth_beth_pair, ust_meth_pair = await terraswap_factory.get_pairs(
+        ["BETH_UST", "mETH_BETH", "UST_mETH"]
+    )
+    return [
+        terraswap.MultiRoutes(client, UST, [[beth_ust_pair], [meth_beth_pair], [ust_meth_pair]])
+    ]
+
+
 @dataclass
 class ArbParams(TerraArbParams):
     timestamp_found: float
@@ -323,7 +335,8 @@ async def run():
 
     loop_routes = await _get_ust_loop_3cycle_routes(client, loop_factory, terraswap_factory)
     ust_routes = await _get_ust_2cycle_routes(client, loop_factory, terraswap_factory)
-    routes = loop_routes + ust_routes
+    terraswap_routes = await _get_ust_terraswap_3cycle_routes(client, terraswap_factory)
+    routes = loop_routes + ust_routes + terraswap_routes
     arb_routes = [UstCyclesArbitrage(client, multi_routes) for multi_routes in routes]
 
     mempool_filters = {
