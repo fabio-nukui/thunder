@@ -19,7 +19,10 @@ _FactoryT = TypeVar("_FactoryT", bound="Factory")
 
 log = logging.getLogger(__name__)
 
-_FEES = {"terra154jt8ppucvvakvqa5fyfjdflsu6v83j4ckjfq3": Decimal("0.00300001")}  # LOOP_LOOPR
+_FEES = {
+    "terra154jt8ppucvvakvqa5fyfjdflsu6v83j4ckjfq3": Decimal("0.00300001"),  # LOOP_LOOPR
+    "terra1dw5j23l6nwge69z0enemutfmyc93c36aqnzjj5": Decimal("0.00300001"),  # LOOPR_UST
+}
 
 
 def _get_fee_rate(contract_addr: str) -> Decimal | None:
