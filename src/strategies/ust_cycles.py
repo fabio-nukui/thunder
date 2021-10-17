@@ -327,7 +327,7 @@ class UstCyclesArbitrage(TerraSingleTxArbitrage):
         return amount_received, (amount_received - amount_sent).amount
 
 
-async def run():
+async def run(max_n_blocks: int = None):
     client = await TerraClient.new()
     terraswap_factory, loop_factory = await asyncio.gather(
         terraswap.TerraswapFactory.new(client), terraswap.LoopFactory.new(client)
@@ -344,6 +344,7 @@ async def run():
         for arb_route in arb_routes
         for pair in arb_route.pairs
     }
+    start_height = client.height
     async for height, filtered_mempool in client.mempool.iter_height_mempool(mempool_filters):
         if any(height > arb_route.last_height_run for arb_route in arb_routes):
             utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)
@@ -356,3 +357,6 @@ async def run():
             any_new_mempool_msg = any(list_msgs for list_msgs in fitered_route_mempool.values())
             if height > arb_route.last_height_run or any_new_mempool_msg:
                 await arb_route.run(height, fitered_route_mempool)
+        if max_n_blocks is not None and (n_blocks := height - start_height) >= max_n_blocks:
+            break
+    log.info(f"Stopped execution after {n_blocks=}")
