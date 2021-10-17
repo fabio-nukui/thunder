@@ -35,7 +35,7 @@ log = logging.getLogger(__name__)
 
 TERRA_CONTRACT_QUERY_CACHE_SIZE = 10_000
 CONTRACT_INFO_CACHE_TTL = 86400  # Contract info should not change; 24h ttl
-_pat_contract_not_found = re.compile(r"contract terra1\w+: not found")
+_pat_contract_not_found = re.compile(r"contract terra1(\w+): not found")
 
 
 class TerraClient(ITerraClient):
@@ -105,8 +105,8 @@ class TerraClient(ITerraClient):
         try:
             return await self.lcd.wasm.contract_query(contract_addr, query_msg)
         except LCDResponseError as e:
-            if e.response.status == 500 and _pat_contract_not_found.search(e.message):
-                raise NotContract
+            if e.response.status == 500 and (match := _pat_contract_not_found.search(e.message)):
+                raise NotContract(match.group(1))
             else:
                 raise e
 
