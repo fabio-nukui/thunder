@@ -30,10 +30,10 @@ class TxApi(ITxApi):
     @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=TERRA_GAS_PRICE_CACHE_TTL)
     async def get_gas_prices(self) -> Coins:
         res = await self.client.fcd_client.get("v1/txs/gas_prices")
-        coin_list: list[Coin] = []
-        for denom, amount in res.json().items():
-            amount = str(Decimal(amount) * (1 + configs.TERRA_GAS_PREMIUM))
-            coin_list.append(Coin(denom=denom, amount=amount))
+        coin_list = [
+            Coin(denom=denom, amount=str(Decimal(amount) * configs.TERRA_GAS_MULTIPLIER_PREMIUM))
+            for denom, amount in res.json().items()
+        ]
         return Coins(coin_list)
 
     async def estimate_fee(
