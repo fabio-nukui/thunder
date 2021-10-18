@@ -54,6 +54,7 @@ class TerraClient(ITerraClient):
         fcd_uri: str = configs.TERRA_FCD_URI,
         rpc_http_uri: str = configs.TERRA_RPC_HTTP_URI,
         rpc_websocket_uri: str = configs.TERRA_RPC_WEBSOCKET_URI,
+        broadcast_lcd_uris: list[str] = configs.TERRA_BROADCAST_LCD_URIS,
         chain_id: str = configs.TERRA_CHAIN_ID,
         fee_denom: str = UST.denom,
         gas_prices: Coins.Input = None,
@@ -67,6 +68,9 @@ class TerraClient(ITerraClient):
         self.fcd_client = utils.ahttp.AsyncClient(base_url=fcd_uri)
         self.rpc_http_client = utils.ahttp.AsyncClient(base_url=rpc_http_uri)
         self.rpc_websocket_uri = rpc_websocket_uri
+        self.broadcast_lcd_clients = [
+            utils.ahttp.AsyncClient(base_url=url) for url in broadcast_lcd_uris if url != ""
+        ]
         self.chain_id = chain_id
         self.fee_denom = fee_denom
         self.gas_adjustment = Decimal(gas_adjustment)

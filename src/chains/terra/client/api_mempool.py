@@ -95,9 +95,7 @@ class MempoolCacheManager:
                 self._txs_cache = data
                 self._running_thread_update_height = True
                 fut_next_height: Future[int] = next(as_completed_events)  # type: ignore
-                asyncio.run_coroutine_threadsafe(
-                    self._update_height(fut_next_height), asyncio.get_event_loop()
-                )
+                asyncio.create_task(self._update_height(fut_next_height))
         if self._new_blockchain_state:
             raise BlockchainNewState
         unread_txs_msgs = [

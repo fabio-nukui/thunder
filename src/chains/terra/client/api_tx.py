@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from decimal import Decimal
@@ -144,6 +145,7 @@ class TxApi(ITxApi):
                     raise e
             else:
                 self.client.account_sequence = sequence + 1
+                asyncio.create_task(self._broadcast_async(payload))
                 break
 
         log.debug(f"Tx executed: {data['txhash']}")
@@ -153,3 +155,8 @@ class TxApi(ITxApi):
             code=data.get("code"),
             codespace=data.get("codespace"),
         )
+
+    async def _broadcast_async(self, payload: dict):
+        payload["mode"] = "async"
+        tasks = (client.post("txs", json=payload) for client in self.client.broadcast_lcd_clients)
+        await asyncio.gather(*tasks)

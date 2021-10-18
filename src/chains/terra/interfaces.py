@@ -118,6 +118,7 @@ class ITerraClient(AsyncBlockchainClient, ABC):
     fcd_client: utils.ahttp.AsyncClient
     rpc_http_client: utils.ahttp.AsyncClient
     rpc_websocket_uri: str
+    broadcast_lcd_clients: list[utils.ahttp.AsyncClient]
     chain_id: str
     key: MnemonicKey
     lcd: AsyncLCDClient
