@@ -21,7 +21,7 @@ from ..interfaces import ITxApi
 log = logging.getLogger(__name__)
 
 TERRA_GAS_PRICE_CACHE_TTL = 3600
-FALLBACK_EXTRA_GAS_ADJUSTMENT = Decimal("0.1")
+FALLBACK_EXTRA_GAS_ADJUSTMENT = Decimal("0.20")
 MAX_BROADCAST_TRIES = 10
 
 _pat_sequence_error = re.compile(r"account sequence mismatch, expected (\d+)")
