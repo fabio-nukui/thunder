@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from copy import copy
 from typing import Literal
@@ -8,6 +9,7 @@ import web3.middleware
 from eth_account.datastructures import SignedTransaction
 from eth_account.signers.local import LocalAccount
 from web3 import Account, HTTPProvider, IPCProvider, Web3, WebsocketProvider
+from web3._utils.request import _session_cache as web3_http_sessions_cache
 from web3.contract import ContractFunction
 
 import auth_secrets
@@ -33,16 +35,17 @@ class EVMClient(BaseEVMClient):
         hd_wallet: dict = None,
         hd_wallet_index: int = 0,
         timeout: int = None,
-        height: int | Literal["latest"] = "latest",
+        block_identifier: int | Literal["latest"] = "latest",
         raise_on_syncing: bool = False,
     ):
         self.endpoint_uri = endpoint_uri
         self.chain_id = chain_id
         self.middlewares = middlewares
         self.timeout = DEFAULT_CONN_TIMEOUT if timeout is None else timeout
-        self.height = height
+        self.block_identifier = block_identifier
 
         self.w3 = get_w3(endpoint_uri, middlewares, timeout)
+        self.height = self.w3.eth.block_number
 
         hd_wallet = auth_secrets.hd_wallet() if hd_wallet is None else hd_wallet
 
@@ -61,6 +64,20 @@ class EVMClient(BaseEVMClient):
     @property
     def syncing(self) -> bool:
         return self.w3.eth.syncing
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return self.close()
+
+    def close(self):
+        if isinstance(self.w3.provider, WebsocketProvider) and self.w3.provider.conn.ws is not None:
+            asyncio.get_event_loop().run_until_complete(self.w3.provider.conn.ws())
+        if isinstance(self.w3.provider, HTTPProvider):
+            for session in web3_http_sessions_cache.values():
+                session.close()
+            web3_http_sessions_cache.clear()
 
     def get_gas_price(self) -> int:
         return self.w3.eth.gas_price
@@ -102,8 +119,9 @@ class EVMClient(BaseEVMClient):
 def get_w3(
     endpoint_uri: str,
     middlewares: list[str] = None,
-    timeout: int = DEFAULT_CONN_TIMEOUT,
+    timeout: int = None,
 ) -> Web3:
+    timeout = DEFAULT_CONN_TIMEOUT if timeout is None else timeout
     if endpoint_uri.startswith("http"):
         provider = HTTPProvider(endpoint_uri, request_kwargs={"timeout": timeout})
     elif endpoint_uri.startswith("wss"):

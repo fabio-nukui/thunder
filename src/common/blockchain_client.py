@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Literal, TypeVar
+from typing import TypeVar
 
 from exceptions import NodeSyncing
 
@@ -10,13 +10,12 @@ log = logging.getLogger(__name__)
 
 
 class BlockchainClient(ABC):
-    height: int | Literal["latest"]
+    height: int
 
 
 class SyncBlockchainClient(BlockchainClient, ABC):
     def __init__(self, raise_on_syncing: bool = False) -> None:
         if raise_on_syncing and self.syncing:
-            assert isinstance(self.height, int), f"Unexpected height={self.height}, expected int"
             raise NodeSyncing(self.height)
 
         log.info(f"Initialized {self} at height={self.height}")
