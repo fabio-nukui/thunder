@@ -12,10 +12,12 @@ from terra_sdk.exceptions import LCDResponseError
 
 import utils
 from chains.terra import LUNA, UST, TerraClient, TerraTokenAmount, terraswap
+from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
 from exceptions import TxError, UnprofitableArbitrage
 
 from .common.default_params import MIN_PROFIT_UST, MIN_UST_RESERVED_AMOUNT, OPTIMIZATION_TOLERANCE
 from .common.terra_single_tx_arbitrage import TerraArbParams, TerraSingleTxArbitrage
+from .common.terraswap_lp_reserve_simulation import TerraswapLPReserveSimulationMixin
 
 log = logging.getLogger(__name__)
 
@@ -60,7 +62,7 @@ class ArbParams(TerraArbParams):
         }
 
 
-class LunaUstMarketArbitrage(TerraSingleTxArbitrage):
+class LunaUstMarketArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArbitrage):
     def __init__(self, client: TerraClient, router: terraswap.Router) -> None:
         self.router = router
         (self.terraswap_pool,) = router.pairs.values()
@@ -79,29 +81,28 @@ class LunaUstMarketArbitrage(TerraSingleTxArbitrage):
         return f"{self.__class__.__name__}(client={self.client}, state={self.state})"
 
     def _reset_mempool_params(self):
-        pass
+        super()._reset_mempool_params()
 
     async def _get_arbitrage_params(
         self,
         height: int,
         filtered_mempool: dict[Any, list[list[dict]]] = None,
     ) -> ArbParams:
-        if filtered_mempool:
-            raise NotImplementedError
-        prices = await self._get_prices()
-        terraswap_premium = prices["terraswap"] / prices["market"] - 1
-        if terraswap_premium > 0:
-            direction = Direction.native_first
-            route = self._route_native_first
-        else:
-            direction = Direction.terraswap_first
-            route = self._route_terraswap_first
-        ust_balance = (await UST.get_balance(self.client)).amount
+        async with self._simulate_reserve_changes(filtered_mempool):
+            prices = await self._get_prices()
+            terraswap_premium = prices["terraswap"] / prices["market"] - 1
+            if terraswap_premium > 0:
+                direction = Direction.native_first
+                route = self._route_native_first
+            else:
+                direction = Direction.terraswap_first
+                route = self._route_terraswap_first
+            ust_balance = (await UST.get_balance(self.client)).amount
 
-        initial_amount = await self._get_optimal_argitrage_amount(
-            route, terraswap_premium, ust_balance
-        )
-        final_amount, msgs = await self._op_arbitrage(initial_amount, route, safety_round=True)
+            initial_amount = await self._get_optimal_argitrage_amount(
+                route, terraswap_premium, ust_balance
+            )
+            final_amount, msgs = await self._op_arbitrage(initial_amount, route, safety_round=True)
         try:
             fee = await self.client.tx.estimate_fee(msgs)
         except LCDResponseError as e:
@@ -211,14 +212,20 @@ class LunaUstMarketArbitrage(TerraSingleTxArbitrage):
         return UST.to_amount(), Decimal(0)  # TODO: implement
 
 
-async def run():
+async def run(max_n_blocks: int = None):
     async with await TerraClient.new() as client:
         factory = await terraswap.TerraswapFactory.new(client)
 
         pair = await factory.get_pair("UST_LUNA")
         router = factory.get_router([pair])
+        mempool_filter = {pair: FilterSingleSwapTerraswapPair(pair)}
+        start_height = client.height
 
         arb = LunaUstMarketArbitrage(client, router)
-        async for height in client.loop_latest_height():
-            await arb.run(height)
-            utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)
+        async for height, mempool in client.mempool.iter_height_mempool(mempool_filter):
+            if height > arb.last_height_run:
+                utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)
+            await arb.run(height, mempool)
+            if max_n_blocks is not None and (n_blocks := height - start_height) >= max_n_blocks:
+                break
+        log.info(f"Stopped execution after {n_blocks=}")

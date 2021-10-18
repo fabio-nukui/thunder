@@ -24,6 +24,9 @@ class TerraswapLPReserveSimulationMixin:
             pair: (pair.tokens[0].to_amount(0), pair.tokens[1].to_amount(0)) for pair in self.pairs
         }
 
+    def _reset_mempool_params(self):
+        self._mempool_reserve_changes = self._get_initial_mempool_params()
+
     @asynccontextmanager
     async def _simulate_reserve_changes(
         self,

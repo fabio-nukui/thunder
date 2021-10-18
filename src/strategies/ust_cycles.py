@@ -16,7 +16,6 @@ import utils
 from chains.terra import UST, TerraClient, TerraTokenAmount, terraswap
 from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
 from exceptions import TxError, UnprofitableArbitrage
-from strategies.common.terraswap_lp_reserve_simulation import TerraswapLPReserveSimulationMixin
 
 from .common.default_params import (
     MAX_SLIPPAGE,
@@ -26,6 +25,7 @@ from .common.default_params import (
     OPTIMIZATION_TOLERANCE,
 )
 from .common.terra_single_tx_arbitrage import TerraArbParams, TerraSingleTxArbitrage
+from .common.terraswap_lp_reserve_simulation import TerraswapLPReserveSimulationMixin
 
 log = logging.getLogger(__name__)
 
@@ -161,7 +161,7 @@ class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArbitra
         )
 
     def _reset_mempool_params(self):
-        self._mempool_reserve_changes = self._get_initial_mempool_params()
+        super()._reset_mempool_params()
 
     async def _get_arbitrage_params(
         self,
