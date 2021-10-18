@@ -11,9 +11,8 @@ AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
 
 
 class TerraswapLPReserveSimulationMixin:
-    pairs: list[terraswap.LiquidityPair]
-
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args, pairs: list[terraswap.LiquidityPair], **kwargs):
+        self.pairs = pairs
         self._simulating_reserve_changes = False
         self._mempool_reserve_changes = self._get_initial_mempool_params()
 

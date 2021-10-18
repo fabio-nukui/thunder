@@ -75,7 +75,7 @@ class LunaUstMarketArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArb
             terraswap.RouteStepNative(LUNA, UST),
         ]
 
-        super().__init__(client)
+        super().__init__(client, pairs=[self.terraswap_pool])
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(client={self.client}, state={self.state})"

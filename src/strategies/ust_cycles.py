@@ -148,11 +148,10 @@ class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArbitra
 
         self.multi_routes = multi_routes
         self.routes = multi_routes.routes
-        self.pairs = multi_routes.pairs
         self.tokens = multi_routes.tokens[1:-1]
         self.estimated_gas_use = _estimated_gas_use(multi_routes.n_steps)
 
-        super().__init__(client)
+        super().__init__(client, pairs=multi_routes.pairs)
 
     def __repr__(self) -> str:
         return (
