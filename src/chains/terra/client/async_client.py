@@ -79,6 +79,7 @@ class TerraClient(ITerraClient):
         self.wallet = self.lcd.wallet(key)
         self.address = self.wallet.key.acc_address
         self.height = await self.get_latest_height()
+        self.account_sequence = 0
 
         self.market = MarketApi(self)
         self.mempool = MempoolApi(self)
@@ -146,6 +147,24 @@ class TerraClient(ITerraClient):
             for c in coins_balance
             if denoms is None or c.denom in denoms
         ]
+
+    @ttl_cache(CacheGroup.TERRA)
+    async def get_account_number(self, address: AccAddress = None) -> int:
+        address = self.address if address is None else address
+        return (await self.lcd.auth.account_info(address)).account_number
+
+    async def get_account_sequence(self, address: AccAddress = None) -> int:
+        address = self.address if address is None else address
+        on_chain = (await self.lcd.auth.account_info(address)).sequence
+        local = self.account_sequence
+        if on_chain == local:
+            return on_chain
+        if on_chain > local:
+            log.debug(f"Using higher on-chain sequence value ({on_chain=}, {local=})")
+            self.account_sequence = on_chain
+            return on_chain
+        log.debug(f"Using higher local sequence value ({local=}, {on_chain=})")
+        return self.account_sequence
 
     @staticmethod
     def encode_msg(msg: dict) -> str:

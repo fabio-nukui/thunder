@@ -126,6 +126,7 @@ class ITerraClient(AsyncBlockchainClient, ABC):
     fee_denom: str
     gas_adjustment: Decimal
     height: int
+    account_sequence: int
 
     market: IMarketApi
     mempool: IMempoolApi
@@ -147,6 +148,14 @@ class ITerraClient(AsyncBlockchainClient, ABC):
         denoms: list[str] = None,
         address: str = None,
     ) -> list[TerraTokenAmount]:
+        ...
+
+    @abstractmethod
+    async def get_account_number(self, address: AccAddress = None) -> int:
+        ...
+
+    @abstractmethod
+    async def get_account_sequence(self, address: AccAddress = None) -> int:
         ...
 
     @staticmethod

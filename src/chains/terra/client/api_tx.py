@@ -21,8 +21,14 @@ log = logging.getLogger(__name__)
 
 TERRA_GAS_PRICE_CACHE_TTL = 3600
 FALLBACK_EXTRA_GAS_ADJUSTMENT = Decimal("0.1")
+MAX_BROADCAST_TRIES = 10
 
 _pat_sequence_error = re.compile(r"account sequence mismatch, expected (\d+)")
+
+
+class NoLogError(Exception):
+    def __init__(self, message: str):
+        self.message = message
 
 
 class TxApi(ITxApi):
@@ -97,6 +103,8 @@ class TxApi(ITxApi):
         self,
         msgs: list[Msg],
         expect_logs_: bool = True,
+        account_number: int = None,
+        sequence: int = None,
         **kwargs,
     ) -> SyncTxBroadcastResult:
         log.debug(f"Sending tx: {msgs}")
@@ -104,29 +112,42 @@ class TxApi(ITxApi):
         # Fixes bug in terraswap_sdk==1.0.0b2
         if "fee" not in kwargs:
             kwargs["fee"] = self.estimate_fee(msgs)
-        while True:
+        if account_number is None:
+            account_number = await self.client.get_account_number()
+        if sequence is None:
+            sequence = await self.client.get_account_sequence()
+        for i in range(1, MAX_BROADCAST_TRIES + 1):
             signed_tx = await self.client.wallet.create_and_sign_tx(
                 msgs,
                 fee_denoms=[self.client.fee_denom],
+                account_number=account_number,
+                sequence=sequence,
                 **kwargs,
             )
-            payload = {"tx": signed_tx.to_data()["value"], "mode": "sync"}
+            payload = {
+                "tx": signed_tx.to_data()["value"],
+                "mode": "sync",
+                "sequences": [str(sequence)],
+            }
             try:
                 res = await self.client.lcd_http_client.post("txs", json=payload)
                 data: dict = res.json()
                 if expect_logs_ and data.get("logs") is None:
-                    raise LCDResponseError(data.get("raw_log", ""), res)
-                break
-            except LCDResponseError as e:
+                    raise NoLogError(data.get("raw_log", ""))
+            except (NoLogError, LCDResponseError) as e:
+                if i == MAX_BROADCAST_TRIES:
+                    raise Exception(f"Broadcast failed after {i} tries", e)
                 if match := _pat_sequence_error.search(e.message):
-                    kwargs["sequence"] = int(match.group(1))
-                    log.debug(f"Retrying with updated sequence={kwargs['sequence']}")
+                    sequence = int(match.group(1))
+                    log.debug(f"Retrying with updated sequence={sequence}")
                 else:
                     raise e
+            else:
+                self.client.account_sequence = sequence + 1
+                break
 
         log.debug(f"Tx executed: {data['txhash']}")
         return SyncTxBroadcastResult(
-            height=data.get("height", self.client.height),
             txhash=data["txhash"],
             raw_log=data.get("raw_log"),
             code=data.get("code"),
