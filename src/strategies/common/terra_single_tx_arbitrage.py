@@ -3,12 +3,15 @@ import time
 from abc import ABC, abstractmethod
 from datetime import datetime
 from decimal import Decimal
+from typing import Any, Iterable, Mapping, Sequence
 
 from terra_sdk.core.auth import StdFee, TxInfo
 from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.exceptions import LCDResponseError
 
+import utils
 from chains.terra import TerraClient, TerraTokenAmount
+from chains.terra.tx_filter import Filter
 from exceptions import BlockchainNewState, IsBusy
 
 from .single_tx_arbitrage import ArbResult, ArbTx, BaseArbParams, SingleTxArbitrage, TxStatus
@@ -28,6 +31,10 @@ class TerraArbParams(BaseArbParams):
 
 
 class TerraSingleTxArbitrage(SingleTxArbitrage[TerraClient], ABC):
+    def __init__(self, *args, filter_keys: Iterable, **kwargs):
+        self.filter_keys = filter_keys
+        super().__init__(*args, **kwargs)
+
     async def _broadcast_tx(self, arb_params: TerraArbParams, height: int) -> ArbTx:
         if (latest_height := await self.client.get_latest_height()) != height:
             raise BlockchainNewState(f"{latest_height=} different from {height=}")
@@ -77,3 +84,25 @@ class TerraSingleTxArbitrage(SingleTxArbitrage[TerraClient], ABC):
         logs: TxInfo,
     ) -> tuple[TerraTokenAmount, Decimal]:
         ...
+
+
+async def run_strategy(
+    client: TerraClient,
+    arb_routes: Sequence[TerraSingleTxArbitrage],
+    mempool_filters: Mapping[Any, Filter],
+    max_n_blocks: int = None,
+):
+    start_height = client.height
+    async for height, mempool in client.mempool.iter_height_mempool(mempool_filters):
+        if any(height > arb_route.last_height_run for arb_route in arb_routes):
+            utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)
+        for arb_route in arb_routes:
+            mempool_route = {
+                key: filter_ for key, filter_ in mempool.items() if key in arb_route.filter_keys
+            }
+            any_new_mempool_msg = any(list_msgs for list_msgs in mempool_route.values())
+            if height > arb_route.last_height_run or any_new_mempool_msg:
+                await arb_route.run(height, mempool_route)
+        if max_n_blocks is not None and (n_blocks := height - start_height) >= max_n_blocks:
+            break
+    log.info(f"Stopped execution after {n_blocks=}")

@@ -24,7 +24,7 @@ from .common.default_params import (
     MIN_UST_RESERVED_AMOUNT,
     OPTIMIZATION_TOLERANCE,
 )
-from .common.terra_single_tx_arbitrage import TerraArbParams, TerraSingleTxArbitrage
+from .common.terra_single_tx_arbitrage import TerraArbParams, TerraSingleTxArbitrage, run_strategy
 from .common.terraswap_lp_reserve_simulation import TerraswapLPReserveSimulationMixin
 
 log = logging.getLogger(__name__)
@@ -34,7 +34,37 @@ def _estimated_gas_use(n_steps: int) -> int:
     return 486_319 + (n_steps - 2) * 341_002
 
 
-async def _get_aribtrages(client: TerraClient) -> list[UstCyclesArbitrage]:
+@dataclass
+class ArbParams(TerraArbParams):
+    timestamp_found: float
+    block_found: int
+
+    ust_balance: Decimal
+    route: terraswap.SingleRoute
+    reverse: bool
+
+    initial_amount: TerraTokenAmount
+    msgs: list[MsgExecuteContract]
+    est_final_amount: TerraTokenAmount
+    est_fee: StdFee
+    est_net_profit_usd: Decimal
+
+    def to_data(self) -> dict:
+        return {
+            "timestamp_found": self.timestamp_found,
+            "block_found": self.block_found,
+            "ust_balance": float(self.ust_balance),
+            "route": str(self.route),
+            "reverse": self.reverse,
+            "initial_amount": self.initial_amount.to_data(),
+            "msgs": [msg.to_data() for msg in self.msgs],
+            "est_final_amount": self.est_final_amount.to_data(),
+            "est_fee": self.est_fee.to_data(),
+            "est_net_profit_usd": float(self.est_net_profit_usd),
+        }
+
+
+async def get_arbitrages(client: TerraClient) -> list[UstCyclesArbitrage]:
     terraswap_factory, loop_factory = await asyncio.gather(
         terraswap.TerraswapFactory.new(client), terraswap.LoopFactory.new(client)
     )
@@ -45,6 +75,16 @@ async def _get_aribtrages(client: TerraClient) -> list[UstCyclesArbitrage]:
     arb_routes = [UstCyclesArbitrage(client, multi_routes) for multi_routes in routes]
 
     return arb_routes
+
+
+def get_filters(
+    arb_routes: list[UstCyclesArbitrage],
+) -> dict[terraswap.LiquidityPair, FilterSingleSwapTerraswapPair]:
+    return {
+        pair: FilterSingleSwapTerraswapPair(pair)
+        for arb_route in arb_routes
+        for pair in arb_route.pairs
+    }
 
 
 async def _get_ust_loop_3cycle_routes(
@@ -111,36 +151,6 @@ async def _get_ust_terraswap_3cycle_routes(
     ]
 
 
-@dataclass
-class ArbParams(TerraArbParams):
-    timestamp_found: float
-    block_found: int
-
-    ust_balance: Decimal
-    route: terraswap.SingleRoute
-    reverse: bool
-
-    initial_amount: TerraTokenAmount
-    msgs: list[MsgExecuteContract]
-    est_final_amount: TerraTokenAmount
-    est_fee: StdFee
-    est_net_profit_usd: Decimal
-
-    def to_data(self) -> dict:
-        return {
-            "timestamp_found": self.timestamp_found,
-            "block_found": self.block_found,
-            "ust_balance": float(self.ust_balance),
-            "route": str(self.route),
-            "reverse": self.reverse,
-            "initial_amount": self.initial_amount.to_data(),
-            "msgs": [msg.to_data() for msg in self.msgs],
-            "est_final_amount": self.est_final_amount.to_data(),
-            "est_fee": self.est_fee.to_data(),
-            "est_net_profit_usd": float(self.est_net_profit_usd),
-        }
-
-
 class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArbitrage):
     def __init__(self, client: TerraClient, multi_routes: terraswap.MultiRoutes):
         """Arbitrage with UST as starting point and a cycle of liquidity pairs"""
@@ -151,7 +161,7 @@ class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArbitra
         self.tokens = multi_routes.tokens[1:-1]
         self.estimated_gas_use = _estimated_gas_use(multi_routes.n_steps)
 
-        super().__init__(client, pairs=multi_routes.pairs)
+        super().__init__(client, pairs=multi_routes.pairs, filter_keys=multi_routes.pairs)
 
     def __repr__(self) -> str:
         return (
@@ -297,33 +307,8 @@ class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArbitra
         return amount_received, (amount_received - amount_sent).amount
 
 
-async def _run_arbitrages(
-    arb_routes: list[UstCyclesArbitrage],
-    height: int,
-    mempool: dict[terraswap.LiquidityPair, list[list[dict]]],
-):
-    if any(height > arb_route.last_height_run for arb_route in arb_routes):
-        utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)
-    for arb_route in arb_routes:
-        mempool_route = {
-            pair: filter_ for pair, filter_ in mempool.items() if pair in arb_route.pairs
-        }
-        any_new_mempool_msg = any(list_msgs for list_msgs in mempool_route.values())
-        if height > arb_route.last_height_run or any_new_mempool_msg:
-            await arb_route.run(height, mempool_route)
-
-
 async def run(max_n_blocks: int = None):
     async with await TerraClient.new() as client:
-        arb_routes = await _get_aribtrages(client)
-        mempool_filters = {
-            pair: FilterSingleSwapTerraswapPair(pair)
-            for arb_route in arb_routes
-            for pair in arb_route.pairs
-        }
-        start_height = client.height
-        async for height, mempool in client.mempool.iter_height_mempool(mempool_filters):
-            await _run_arbitrages(arb_routes, height, mempool)
-            if max_n_blocks is not None and (n_blocks := height - start_height) >= max_n_blocks:
-                break
-        log.info(f"Stopped execution after {n_blocks=}")
+        arb_routes = await get_arbitrages(client)
+        mempool_filters = get_filters(arb_routes)
+        await run_strategy(client, arb_routes, mempool_filters, max_n_blocks)

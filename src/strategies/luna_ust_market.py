@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import time
 from dataclasses import dataclass
@@ -16,12 +18,13 @@ from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
 from exceptions import TxError, UnprofitableArbitrage
 
 from .common.default_params import MIN_PROFIT_UST, MIN_UST_RESERVED_AMOUNT, OPTIMIZATION_TOLERANCE
-from .common.terra_single_tx_arbitrage import TerraArbParams, TerraSingleTxArbitrage
+from .common.terra_single_tx_arbitrage import TerraArbParams, TerraSingleTxArbitrage, run_strategy
 from .common.terraswap_lp_reserve_simulation import TerraswapLPReserveSimulationMixin
 
 log = logging.getLogger(__name__)
 
 MIN_START_AMOUNT = UST.to_amount(200)
+ESTIMATED_GAS_USE = 1_620_000
 
 
 class Direction(str, Enum):
@@ -62,6 +65,24 @@ class ArbParams(TerraArbParams):
         }
 
 
+async def get_arbitrages(client: TerraClient) -> list[LunaUstMarketArbitrage]:
+    factory = await terraswap.TerraswapFactory.new(client)
+
+    pair = await factory.get_pair("UST_LUNA")
+    router = factory.get_router([pair])
+    return [LunaUstMarketArbitrage(client, router)]
+
+
+def get_filters(
+    arb_routes: list[LunaUstMarketArbitrage],
+) -> dict[terraswap.LiquidityPair, FilterSingleSwapTerraswapPair]:
+    return {
+        pair: FilterSingleSwapTerraswapPair(pair)
+        for arb_route in arb_routes
+        for pair in arb_route.pairs
+    }
+
+
 class LunaUstMarketArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArbitrage):
     def __init__(self, client: TerraClient, router: terraswap.Router) -> None:
         self.router = router
@@ -75,7 +96,8 @@ class LunaUstMarketArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArb
             terraswap.RouteStepNative(LUNA, UST),
         ]
 
-        super().__init__(client, pairs=[self.terraswap_pool])
+        pairs = [self.terraswap_pool]
+        super().__init__(client, pairs=pairs, filter_keys=pairs)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(client={self.client}, state={self.state})"
@@ -103,21 +125,25 @@ class LunaUstMarketArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArb
                 route, terraswap_premium, ust_balance
             )
             final_amount, msgs = await self._op_arbitrage(initial_amount, route, safety_round=True)
-        try:
-            fee = await self.client.tx.estimate_fee(msgs)
-        except LCDResponseError as e:
-            log.debug(
-                "Error when estimating fee",
-                extra={
-                    "data": {
-                        "terraswap_premium": f"{terraswap_premium:.3%}",
-                        "direction": direction,
-                        "msgs": [msg.to_data() for msg in msgs],
+            try:
+                fee = await self.client.tx.estimate_fee(
+                    msgs,
+                    use_fallback_estimate=self._simulating_reserve_changes,
+                    estimated_gas_use=ESTIMATED_GAS_USE,
+                )
+            except LCDResponseError as e:
+                log.debug(
+                    "Error when estimating fee",
+                    extra={
+                        "data": {
+                            "terraswap_premium": f"{terraswap_premium:.3%}",
+                            "direction": direction,
+                            "msgs": [msg.to_data() for msg in msgs],
+                        },
                     },
-                },
-                exc_info=True,
-            )
-            raise TxError(e)
+                    exc_info=True,
+                )
+                raise TxError(e)
         gas_cost = TerraTokenAmount.from_coin(*fee.amount)
         gas_cost_raw = gas_cost.amount / self.client.lcd.gas_adjustment
         net_profit_ust = (final_amount - initial_amount).amount - gas_cost_raw
@@ -214,18 +240,6 @@ class LunaUstMarketArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArb
 
 async def run(max_n_blocks: int = None):
     async with await TerraClient.new() as client:
-        factory = await terraswap.TerraswapFactory.new(client)
-
-        pair = await factory.get_pair("UST_LUNA")
-        router = factory.get_router([pair])
-        mempool_filter = {pair: FilterSingleSwapTerraswapPair(pair)}
-        start_height = client.height
-
-        arb = LunaUstMarketArbitrage(client, router)
-        async for height, mempool in client.mempool.iter_height_mempool(mempool_filter):
-            if height > arb.last_height_run:
-                utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)
-            await arb.run(height, mempool)
-            if max_n_blocks is not None and (n_blocks := height - start_height) >= max_n_blocks:
-                break
-        log.info(f"Stopped execution after {n_blocks=}")
+        arb_routes = await get_arbitrages(client)
+        mempool_filters = get_filters(arb_routes)
+        await run_strategy(client, arb_routes, mempool_filters, max_n_blocks)

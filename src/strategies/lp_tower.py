@@ -23,6 +23,7 @@ from chains.terra import (
     TerraTokenAmount,
     terraswap,
 )
+from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
 from exceptions import TxError, UnprofitableArbitrage
 
 from .common.default_params import (
@@ -31,9 +32,11 @@ from .common.default_params import (
     MIN_START_AMOUNT,
     OPTIMIZATION_TOLERANCE,
 )
-from .common.terra_single_tx_arbitrage import TerraArbParams, TerraSingleTxArbitrage
+from .common.terra_single_tx_arbitrage import TerraArbParams, TerraSingleTxArbitrage, run_strategy
+from .common.terraswap_lp_reserve_simulation import TerraswapLPReserveSimulationMixin
 
 log = logging.getLogger(__name__)
+ESTIMATED_GAS_USE = 1_555_000
 
 
 class Direction(str, Enum):
@@ -75,7 +78,26 @@ class ArbParams(TerraArbParams):
         }
 
 
-class LPTowerArbitrage(TerraSingleTxArbitrage):
+async def get_arbitrages(client: TerraClient) -> list[LPTowerArbitrage]:
+    factory = await terraswap.TerraswapFactory.new(client)
+
+    pool_0, pool_1, pool_tower = await factory.get_pairs(
+        ["BLUNA_LUNA", "UST_LUNA", "BLUNA-LUNA_UST-LUNA"]
+    )
+    return [LPTowerArbitrage(client, pool_0, pool_1, pool_tower)]
+
+
+def get_filters(
+    arb_routes: list[LPTowerArbitrage],
+) -> dict[terraswap.LiquidityPair, FilterSingleSwapTerraswapPair]:
+    return {
+        pair: FilterSingleSwapTerraswapPair(pair)
+        for arb_route in arb_routes
+        for pair in arb_route.pairs
+    }
+
+
+class LPTowerArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArbitrage):
     def __init__(
         self,
         client: TerraClient,
@@ -87,7 +109,8 @@ class LPTowerArbitrage(TerraSingleTxArbitrage):
         self.pool_1 = pool_1
         self.pool_tower = pool_tower
 
-        super().__init__(client)
+        pairs = [pool_0, pool_1, pool_tower]
+        super().__init__(client, pairs=pairs, filter_keys=pairs)
 
     def __repr__(self) -> str:
         return (
@@ -96,46 +119,51 @@ class LPTowerArbitrage(TerraSingleTxArbitrage):
         )
 
     def _reset_mempool_params(self):
-        pass
+        super()._reset_mempool_params()
 
     async def _get_arbitrage_params(
         self,
         height: int,
         filtered_mempool: dict[Any, list[list[dict]]] = None,
     ) -> ArbParams:
-        if filtered_mempool:
-            raise NotImplementedError
-        prices = await self._get_prices()
-        balance_ratio, direction = await self._get_pool_balance_ratio(
-            prices[self.pool_0.lp_token],
-            prices[self.pool_1.lp_token],
-        )
-        luna_price = await self.client.oracle.get_exchange_rate(LUNA, UST)
-        lp_ust_price = prices[self.pool_0.lp_token] * luna_price
-        pool_0_lp_balance = await self.pool_0.lp_token.get_balance(self.client)
-
-        initial_amount = await self._get_optimal_argitrage_amount(
-            lp_ust_price,
-            direction,
-            pool_0_lp_balance,
-            balance_ratio,
-        )
-        final_amount, msgs = await self._op_arbitrage(initial_amount, direction, safety_margin=True)
-        try:
-            fee = await self.client.tx.estimate_fee(msgs)
-        except LCDResponseError as e:
-            log.debug(
-                "Error when estimating fee",
-                extra={
-                    "data": {
-                        "balance_ratio": f"{balance_ratio:.3%}",
-                        "direction": direction,
-                        "msgs": [msg.to_data() for msg in msgs],
-                    },
-                },
-                exc_info=True,
+        async with self._simulate_reserve_changes(filtered_mempool):
+            prices = await self._get_prices()
+            balance_ratio, direction = await self._get_pool_balance_ratio(
+                prices[self.pool_0.lp_token],
+                prices[self.pool_1.lp_token],
             )
-            raise TxError(e)
+            luna_price = await self.client.oracle.get_exchange_rate(LUNA, UST)
+            lp_ust_price = prices[self.pool_0.lp_token] * luna_price
+            pool_0_lp_balance = await self.pool_0.lp_token.get_balance(self.client)
+
+            initial_amount = await self._get_optimal_argitrage_amount(
+                lp_ust_price,
+                direction,
+                pool_0_lp_balance,
+                balance_ratio,
+            )
+            final_amount, msgs = await self._op_arbitrage(
+                initial_amount, direction, safety_margin=True
+            )
+            try:
+                fee = await self.client.tx.estimate_fee(
+                    msgs,
+                    use_fallback_estimate=self._simulating_reserve_changes,
+                    estimated_gas_use=ESTIMATED_GAS_USE,
+                )
+            except LCDResponseError as e:
+                log.debug(
+                    "Error when estimating fee",
+                    extra={
+                        "data": {
+                            "balance_ratio": f"{balance_ratio:.3%}",
+                            "direction": direction,
+                            "msgs": [msg.to_data() for msg in msgs],
+                        },
+                    },
+                    exc_info=True,
+                )
+                raise TxError(e)
         gas_cost = TerraTokenAmount.from_coin(*fee.amount)
         gas_cost_raw = gas_cost.amount / self.client.lcd.gas_adjustment
         net_profit_ust = (final_amount - initial_amount).amount * lp_ust_price - gas_cost_raw
@@ -290,14 +318,8 @@ class LPTowerArbitrage(TerraSingleTxArbitrage):
         return final_amount, round(increase_tokens.amount * pool_0_lp_price_ust, 18)
 
 
-async def run():
+async def run(max_n_blocks: int = None):
     async with await TerraClient.new() as client:
-        factory = await terraswap.TerraswapFactory.new(client)
-
-        pool_0, pool_1, pool_tower = await factory.get_pairs(
-            ["BLUNA_LUNA", "UST_LUNA", "BLUNA-LUNA_UST-LUNA"]
-        )
-        arb = LPTowerArbitrage(client, pool_0, pool_1, pool_tower)
-        async for height in client.loop_latest_height():
-            await arb.run(height)
-            utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)
+        arb_routes = await get_arbitrages(client)
+        mempool_filters = get_filters(arb_routes)
+        await run_strategy(client, arb_routes, mempool_filters, max_n_blocks)
