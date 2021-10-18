@@ -6,6 +6,7 @@ formatters:
     class: pythonjsonlogger.jsonlogger.JsonFormatter
   plaintext:
     format: "[%(asctime)s] (%(filename)s:%(lineno)s) %(levelname)s: %(message)s"
+    class: utils.logger.ExtraDataFormatter
 handlers:
   console:
     class: logging.StreamHandler
@@ -18,7 +19,7 @@ handlers:
     level: DEBUG
     filename: logs/thunder.log
     maxBytes: 10485760
-    backupCount: 5
+    backupCount: 10
   watchtower:
     class: watchtower.CloudWatchLogHandler
     formatter: json
