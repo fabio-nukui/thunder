@@ -20,6 +20,12 @@ class SyncBlockchainClient(BlockchainClient, ABC):
 
         log.info(f"Initialized {self} at height={self.height}")
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return self.close()
+
     @abstractmethod
     def close():
         pass
@@ -38,6 +44,12 @@ class AsyncBlockchainClient(BlockchainClient, ABC):
     @abstractmethod
     async def new(cls: type[_AsyncBlockchainClientT], *args, **kwargs) -> _AsyncBlockchainClientT:
         ...
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        return await self.close()
 
     @abstractmethod
     async def close():

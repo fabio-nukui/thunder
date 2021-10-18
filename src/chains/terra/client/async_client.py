@@ -103,12 +103,6 @@ class TerraClient(ITerraClient):
             f"account={self.key.acc_address})"
         )
 
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *args):
-        return await self.close()
-
     async def is_syncing(self) -> bool:
         return await self.lcd.tendermint.syncing()
 

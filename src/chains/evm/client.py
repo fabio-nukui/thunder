@@ -65,12 +65,6 @@ class EVMClient(BaseEVMClient):
     def syncing(self) -> bool:
         return self.w3.eth.syncing
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        return self.close()
-
     def close(self):
         if isinstance(self.w3.provider, WebsocketProvider) and self.w3.provider.conn.ws is not None:
             asyncio.get_event_loop().run_until_complete(self.w3.provider.conn.ws())
