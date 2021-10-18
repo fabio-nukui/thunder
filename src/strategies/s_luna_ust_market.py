@@ -100,7 +100,7 @@ class LunaUstMarketArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArb
         super().__init__(client, pairs=pairs, filter_keys=pairs)
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(client={self.client}, state={self.state})"
+        return f"{self.__class__.__name__}(pairs={self.pairs})"
 
     def _reset_mempool_params(self):
         super()._reset_mempool_params()

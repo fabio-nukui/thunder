@@ -77,10 +77,11 @@ class LiquidityPair:
 
     def __repr__(self) -> str:
         factory_name_str = "" if self.factory_name is None else f", factory={self.factory_name!r}"
-        return (
-            f"{self.__class__.__name__}"
-            f"({self.tokens[0].repr_symbol}/{self.tokens[1].repr_symbol}{factory_name_str})"
-        )
+        return f"{self.__class__.__name__}({self.repr_symbol}{factory_name_str})"
+
+    @property
+    def repr_symbol(self) -> str:
+        return f"{self.tokens[0].repr_symbol}/{self.tokens[1].repr_symbol}"
 
     async def get_reserves(self) -> AmountTuple:
         if not self.stop_updates:

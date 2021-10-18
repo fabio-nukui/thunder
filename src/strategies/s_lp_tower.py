@@ -114,8 +114,8 @@ class LPTowerArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArbitrage
 
     def __repr__(self) -> str:
         return (
-            f"{self.__class__.__name__}(client={self.client}, "
-            f"pool_tower={self.pool_tower}, state={self.state})"
+            f"{self.__class__.__name__}"
+            f"(pool_0={self.pool_0.repr_symbol}, pool_1={self.pool_1.repr_symbol})"
         )
 
     def _reset_mempool_params(self):
