@@ -4,7 +4,6 @@ import asyncio
 import logging
 import re
 import time
-from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
@@ -16,7 +15,8 @@ from terra_sdk.exceptions import LCDResponseError
 import utils
 from chains.terra import UST, TerraClient, TerraTokenAmount, terraswap
 from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
-from exceptions import MaxSpreadAssertion, TxError, UnprofitableArbitrage
+from exceptions import TxError, UnprofitableArbitrage
+from strategies.common.terraswap_lp_reserve_simulation import TerraswapLPReserveSimulationMixin
 
 from .common.default_params import (
     MAX_SLIPPAGE,
@@ -130,7 +130,7 @@ class ArbParams(TerraArbParams):
         return {
             "timestamp_found": self.timestamp_found,
             "block_found": self.block_found,
-            "ust_balance": self.ust_balance,
+            "ust_balance": float(self.ust_balance),
             "route": str(self.route),
             "reverse": self.reverse,
             "initial_amount": self.initial_amount.to_data(),
@@ -141,7 +141,7 @@ class ArbParams(TerraArbParams):
         }
 
 
-class UstCyclesArbitrage(TerraSingleTxArbitrage):
+class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArbitrage):
     def __init__(self, client: TerraClient, multi_routes: terraswap.MultiRoutes):
         """Arbitrage with UST as starting point and a cycle of liquidity pairs"""
         assert multi_routes.tokens[0] == UST and multi_routes.is_cycle
@@ -152,11 +152,6 @@ class UstCyclesArbitrage(TerraSingleTxArbitrage):
         self.tokens = multi_routes.tokens[1:-1]
         self.estimated_gas_use = _estimated_gas_use(multi_routes.n_steps)
 
-        self._mempool_reserve_changes = {
-            pair: (pair.tokens[0].to_amount(0), pair.tokens[1].to_amount(0)) for pair in self.pairs
-        }
-        self._simulating_reserve_changes = False
-
         super().__init__(client)
 
     def __repr__(self) -> str:
@@ -166,9 +161,7 @@ class UstCyclesArbitrage(TerraSingleTxArbitrage):
         )
 
     def _reset_mempool_params(self):
-        self._mempool_reserve_changes = {
-            pair: (pair.tokens[0].to_amount(0), pair.tokens[1].to_amount(0)) for pair in self.pairs
-        }
+        self._mempool_reserve_changes = self._get_initial_mempool_params()
 
     async def _get_arbitrage_params(
         self,
@@ -237,41 +230,6 @@ class UstCyclesArbitrage(TerraSingleTxArbitrage):
             "fee": fee,
             "net_profit_ust": net_profit_ust,
         }
-
-    @asynccontextmanager
-    async def _simulate_reserve_changes(
-        self,
-        filtered_mempool: dict[terraswap.LiquidityPair, list[list[dict]]] = None,
-    ):
-        if filtered_mempool is None:
-            yield
-            return
-        if not any(list_msgs for list_msgs in filtered_mempool.values()):
-            yield
-            return
-        for pair, list_msgs in filtered_mempool.items():
-            for (msg,) in list_msgs:  # Only txs with one message were filtered
-                try:
-                    changes = await pair.get_reserve_changes_from_msg(msg["value"])
-                except MaxSpreadAssertion:
-                    continue
-                self._mempool_reserve_changes[pair] = (
-                    self._mempool_reserve_changes[pair][0] + changes[0],
-                    self._mempool_reserve_changes[pair][1] + changes[1],
-                )
-        async with AsyncExitStack() as stack:
-            for pair in self.pairs:
-                pair_changes = self._mempool_reserve_changes[pair]
-                if any(amount for amount in pair_changes):
-                    log.debug(f"{self}: Simulation of reserve changes: {pair}: {pair_changes}")
-                    await stack.enter_async_context(pair.simulate_reserve_change(pair_changes))
-
-            simulating_reserve_changes = self._simulating_reserve_changes
-            self._simulating_reserve_changes = True
-            try:
-                yield
-            finally:
-                self._simulating_reserve_changes = simulating_reserve_changes
 
     async def _get_optimal_argitrage_amount(
         self,
