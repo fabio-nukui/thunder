@@ -94,14 +94,14 @@ async def run_strategy(
 ):
     start_height = client.height
     async for height, mempool in client.mempool.iter_height_mempool(mempool_filters):
-        if any(height > arb_route.last_height_run for arb_route in arb_routes):
+        if any(height > arb_route.last_run_height for arb_route in arb_routes):
             utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)
         for arb_route in arb_routes:
             mempool_route = {
                 key: filter_ for key, filter_ in mempool.items() if key in arb_route.filter_keys
             }
             any_new_mempool_msg = any(list_msgs for list_msgs in mempool_route.values())
-            if height > arb_route.last_height_run or any_new_mempool_msg:
+            if height > arb_route.last_run_height or any_new_mempool_msg:
                 await arb_route.run(height, mempool_route)
         if max_n_blocks is not None and (n_blocks := height - start_height) >= max_n_blocks:
             break

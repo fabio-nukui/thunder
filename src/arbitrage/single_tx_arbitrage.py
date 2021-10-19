@@ -101,7 +101,7 @@ class SingleTxArbitrage(Generic[_BlockchainClientT], ABC):
         self.client = client
         self.data = ArbitrageData()
         log.info(f"Initialized {self} at height={self.client.height}")
-        self.last_height_run = 0
+        self.last_run_height = 0
 
     @abstractmethod
     def _reset_mempool_params(self):
@@ -118,17 +118,18 @@ class SingleTxArbitrage(Generic[_BlockchainClientT], ABC):
         return State.finished
 
     async def run(self, height: int, filtered_mempool: dict[Any, list[list[dict]]] = None):
-        if height > self.last_height_run:
+        if height > self.last_run_height:
             self._reset_mempool_params()
         try:
             if self.state == State.waiting_confirmation:
-                if self.last_height_run >= height:
+                if self.last_run_height >= height:
                     return
                 log.debug(f"{self} ({height=}) Looking for tx confirmation(s)")
                 try:
                     self.data.result = await self._confirm_tx(height)
                     log.info(
-                        f"Arbitrage {self.data.result.tx_status}",
+                        f"Arbitrage {self.data.result.tx_status}, "
+                        f"net_profit_usd={self.data.result.net_profit_usd:.2f}",
                         extra={"data": self.data.to_data()},
                     )
                     self.data.reset()
@@ -152,7 +153,7 @@ class SingleTxArbitrage(Generic[_BlockchainClientT], ABC):
                     self.data.reset()
                 return
         finally:
-            self.last_height_run = height
+            self.last_run_height = height
 
     @abstractmethod
     async def _get_arbitrage_params(
