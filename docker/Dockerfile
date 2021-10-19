@@ -24,13 +24,13 @@ RUN useradd -m -s /bin/bash -N -u $UID $USER && \
 USER $USER
 
 RUN conda install --quiet --yes \
-        'boto3==1.18.44' \
-        'cachetools==4.2.2' \
-        'httpx==0.19.0' \
+        'boto3==1.18.63' \
+        'cachetools==4.2.4' \
+        'httpx==0.20.0' \
         'python-json-logger==2.0.1' \
-        'pyyaml==5.4.1' \
+        'pyyaml==6.0' \
         'watchtower==1.0.6' \
-        'web3==5.23.1' && \
+        'web3==5.24.0' && \
     conda clean --all -f -y && \
     fix-permissions $HOME $CONDA_DIR
 
@@ -76,14 +76,14 @@ RUN apt-get -q update && \
 USER $USER
 
 RUN conda install --quiet --yes \
-        'autopep8' \
-        'black' \
-        'flake8' \
-        'ipython' \
-        'isort' \
-        'line_profiler' \
-        'nodejs' \
-        'pytest' \
+        'autopep8==1.5.7' \
+        'black==21.9b0' \
+        'flake8==4.0.1' \
+        'ipython==7.28.0' \
+        'isort==5.9.3' \
+        'line_profiler=3.3.1' \
+        'nodejs==16.10.0' \
+        'pytest==6.2.5' \
         'types-cachetools' \
         'types-PyYAML' && \
     conda clean --all -f -y  && \
