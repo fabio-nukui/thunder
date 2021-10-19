@@ -96,18 +96,18 @@ async def _get_ust_loop_3cycle_routes(
     loop_factory: terraswap.LoopFactory,
     terraswap_factory: terraswap.TerraswapFactory,
 ) -> list[terraswap.MultiRoutes]:
-    loop_ust_pair = await loop_factory.get_pair("LOOP_UST")
-    pat_token_symbol = re.compile(r"^(?:([a-zA-Z]+)_LOOP|LOOP_([a-zA-Z]+))$")
+    loop_ust_pair = await loop_factory.get_pair("LOOP-UST")
+    pat_token_symbol = re.compile(r"^(?:([a-zA-Z]+)-LOOP|LOOP-([a-zA-Z]+))$")
 
     routes: list[terraswap.MultiRoutes] = []
     for pair_symbol in loop_factory.addresses["pairs"]:
-        if not (match := pat_token_symbol.match(pair_symbol)) or pair_symbol == "LOOP_UST":
+        if not (match := pat_token_symbol.match(pair_symbol)) or pair_symbol == "LOOP-UST":
             continue
         token_symbol = match.group(1) or match.group(2)
 
         ust_pairs: list[terraswap.LiquidityPair] = []
         for factory in (terraswap_factory, loop_factory):
-            for ust_pair_symbol in (f"{token_symbol}_UST", f"UST_{token_symbol}"):
+            for ust_pair_symbol in (f"{token_symbol}-UST", f"UST-{token_symbol}"):
                 if ust_pair_symbol in factory.addresses["pairs"]:
                     ust_pairs.append(await factory.get_pair(ust_pair_symbol))
         assert ust_pairs, f"No UST pairs found for {token_symbol}"
@@ -124,14 +124,14 @@ async def _get_ust_2cycle_routes(
     loop_factory: terraswap.LoopFactory,
     terraswap_factory: terraswap.TerraswapFactory,
 ) -> list[terraswap.MultiRoutes]:
-    pat_token_symbol = re.compile(r"([A-Z]+)_UST|UST_([A-Z]+)")
+    pat_token_symbol = re.compile(r"([A-Z]+)-UST|UST-([A-Z]+)")
     pair_symbol: str
 
     routes: list[terraswap.MultiRoutes] = []
     for pair_symbol in loop_factory.addresses["pairs"]:
         if not (match := pat_token_symbol.match(pair_symbol)):
             continue
-        reversed_symbol = f"{match.group(2)}_UST" if match.group(2) else f"UST_{match.group(1)}"
+        reversed_symbol = f"{match.group(2)}-UST" if match.group(2) else f"UST-{match.group(1)}"
         if pair_symbol in terraswap_factory.addresses["pairs"]:
             terraswap_pair = await terraswap_factory.get_pair(pair_symbol)
         elif reversed_symbol in terraswap_factory.addresses["pairs"]:
@@ -148,7 +148,7 @@ async def _get_ust_terraswap_3cycle_routes(
     terraswap_factory: terraswap.TerraswapFactory,
 ) -> list[terraswap.MultiRoutes]:
     beth_ust_pair, meth_beth_pair, ust_meth_pair = await terraswap_factory.get_pairs(
-        ["BETH_UST", "mETH_BETH", "UST_mETH"]
+        ["BETH-UST", "mETH-BETH", "UST-mETH"]
     )
     return [
         terraswap.MultiRoutes(client, UST, [[beth_ust_pair], [meth_beth_pair], [ust_meth_pair]])

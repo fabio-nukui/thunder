@@ -83,7 +83,7 @@ class Factory:
             except LCDResponseError as e:
                 log.info(f"Error querying {info['contract_addr']}: {e.message}")
                 continue
-            pair_symbol = "_".join(token.repr_symbol for token in tokens)
+            pair_symbol = "-".join(token.repr_symbol for token in tokens)
             if pair_symbol in addresses["pairs"]:
                 log.info(f"{pair_symbol=}, address={info['contract_addr']} already in pairs")
             else:

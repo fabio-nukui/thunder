@@ -72,7 +72,7 @@ class ArbParams(TerraArbParams):
 async def get_arbitrages(client: TerraClient) -> list[LunaUstMarketArbitrage]:
     factory = await terraswap.TerraswapFactory.new(client)
 
-    pair = await factory.get_pair("UST_LUNA")
+    pair = await factory.get_pair("UST-LUNA")
     router = factory.get_router([pair])
     return [LunaUstMarketArbitrage(client, router)]
 

@@ -1,20 +1,22 @@
 {
   "factory": "terra16hdjuvghcumu6prg22cdjl96ptuay6r0hc6yns",
   "pairs": {
-    "TWD_UST": "terra1jfp5ew4tsru98wthajsqegtzaxt49ty4z2qws0",
-    "SPEC_UST": "terra1jkr0ef9fpghdru38ht70ds6jfldprgttw6xlek",
-    "STT_UST": "terra1lgazu0ltsxm3ayellqa2mhnhlvgx3hevkqeqy2",
-    "LOOPR_UST": "terra1dw5j23l6nwge69z0enemutfmyc93c36aqnzjj5",
-    "LOOP_UST": "terra106a00unep7pvwvcck4wylt4fffjhgkf9a0u6eu",
-    "MIR_UST": "terra1cpzkckgzz90pq8fkumdjc58ee5llrxt2yka9fp",
-    "ALTE_UST": "terra1whns5nyc8sw328uw3qqnyafxd5yfqsytkdkgqz",
-    "ANC_UST": "terra1f6d3pggq7h2y7jrgwxp3xh08yhvj8znalql87h",
-    "MINE_UST": "terra13eggta6zqfg03mxgqg9p5paqka7tgaaxnkhuuu",
-    "LOTA_UST": "terra15568nqrqcawm263yqcuuuvj5mh763tp8jyscq3",
-    "LOOP_LOOPR": "terra154jt8ppucvvakvqa5fyfjdflsu6v83j4ckjfq3",
-    "LOOP_MIR": "terra13ay3hftcft25uazl76q8gmdk993y9nyv9avu2h",
-    "LOOP_ANC": "terra1w7hny2catfwsv6dq8gfm4zgazx3hmpl3xwzxya",
-    "LOOP_MINE": "terra1a26j00ywq0llvms707hqycwlkl9erwhacr6jve",
-    "LOOP_LOTA": "terra1kw95x0l3qw5y7jw3j0h3fy83y56rj68wd8w7rc"
+    "TWD-UST": "terra1jfp5ew4tsru98wthajsqegtzaxt49ty4z2qws0",
+    "SPEC-UST": "terra1jkr0ef9fpghdru38ht70ds6jfldprgttw6xlek",
+    "STT-UST": "terra1lgazu0ltsxm3ayellqa2mhnhlvgx3hevkqeqy2",
+    "LOOPR-UST": "terra1dw5j23l6nwge69z0enemutfmyc93c36aqnzjj5",
+    "LOOP-UST": "terra106a00unep7pvwvcck4wylt4fffjhgkf9a0u6eu",
+    "MIR-UST": "terra1cpzkckgzz90pq8fkumdjc58ee5llrxt2yka9fp",
+    "ALTE-UST": "terra1whns5nyc8sw328uw3qqnyafxd5yfqsytkdkgqz",
+    "ANC-UST": "terra1f6d3pggq7h2y7jrgwxp3xh08yhvj8znalql87h",
+    "MINE-UST": "terra13eggta6zqfg03mxgqg9p5paqka7tgaaxnkhuuu",
+    "LOTA-UST": "terra15568nqrqcawm263yqcuuuvj5mh763tp8jyscq3",
+    "MIAW-UST": "terra1yk5z0f5zkcd8ur6fg5g2ay2eemsetrj85rhhxk",
+    "DPH-UST": "terra178yhudw6cwtnrn4fq593z87y385m0xe9n6x423",
+    "LOOP-LOOPR": "terra154jt8ppucvvakvqa5fyfjdflsu6v83j4ckjfq3",
+    "LOOP-MIR": "terra13ay3hftcft25uazl76q8gmdk993y9nyv9avu2h",
+    "LOOP-ANC": "terra1w7hny2catfwsv6dq8gfm4zgazx3hmpl3xwzxya",
+    "LOOP-MINE": "terra1a26j00ywq0llvms707hqycwlkl9erwhacr6jve",
+    "LOOP-LOTA": "terra1kw95x0l3qw5y7jw3j0h3fy83y56rj68wd8w7rc"
   }
 }

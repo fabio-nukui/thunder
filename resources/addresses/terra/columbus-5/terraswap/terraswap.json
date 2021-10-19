@@ -1,20 +1,22 @@
 {
   "factory": "terra1ulgw0td86nvs4wtpsc80thv6xelk76ut7a7apj",
   "pairs": {
-    "UST_MIR": "terra1amv303y8kzxuegvurh0gug2xe9wkgj65enq2ux",
-    "UST_mETH": "terra14fyt2g3umeatsr4j4g2rs8ca0jceu3k0mcs7ry",
-    "UST_LUNA": "terra1tndcaqxkpc5ce9qee5ggqf430mr2z3pefe5wj6",
-    "ANC_UST": "terra1gm5p3ner9x9xpwugn9sp6gvhd0lwrtkyrecdn3",
-    "BLUNA_LUNA": "terra1jxazgm67et0ce260kvrpfv50acuushpjsz2y0p",
-    "MINE_UST": "terra178jydtjvj4gw8earkgnqc80c3hrmqj4kw2welz",
-    "SPEC_UST": "terra1tn8ejzw8kpuc87nu42f6qeyen4c7qy35tl8t20",
-    "STT_UST": "terra19pg6d7rrndg4z4t0jhcd7z9nhl3p5ygqttxjll",
-    "TWD_UST": "terra1etdkg9p0fkl8zal6ecp98kypd32q8k3ryced9d",
-    "ALTE_UST": "terra18adm0emn6j3pnc90ldechhun62y898xrdmfgfz",
-    "LOTA_UST": "terra1pn20mcwnmeyxf68vpt3cyel3n57qm9mp289jta",
-    "BETH_UST": "terra1c0afrdc5253tkp5wt7rxhuj42xwyf2lcre0s7c",
-    "mETH_BETH": "terra1c5swgtnuunpf75klq5uztynurazuwqf0mmmcyy",
-    "BLUNA-LUNA_UST-LUNA": "terra1wrwf3um5vm30vpwnlpvjzgwpf5fjknt68nah05"
+    "ALTE-UST": "terra18adm0emn6j3pnc90ldechhun62y898xrdmfgfz",
+    "ANC-UST": "terra1gm5p3ner9x9xpwugn9sp6gvhd0lwrtkyrecdn3",
+    "BETH-UST": "terra1c0afrdc5253tkp5wt7rxhuj42xwyf2lcre0s7c",
+    "BLUNA-LUNA": "terra1jxazgm67et0ce260kvrpfv50acuushpjsz2y0p",
+    "(BLUNA-LUNA)-(UST-LUNA)": "terra1wrwf3um5vm30vpwnlpvjzgwpf5fjknt68nah05",
+    "DPH-UST": "terra1zz39wfyyqt4tjz7dz6p7s9c8pwmcw2xzde3xl8",
+    "LOTA-UST": "terra1pn20mcwnmeyxf68vpt3cyel3n57qm9mp289jta",
+    "MIAW-UST": "terra12mzh5cp6tgc65t2cqku5zvkjj8xjtuv5v9whyd",
+    "MINE-UST": "terra178jydtjvj4gw8earkgnqc80c3hrmqj4kw2welz",
+    "SPEC-UST": "terra1tn8ejzw8kpuc87nu42f6qeyen4c7qy35tl8t20",
+    "STT-UST": "terra19pg6d7rrndg4z4t0jhcd7z9nhl3p5ygqttxjll",
+    "TWD-UST": "terra1etdkg9p0fkl8zal6ecp98kypd32q8k3ryced9d",
+    "UST-LUNA": "terra1tndcaqxkpc5ce9qee5ggqf430mr2z3pefe5wj6",
+    "UST-MIR": "terra1amv303y8kzxuegvurh0gug2xe9wkgj65enq2ux",
+    "UST-mETH": "terra14fyt2g3umeatsr4j4g2rs8ca0jceu3k0mcs7ry",
+    "mETH-BETH": "terra1c5swgtnuunpf75klq5uztynurazuwqf0mmmcyy"
   },
   "router": "terra19qx5xe6q9ll4w0890ux7lv2p4mf3csd4qvt3ex"
 }

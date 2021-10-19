@@ -551,4 +551,4 @@ class LPToken(CW20Token):
 
     @property
     def repr_symbol(self):
-        return "-".join(t.repr_symbol for t in self.pair_tokens)
+        return "-".join(f"({t.repr_symbol})" for t in self.pair_tokens)
