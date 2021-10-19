@@ -17,7 +17,7 @@ _BlockchainClientT = TypeVar("_BlockchainClientT", bound=BlockchainClient)
 
 
 class State(str, Enum):
-    start = "start"
+    ready_to_generate_parameters = "ready_to_generate_parameters"
     ready_to_broadcast = "ready_to_broadcast"
     waiting_confirmation = "waiting_confirmation"
     finished = "finished"
@@ -110,7 +110,7 @@ class SingleTxArbitrage(Generic[_BlockchainClientT], ABC):
     @property
     def state(self) -> State:
         if self.data.params is None:
-            return State.start
+            return State.ready_to_generate_parameters
         if self.data.tx is None:
             return State.ready_to_broadcast
         if self.data.result is None:
@@ -134,7 +134,7 @@ class SingleTxArbitrage(Generic[_BlockchainClientT], ABC):
                     self.data.reset()
                 except IsBusy:
                     return
-            if self.state == State.start:
+            if self.state == State.ready_to_generate_parameters:
                 log.debug(f"{self} ({height=}) Generating arbitrage parameters")
                 try:
                     self.data.params = await self._get_arbitrage_params(height, filtered_mempool)
