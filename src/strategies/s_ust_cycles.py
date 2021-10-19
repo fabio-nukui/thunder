@@ -13,6 +13,12 @@ from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.exceptions import LCDResponseError
 
 import utils
+from arbitrage.terra import (
+    TerraArbParams,
+    TerraSingleTxArbitrage,
+    TerraswapLPReserveSimulationMixin,
+    run_strategy,
+)
 from chains.terra import UST, TerraClient, TerraTokenAmount, terraswap
 from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
 from exceptions import TxError, UnprofitableArbitrage
@@ -24,8 +30,6 @@ from .common.default_params import (
     MIN_UST_RESERVED_AMOUNT,
     OPTIMIZATION_TOLERANCE,
 )
-from .common.terra_single_tx_arbitrage import TerraArbParams, TerraSingleTxArbitrage, run_strategy
-from .common.terraswap_lp_reserve_simulation import TerraswapLPReserveSimulationMixin
 
 log = logging.getLogger(__name__)
 

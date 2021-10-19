@@ -14,7 +14,7 @@ from chains.terra import TerraClient, TerraTokenAmount
 from chains.terra.tx_filter import Filter
 from exceptions import BlockchainNewState, IsBusy
 
-from .single_tx_arbitrage import ArbResult, ArbTx, BaseArbParams, SingleTxArbitrage, TxStatus
+from ..single_tx_arbitrage import ArbResult, ArbTx, BaseArbParams, SingleTxArbitrage, TxStatus
 
 log = logging.getLogger(__name__)
 

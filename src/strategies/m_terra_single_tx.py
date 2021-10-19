@@ -1,10 +1,10 @@
 import asyncio
 from typing import Sequence
 
+from arbitrage.terra import TerraSingleTxArbitrage, run_strategy
 from chains.terra import TerraClient
 
 from . import s_lp_tower, s_luna_ust_market, s_ust_cycles
-from .common.terra_single_tx_arbitrage import TerraSingleTxArbitrage, run_strategy
 
 
 async def run(max_n_blocks: int = None):
