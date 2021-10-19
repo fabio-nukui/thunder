@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import logging
+from typing import Any
 
 from web3 import Web3
 
@@ -36,18 +39,17 @@ class OneInchExchange:
         self,
         amount_in: EVMTokenAmount,
         token_out: EVMToken,
-        gas_price: int = None,
+        gas_multiplier: float = None,
     ) -> EVMTokenAmount:
         token_in = amount_in.token
         address_from = NATIVE_ADDRESS if isinstance(token_in, EVMNativeToken) else token_in.address
         address_to = NATIVE_ADDRESS if isinstance(token_out, EVMNativeToken) else token_out.address
 
-        gas_price = self.client.get_gas_price() if gas_price is None else gas_price
         query_params = {
             "fromTokenAddress": address_from,
             "toTokenAddress": address_to,
             "amount": amount_in.int_amount,
-            "gasPrice": gas_price,
+            **self.client.get_gas_price(gas_multiplier, force_legacy_tx=True),
         }
         res = utils.http.get(f"{self.api_url}/quote", params=query_params, timeout=TIMEOUT_REQUESTS)
         int_amount = res.json()["toTokenAmount"]
@@ -58,7 +60,8 @@ class OneInchExchange:
         amount_in: EVMTokenAmount,
         token_out: EVMToken,
         max_slippage: float = DEFAULT_MAX_SLIPPAGE,
-        gas_price: int = None,
+        gas_multiplier: float = None,
+        base_fee_multiplier: float = None,
         infinite_approval: bool = True,
     ) -> str:
         token_in = amount_in.token
@@ -67,14 +70,13 @@ class OneInchExchange:
 
         amount_in.ensure_allowance(self.client, self.router_address, infinite_approval)
 
-        gas_price = self.client.get_gas_price() if gas_price is None else gas_price
         query_params = {
             "fromTokenAddress": address_from,
             "toTokenAddress": address_to,
             "amount": amount_in.int_amount,
             "fromAddress": self.client.address,
             "slippage": max_slippage,
-            "gasPrice": gas_price,
+            **self.client.get_gas_price(gas_multiplier, force_legacy_tx=True),
             "allowPartialFill": True,
         }
         res = utils.http.get(
@@ -83,10 +85,10 @@ class OneInchExchange:
             params=query_params,
             timeout=TIMEOUT_REQUESTS,
         )
-        tx = res.json()["tx"]
+        tx: dict[str, Any] = res.json()["tx"]
         tx["gas"] = round(tx["gas"] * GAS_ESTIMATE_MARGIN)
         tx["value"] = int(tx["value"])
-        tx["gasPrice"] = int(tx["gasPrice"])
+        tx.update(self.client.get_gas_price(gas_multiplier, base_fee_multiplier))
         tx["to"] = Web3.toChecksumAddress(tx["to"])
 
         return self.client.sign_and_send_tx(tx)

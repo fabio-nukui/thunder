@@ -8,6 +8,7 @@ from typing import Literal, Optional, Union
 from eth_account.signers.local import LocalAccount
 from web3 import Web3
 from web3.contract import ContractFunction
+from web3.types import TxParams
 
 import configs
 from common import SyncBlockchainClient, Token, TokenAmount
@@ -22,8 +23,6 @@ _NATIVE_TOKENS = {
 
 # Almost same as max uint256, but uses less gas
 INF_APPROVAL_AMOUNT = 0xFF00000000000000000000000000000000000000000000000000000000000000
-
-DEFAULT_MAX_GAS = 1_000_000
 
 
 class EVMTokenAmount(TokenAmount):
@@ -154,6 +153,9 @@ class BaseEVMClient(SyncBlockchainClient, ABC):
     endpoint_uri: str
     chain_id: int
     block_identifier: int | Literal["latest"]
+    eip_1559: bool
+    gas_multiplier: float
+    base_fee_multiplier: float
     w3: Web3
     account: LocalAccount
     address: str
@@ -163,7 +165,7 @@ class BaseEVMClient(SyncBlockchainClient, ABC):
         ...
 
     @abstractmethod
-    def sign_and_send_tx(self, tx: dict) -> str:
+    def sign_and_send_tx(self, tx: TxParams) -> str:
         ...
 
     @abstractmethod
@@ -171,7 +173,8 @@ class BaseEVMClient(SyncBlockchainClient, ABC):
         self,
         contract_call: ContractFunction,
         value: int = 0,
-        gas_price: int = None,
-        max_gas: int = DEFAULT_MAX_GAS,
+        max_gas: int = None,
+        gas_multiplier: float = None,
+        base_fee_multiplier: float = None,
     ) -> str:
         ...

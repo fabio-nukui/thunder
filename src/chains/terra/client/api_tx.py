@@ -37,7 +37,7 @@ class TxApi(ITxApi):
     async def get_gas_prices(self) -> Coins:
         res = await self.client.fcd_client.get("v1/txs/gas_prices")
         adjusted_prices = {
-            denom: str(Decimal(amount) * configs.TERRA_GAS_MULTIPLIER_PREMIUM)
+            denom: str(Decimal(amount) * configs.TERRA_GAS_MULTIPLIER)
             for denom, amount in res.json().items()
         }
         return Coins(adjusted_prices)

@@ -11,10 +11,11 @@ from eth_account.signers.local import LocalAccount
 from web3 import Account, HTTPProvider, IPCProvider, Web3, WebsocketProvider
 from web3._utils.request import _session_cache as web3_http_sessions_cache
 from web3.contract import ContractFunction
+from web3.types import TxParams
 
 import auth_secrets
 
-from .core import DEFAULT_MAX_GAS, BaseEVMClient
+from .core import BaseEVMClient
 
 log = logging.getLogger(__name__)
 
@@ -23,6 +24,9 @@ Account.enable_unaudited_hdwallet_features()
 
 DEFAULT_CONN_TIMEOUT = 3
 MAX_BLOCKS_WAIT_RECEIPT = 10
+DEFAULT_MAX_GAS = 1_000_000
+DEFAULT_GAS_MULTIPLIER = 1.01
+DEFAULT_BASE_FEE_MULTIPLIER = 2.1
 
 
 class EVMClient(BaseEVMClient):
@@ -36,6 +40,9 @@ class EVMClient(BaseEVMClient):
         hd_wallet_index: int = 0,
         timeout: int = None,
         block_identifier: int | Literal["latest"] = "latest",
+        eip_1559: bool = True,
+        gas_multiplier: float = DEFAULT_GAS_MULTIPLIER,
+        base_fee_multiplier: float = DEFAULT_BASE_FEE_MULTIPLIER,
         raise_on_syncing: bool = False,
     ):
         self.endpoint_uri = endpoint_uri
@@ -43,6 +50,9 @@ class EVMClient(BaseEVMClient):
         self.middlewares = middlewares
         self.timeout = DEFAULT_CONN_TIMEOUT if timeout is None else timeout
         self.block_identifier = block_identifier
+        self.eip_1559 = eip_1559
+        self.gas_multiplier = gas_multiplier
+        self.base_fee_multiplier = base_fee_multiplier
 
         self.w3 = get_w3(endpoint_uri, middlewares, timeout)
         self.height = self.w3.eth.block_number
@@ -73,17 +83,34 @@ class EVMClient(BaseEVMClient):
                 session.close()
             web3_http_sessions_cache.clear()
 
-    def get_gas_price(self) -> int:
-        return self.w3.eth.gas_price
+    def get_gas_price(
+        self,
+        gas_multiplier: float = None,
+        base_fee_multiplier: float = None,
+        force_legacy_tx: bool = False,
+    ) -> dict[str, int]:
+        gas_multiplier = gas_multiplier or self.gas_multiplier
+        base_fee_multiplier = base_fee_multiplier or self.base_fee_multiplier
 
-    def sign_and_send_tx(self, tx: dict) -> str:
+        if force_legacy_tx or not self.eip_1559:
+            return {"gasPrice": round(self.w3.eth.gas_price * gas_multiplier)}
+
+        base_fee = self.w3.eth.get_block("pending")["baseFeePerGas"]
+        return {
+            "maxFeePerGas": round(base_fee * base_fee_multiplier),
+            "maxPriorityFeePerGas": round(self.w3.eth.max_priority_fee * gas_multiplier),
+            "type": 2,
+        }
+
+    def sign_and_send_tx(self, tx: TxParams) -> str:
         tx = copy(tx)
         tx.setdefault("gas", DEFAULT_MAX_GAS)
 
         # Avoid dict's setdefault() or get() to avoid side effects / calling expensive functions
         if "nonce" not in tx:
             tx["nonce"] = self.w3.eth.get_transaction_count(self.address)
-        tx["gasPrice"] = tx["gasPrice"] if "gasPrice" in tx else self.get_gas_price()
+        if "gasPrice" not in tx or self.eip_1559 and "maxFeePerGas" not in tx:
+            tx.update(self.get_gas_price())
 
         signed_tx: SignedTransaction = self.account.sign_transaction(tx)
         tx_hash = signed_tx.hash.hex()
@@ -95,16 +122,17 @@ class EVMClient(BaseEVMClient):
         self,
         contract_call: ContractFunction,
         value: int = 0,
-        gas_price: int = None,
-        max_gas: int = DEFAULT_MAX_GAS,
+        max_gas: int = None,
+        gas_multiplier: float = None,
+        base_fee_multiplier: float = None,
     ) -> str:
         tx = contract_call.buildTransaction(
             {
                 "from": self.address,
                 "value": value,
                 "chainId": self.chain_id,
-                "gas": max_gas,
-                "gasPrice": self.get_gas_price() if gas_price is None else gas_price,
+                "gas": DEFAULT_MAX_GAS if max_gas is None else max_gas,
+                **self.get_gas_price(gas_multiplier, base_fee_multiplier),
             }
         )
         return self.sign_and_send_tx(tx)
