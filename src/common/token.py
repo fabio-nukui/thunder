@@ -152,6 +152,9 @@ class TokenAmount:
     def __add__(self: _TokenAmountT, other: _TokenAmountT | DecInput) -> _TokenAmountT:
         return self.__class__(self.token, self.amount + self._to_decimal(other))
 
+    def __radd__(self: _TokenAmountT, other: _TokenAmountT | DecInput) -> _TokenAmountT:
+        return self.__add__(other)
+
     def __sub__(self: _TokenAmountT, other: _TokenAmountT | DecInput) -> _TokenAmountT:
         return self.__class__(self.token, self.amount - self._to_decimal(other))
 
