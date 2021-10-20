@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from decimal import Decimal
 from typing import Any, Iterable, Tuple, TypeVar
@@ -8,17 +9,18 @@ from typing import Any, Iterable, Tuple, TypeVar
 from terra_sdk.core.strings import AccAddress
 from terra_sdk.exceptions import LCDResponseError
 
+from chains.terra.token import CW20Token, TerraToken
 from exceptions import NotContract
 
 from ..client import TerraClient
-from .liquidity_pair import LiquidityPair
+from .liquidity_pair import LiquidityPair, LPToken, pair_tokens_from_data
 from .router import Router
-from .utils import pair_tokens_from_data
 
 _FactoryT = TypeVar("_FactoryT", bound="Factory")
 
 log = logging.getLogger(__name__)
 
+_CW20_WHITELIST: dict = json.load(open("resources/addresses/terra/columbus-5/cw20_whitelist.json"))
 _FEES = {
     "terra154jt8ppucvvakvqa5fyfjdflsu6v83j4ckjfq3": Decimal("0.00300001"),  # LOOP_LOOPR
     "terra1dw5j23l6nwge69z0enemutfmyc93c36aqnzjj5": Decimal("0.00300001"),  # LOOPR_UST
@@ -27,6 +29,14 @@ _FEES = {
 
 def _get_fee_rate(contract_addr: str) -> Decimal | None:
     return _FEES.get(contract_addr)
+
+
+def _check_cw20_whitelist(token: TerraToken) -> bool:
+    if not isinstance(token, CW20Token):
+        return True
+    if isinstance(token, LPToken):
+        return all(_check_cw20_whitelist(t) for t in token.pair_tokens)
+    return _CW20_WHITELIST.get(token.symbol) == token.contract_addr
 
 
 class Factory:
@@ -70,24 +80,42 @@ class Factory:
             infos.extend(data)
             query_params = {"start_after": data[-1]["asset_infos"]}
 
-    async def generate_addresses_dict(self) -> dict[str, str | dict[str, str]]:
+    async def generate_addresses_dict(
+        self,
+        recursive: bool = True,
+        router_address: str = None,
+    ) -> dict[str, str | dict[str, str]]:
         pair_infos = await self.fetch_all_pair_infos()
         addresses: dict[str, Any] = {"factory": self.contract_addr, "pairs": {}}
+        if router_address is not None:
+            addresses["router"] = router_address
         for info in pair_infos:
             try:
-                tokens = await pair_tokens_from_data(info["asset_infos"], self.client)
+                if recursive:
+                    tokens = await pair_tokens_from_data(
+                        info["asset_infos"], self.client, self.lp_token_code_id
+                    )
+                else:
+                    tokens = await pair_tokens_from_data(info["asset_infos"], self.client)
             except NotImplementedError:  # Wrongly configured native token
                 continue
             except NotContract:  # One or more of the tokens were not implemented
                 continue
             except LCDResponseError as e:
-                log.info(f"Error querying {info['contract_addr']}: {e.message}")
+                log.debug(
+                    f"Error querying {info['contract_addr']}: "
+                    f"status={e.response.status} {e.message}"
+                )
+                continue
+            if not all(_check_cw20_whitelist(token) for token in tokens):
+                log.debug(f"Rejected {info['contract_addr']}: one of {tokens} not in whitelist")
                 continue
             pair_symbol = "-".join(token.repr_symbol for token in tokens)
             if pair_symbol in addresses["pairs"]:
-                log.info(f"{pair_symbol=}, address={info['contract_addr']} already in pairs")
+                log.debug(f"{pair_symbol=}, address={info['contract_addr']} already in pairs")
             else:
                 addresses["pairs"][pair_symbol] = info["contract_addr"]
+        addresses["pairs"] = dict(sorted(addresses["pairs"].items()))
         return addresses
 
     async def get_pairs(self, pairs_names: Iterable[str]) -> Tuple[LiquidityPair, ...]:
@@ -98,6 +126,7 @@ class Factory:
             contract_addr = self.addresses["pairs"][pair_name]
         except KeyError:
             raise Exception(f"{self}: {pair_name} not in pairs addresses")
+        assert self.is_pair(contract_addr)
         return await LiquidityPair.new(
             contract_addr,
             self.client,

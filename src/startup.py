@@ -1,3 +1,4 @@
+import logging
 import logging.config
 import os
 import warnings
@@ -26,6 +27,10 @@ def setup_logger():
         dict_config["root"]["handlers"].remove("watchtower")
 
     dict_config["loggers"]["utils.cache"] = {"level": configs.CACHE_LOG_LEVEL}
+    for handler in dict_config["handlers"].values():
+        handler["level"] = max(
+            logging.getLevelName(configs.MIN_LOG_LEVEL), logging.getLevelName(handler["level"])
+        )
 
     os.makedirs("logs", exist_ok=True)
     logging.config.dictConfig(dict_config)

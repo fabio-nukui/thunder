@@ -6,6 +6,7 @@ STRATEGY = os.getenv("STRATEGY", "no_strategy")
 
 # Logs
 LOG_AWS = os.getenv("LOG_AWS", "").lower() == "true"
+MIN_LOG_LEVEL = os.getenv("MIN_LOG_LEVEL", "DEBUG")
 
 # Secrets
 SECRET_HD_WALLET = os.getenv("SECRET_HD_WALLET", "")

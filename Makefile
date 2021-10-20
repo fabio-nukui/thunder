@@ -136,14 +136,14 @@ endif
 	@exit 0
 
 lint-check: ## Run linter checks
-	docker exec $(DEV_CONTAINER_NAME) isort -c src tests app.py
-	docker exec $(DEV_CONTAINER_NAME) black --check src tests app.py
-	docker exec $(DEV_CONTAINER_NAME) flake8 src tests app.py
+	docker exec $(DEV_CONTAINER_NAME) isort -c src scripts tests app.py
+	docker exec $(DEV_CONTAINER_NAME) black --check src scripts tests app.py
+	docker exec $(DEV_CONTAINER_NAME) flake8 src scripts tests app.py
 	docker exec $(DEV_CONTAINER_NAME) pyright
 
 lint-fix: ## Run linters and auto-fix code style
-	docker exec $(DEV_CONTAINER_NAME) isort src tests app.py
-	docker exec $(DEV_CONTAINER_NAME) black --safe src tests app.py
+	docker exec $(DEV_CONTAINER_NAME) isort src scripts tests app.py
+	docker exec $(DEV_CONTAINER_NAME) black --safe src scripts tests app.py
 
 test: ## Run test cases in tests directory
 	docker exec $(DEV_CONTAINER_NAME) pytest -v tests

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
 import logging
@@ -11,13 +12,14 @@ from enum import Enum
 
 from terra_sdk.core import AccAddress
 from terra_sdk.core.wasm import MsgExecuteContract
+from terra_sdk.exceptions import LCDResponseError
 
-from exceptions import InsufficientLiquidity, MaxSpreadAssertion
+from exceptions import InsufficientLiquidity, MaxSpreadAssertion, NotContract
 from utils.cache import CacheGroup, ttl_cache
 
 from ..client import TerraClient
 from ..token import CW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
-from .utils import Operation, pair_tokens_from_data, token_from_data, token_to_data
+from .utils import Operation, token_to_data
 
 log = logging.getLogger(__name__)
 
@@ -34,6 +36,42 @@ class Action(str, Enum):
 
 class NotTerraswapPair(Exception):
     pass
+
+
+class NotTerraswapLPToken(Exception):
+    pass
+
+
+async def pair_tokens_from_data(
+    asset_infos: list[dict],
+    client: TerraClient,
+    recursive_lp_token_code_id: int = None,
+) -> tuple[TerraToken, TerraToken]:
+    token_0, token_1 = await asyncio.gather(
+        token_from_data(asset_infos[0], client, recursive_lp_token_code_id),
+        token_from_data(asset_infos[1], client, recursive_lp_token_code_id),
+    )
+    return token_0, token_1
+
+
+async def token_from_data(
+    asset_info: dict,
+    client: TerraClient,
+    recursive_lp_token_code_id: int = None,
+) -> TerraToken:
+    if "native_token" in asset_info:
+        return TerraNativeToken(asset_info["native_token"]["denom"])
+    if "token" in asset_info:
+        contract_addr: AccAddress = asset_info["token"]["contract_addr"]
+        if recursive_lp_token_code_id is not None:
+            try:
+                return await LPToken.from_contract(
+                    contract_addr, client, recursive_lp_token_code_id=recursive_lp_token_code_id
+                )
+            except NotTerraswapLPToken:
+                pass
+        return await CW20Token.from_contract(contract_addr, client)
+    raise TypeError(f"Unexpected data format: {asset_info}")
 
 
 def _token_amount_to_data(token_amount: TerraTokenAmount) -> dict:
@@ -60,6 +98,7 @@ class LiquidityPair:
         client: TerraClient,
         fee_rate: Decimal = None,
         factory_name: str = None,
+        recursive_lp_token_code_id: int = None,
     ) -> LiquidityPair:
         self = super().__new__(cls)
         self.contract_addr = contract_addr
@@ -67,7 +106,9 @@ class LiquidityPair:
         self.fee_rate = FEE if fee_rate is None else fee_rate
         self.factory_name = factory_name
 
-        self.lp_token = await LPToken.from_pool_contract(self.contract_addr, self.client)
+        self.lp_token = await LPToken.from_pool_contract(
+            self.contract_addr, self.client, recursive_lp_token_code_id
+        )
         self.tokens = self.lp_token.pair_tokens
 
         self.stop_updates = False
@@ -527,28 +568,57 @@ class LiquidityPair:
 class LPToken(CW20Token):
     pair_tokens: tuple[TerraToken, TerraToken]
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self.repr_symbol[1:-1]})"
+
+    def __str__(self) -> str:
+        return self.repr_symbol[1:-1]
+
     @classmethod
     async def from_contract(
         cls,
         contract_addr: AccAddress,
         client: TerraClient,
         pair_tokens: tuple[TerraToken, TerraToken] = None,
+        recursive_lp_token_code_id: int = None,
     ) -> LPToken:
+        if recursive_lp_token_code_id is not None:
+            try:
+                res = await client.contract_info(contract_addr)
+            except NotContract:
+                raise NotTerraswapLPToken
+            if recursive_lp_token_code_id != int(res["code_id"]):
+                raise NotTerraswapLPToken
         self = await super().from_contract(contract_addr, client)
         if pair_tokens is None:
-            minter_addr = (await client.contract_query(contract_addr, {"minter": {}}))["minter"]
-            pair_data = await client.contract_query(minter_addr, {"pair": {}})
-            pair_tokens = await pair_tokens_from_data(pair_data["asset_infos"], client)
+            res = await client.contract_query(contract_addr, {"minter": {}})
+            if not res:
+                raise NotTerraswapLPToken
+            minter_addr = res["minter"]
+            try:
+                pair_data = await client.contract_query(minter_addr, {"pair": {}})
+            except LCDResponseError:
+                raise NotTerraswapLPToken
+            pair_tokens = await pair_tokens_from_data(
+                pair_data["asset_infos"], client, recursive_lp_token_code_id
+            )
         self.pair_tokens = pair_tokens
         return self
 
     @classmethod
-    async def from_pool_contract(cls, pool_addr: AccAddress, client: TerraClient) -> LPToken:
+    async def from_pool_contract(
+        cls,
+        pool_addr: AccAddress,
+        client: TerraClient,
+        recursive_lp_token_code_id: int = None,
+    ) -> LPToken:
         pair_data = await client.contract_query(pool_addr, {"pair": {}})
         contract_addr = pair_data["liquidity_token"]
-        pair_tokens = await pair_tokens_from_data(pair_data["asset_infos"], client)
+        pair_tokens = await pair_tokens_from_data(
+            pair_data["asset_infos"], client, recursive_lp_token_code_id
+        )
         return await cls.from_contract(contract_addr, client, pair_tokens)
 
     @property
     def repr_symbol(self):
-        return "-".join(f"({t.repr_symbol})" for t in self.pair_tokens)
+        return f"({self.pair_tokens[0].repr_symbol}-{self.pair_tokens[1].repr_symbol})"
