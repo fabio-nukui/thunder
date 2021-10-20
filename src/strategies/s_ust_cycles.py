@@ -72,10 +72,13 @@ async def get_arbitrages(client: TerraClient) -> list[UstCyclesArbitrage]:
     terraswap_factory, loop_factory = await asyncio.gather(
         terraswap.TerraswapFactory.new(client), terraswap.LoopFactory.new(client)
     )
-    loop_routes = await _get_ust_loop_3cycle_routes(client, loop_factory, terraswap_factory)
-    ust_routes = await _get_ust_2cycle_routes(client, loop_factory, terraswap_factory)
-    terraswap_routes = await _get_ust_terraswap_3cycle_routes(client, terraswap_factory)
-    routes = loop_routes + ust_routes + terraswap_routes
+    list_routes = await asyncio.gather(
+        _get_terraswap_priority_3cycle_routes(client, terraswap_factory),
+        _get_ust_loop_3cycle_routes(client, loop_factory, terraswap_factory),
+        _get_ust_2cycle_routes(client, loop_factory, terraswap_factory),
+        _get_alte_terraswap_3cycle_routes(client, terraswap_factory),
+    )
+    routes = [route for list_route in list_routes for route in list_route]
     arb_routes = [UstCyclesArbitrage(client, multi_routes) for multi_routes in routes]
 
     return arb_routes
@@ -89,6 +92,18 @@ def get_filters(
         for arb_route in arb_routes
         for pair in arb_route.pairs
     }
+
+
+async def _get_terraswap_priority_3cycle_routes(
+    client: TerraClient,
+    terraswap_factory: terraswap.TerraswapFactory,
+) -> list[terraswap.MultiRoutes]:
+    beth_ust_pair, meth_beth_pair, ust_meth_pair = await terraswap_factory.get_pairs(
+        ["BETH-UST", "mETH-BETH", "UST-mETH"]
+    )
+    return [
+        terraswap.MultiRoutes(client, UST, [[beth_ust_pair], [meth_beth_pair], [ust_meth_pair]])
+    ]
 
 
 async def _get_ust_loop_3cycle_routes(
@@ -143,16 +158,29 @@ async def _get_ust_2cycle_routes(
     return routes
 
 
-async def _get_ust_terraswap_3cycle_routes(
+async def _get_alte_terraswap_3cycle_routes(
     client: TerraClient,
-    terraswap_factory: terraswap.TerraswapFactory,
+    factory: terraswap.TerraswapFactory,
 ) -> list[terraswap.MultiRoutes]:
-    beth_ust_pair, meth_beth_pair, ust_meth_pair = await terraswap_factory.get_pairs(
-        ["BETH-UST", "mETH-BETH", "UST-mETH"]
-    )
-    return [
-        terraswap.MultiRoutes(client, UST, [[beth_ust_pair], [meth_beth_pair], [ust_meth_pair]])
-    ]
+    alte_ust_pair = await factory.get_pair("ALTE-UST")
+    pat_token_symbol = re.compile(r"^(?:([a-zA-Z]+)-ALTE|ALTE-([a-zA-Z]+))$")
+
+    routes: list[terraswap.MultiRoutes] = []
+    for pair_symbol in factory.addresses["pairs"]:
+        if not (match := pat_token_symbol.match(pair_symbol)) or pair_symbol == "ALTE-UST":
+            continue
+        token_symbol = match.group(1) or match.group(2)
+
+        ust_pairs: list[terraswap.LiquidityPair] = []
+        for ust_pair_symbol in (f"{token_symbol}-UST", f"UST-{token_symbol}"):
+            if ust_pair_symbol in factory.addresses["pairs"]:
+                ust_pairs.append(await factory.get_pair(ust_pair_symbol))
+        assert ust_pairs, f"No UST pairs found for {token_symbol}"
+
+        alte_token_pair = await factory.get_pair(pair_symbol)
+        list_steps = [ust_pairs, [alte_token_pair], [alte_ust_pair]]
+        routes.append(terraswap.MultiRoutes(client, UST, list_steps))
+    return routes
 
 
 class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArbitrage):
