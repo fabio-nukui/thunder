@@ -24,7 +24,6 @@ from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
 from exceptions import TxError, UnprofitableArbitrage
 
 from .common.default_params import (
-    MAX_SLIPPAGE,
     MIN_PROFIT_UST,
     MIN_START_AMOUNT,
     MIN_UST_RESERVED_AMOUNT,
@@ -243,9 +242,7 @@ class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArbitra
     ) -> dict:
         reverse = await route.should_reverse(MIN_START_AMOUNT)
         initial_amount = await self._get_optimal_argitrage_amount(route, reverse, ust_balance)
-        final_amount, msgs = await route.op_swap(
-            initial_amount, reverse, MAX_SLIPPAGE, safety_margin=True
-        )
+        final_amount, msgs = await route.op_swap(initial_amount, reverse, safety_margin=True)
         try:
             fee = await self.client.tx.estimate_fee(
                 msgs,

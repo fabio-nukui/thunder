@@ -24,7 +24,9 @@ from .utils import Operation, token_to_data
 log = logging.getLogger(__name__)
 
 FEE = Decimal("0.003")
-MAX_SLIPPAGE_TOLERANCE = Decimal("0.001")
+MAX_SWAP_SLIPPAGE = Decimal("0.000001")
+MAX_ADD_LIQUIDITY_SLIPPAGE = Decimal("0.0005")
+
 AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
 
 
@@ -189,7 +191,7 @@ class LiquidityPair:
         max_slippage: Decimal = None,
         safety_margin: bool | int = True,
     ) -> Operation:
-        max_slippage = MAX_SLIPPAGE_TOLERANCE if max_slippage is None else max_slippage
+        max_slippage = MAX_SWAP_SLIPPAGE if max_slippage is None else max_slippage
         amount_out = await self.get_swap_amount_out(amount_in, safety_margin)
         min_amount_out = (amount_out * (1 - max_slippage)).safe_margin(safety_margin)
         msg = self.build_swap_msg(sender, amount_in, min_amount_out)
@@ -420,7 +422,7 @@ class LiquidityPair:
     ) -> Operation:
         reserve_in, reserve_out = await self._get_in_out_reserves(amount_in)
         slippage_tolerance = (
-            MAX_SLIPPAGE_TOLERANCE if slippage_tolerance is None else slippage_tolerance
+            MAX_ADD_LIQUIDITY_SLIPPAGE if slippage_tolerance is None else slippage_tolerance
         )
 
         # Calculate optimum ratio to swap before adding liquidity, excluding tax influence
@@ -484,7 +486,7 @@ class LiquidityPair:
         slippage_tolerance: Decimal = None,
     ) -> AmountTuple:
         slippage_tolerance = (
-            MAX_SLIPPAGE_TOLERANCE if slippage_tolerance is None else slippage_tolerance
+            MAX_ADD_LIQUIDITY_SLIPPAGE if slippage_tolerance is None else slippage_tolerance
         )
         reserves = await self.get_reserves()
         amounts_in = self._fix_amounts_order(amounts_in)
@@ -500,7 +502,7 @@ class LiquidityPair:
         slippage_tolerance: Decimal = None,
     ) -> list[MsgExecuteContract]:
         slippage_tolerance = (
-            MAX_SLIPPAGE_TOLERANCE if slippage_tolerance is None else slippage_tolerance
+            MAX_ADD_LIQUIDITY_SLIPPAGE if slippage_tolerance is None else slippage_tolerance
         )
         msgs = []
         for amount in amounts_in:

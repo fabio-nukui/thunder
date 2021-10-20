@@ -32,12 +32,7 @@ from chains.terra import (
 from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
 from exceptions import TxError, UnprofitableArbitrage
 
-from .common.default_params import (
-    MAX_SLIPPAGE,
-    MIN_PROFIT_UST,
-    MIN_START_AMOUNT,
-    OPTIMIZATION_TOLERANCE,
-)
+from .common.default_params import MIN_PROFIT_UST, MIN_START_AMOUNT, OPTIMIZATION_TOLERANCE
 
 log = logging.getLogger(__name__)
 ESTIMATED_GAS_USE = 1_555_000
@@ -273,24 +268,24 @@ class LPTowerArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArbitrage
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
         if direction == Direction.remove_liquidity_first:
             luna_amount, msgs_remove_single_side = await self.pool_0.op_remove_single_side(
-                self.client.address, initial_lp_amount, LUNA, MAX_SLIPPAGE, safety_margin
+                self.client.address, initial_lp_amount, LUNA, safety_margin=safety_margin
             )
             lp_amount, msgs_add_single_side = await self.pool_1.op_add_single_side(
-                self.client.address, luna_amount, MAX_SLIPPAGE, safety_margin
+                self.client.address, luna_amount, safety_margin=safety_margin
             )
             final_lp_amount, msgs_tower_swap = await self.pool_tower.op_swap(
-                self.client.address, lp_amount, MAX_SLIPPAGE, safety_margin
+                self.client.address, lp_amount, safety_margin=safety_margin
             )
             msgs = msgs_remove_single_side + msgs_add_single_side + msgs_tower_swap
         else:
             lp_amount, msgs_tower_swap = await self.pool_tower.op_swap(
-                self.client.address, initial_lp_amount, MAX_SLIPPAGE, safety_margin
+                self.client.address, initial_lp_amount, safety_margin=safety_margin
             )
             luna_amount, msgs_remove_single_side = await self.pool_1.op_remove_single_side(
-                self.client.address, lp_amount, LUNA, MAX_SLIPPAGE, safety_margin
+                self.client.address, lp_amount, LUNA, safety_margin=safety_margin
             )
             final_lp_amount, msgs_add_single_side = await self.pool_0.op_add_single_side(
-                self.client.address, luna_amount, MAX_SLIPPAGE, safety_margin
+                self.client.address, luna_amount, safety_margin=safety_margin
             )
             msgs = msgs_tower_swap + msgs_remove_single_side + msgs_add_single_side
         return final_lp_amount, msgs
