@@ -53,7 +53,6 @@ class TerraSingleTxArbitrage(SingleTxArbitrage[TerraClient], ABC):
                     return ArbResult(TxStatus.not_found)
                 raise IsBusy
             raise
-        log.debug(info.to_data())
         if height - info.height < MIN_CONFIRMATIONS:
             raise IsBusy
         gas_cost = TerraTokenAmount.from_coin(*info.tx.fee.amount)
