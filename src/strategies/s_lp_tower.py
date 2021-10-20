@@ -149,6 +149,7 @@ class LPTowerArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArbitrage
                     msgs,
                     use_fallback_estimate=self._simulating_reserve_changes,
                     estimated_gas_use=ESTIMATED_GAS_USE,
+                    native_amount=UST.to_amount(initial_amount.amount * lp_ust_price),
                 )
             except LCDResponseError as e:
                 log.debug(
