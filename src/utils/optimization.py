@@ -2,6 +2,8 @@ import logging
 from decimal import Decimal
 from typing import Callable
 
+from exceptions import OptimizationError
+
 log = logging.getLogger(__name__)
 
 DEFAULT_MAX_ITER = 100
@@ -65,7 +67,7 @@ def optimize_newton(
         second_derivative = (f_x_ip - 2 * f_x_i + f_x_im) / (dx ** 2)
         x_i_next = x_i - first_derivative / second_derivative
         if x_i_next < 0 and x_i < 0 and positive_only:
-            raise Exception(f"Negative result when {positive_only=}")
+            raise OptimizationError(f"Negative result when {positive_only=}")
         if abs(x_i_next - x_i) < tol:
             break
         x_i = x_i_next
@@ -100,7 +102,8 @@ def optimize_bissection(
     x_right = x0 * BISSECTION_SEARCH_EXPANSION
 
     y_left = derivative(x0)
-    assert y_left >= 0, "bissection_optimizer only work for f'(x0) >= 0"
+    if y_left < 0:
+        raise OptimizationError("bissection_optimizer only work for f'(x0) >= 0")
 
     x = bissection_search(derivative, x_left, x_right, tol, max_iter, y_left=y_left)
     return x, func(x)

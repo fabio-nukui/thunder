@@ -28,6 +28,10 @@ class NotContract(Exception):
     pass
 
 
+class OptimizationError(Exception):
+    pass
+
+
 class TxError(Exception):
     pass
 

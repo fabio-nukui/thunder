@@ -8,7 +8,7 @@ from enum import Enum
 from typing import Any, Generic, Optional, TypeVar
 
 from common import BlockchainClient, TokenAmount
-from exceptions import BlockchainNewState, IsBusy, TxError, UnprofitableArbitrage
+from exceptions import BlockchainNewState, IsBusy, OptimizationError, TxError, UnprofitableArbitrage
 
 log = logging.getLogger(__name__)
 
@@ -141,6 +141,9 @@ class SingleTxArbitrage(Generic[_BlockchainClientT], ABC):
                     self.data.params = await self._get_arbitrage_params(height, filtered_mempool)
                 except (UnprofitableArbitrage, TxError) as e:
                     log.debug(e)
+                    return
+                except OptimizationError as e:
+                    log.warning(e)
                     return
             if self.state == State.ready_to_broadcast:
                 log.info(f"{self} ({height=}) Broadcasting transaction")
