@@ -236,10 +236,11 @@ class LunaUstMarketArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArb
         self,
         info: TxInfo,
     ) -> tuple[TerraTokenAmount, Decimal]:
-        tx_events = TerraClient.extract_log_events(info.logs)
-        logs_from_contract = TerraClient.parse_from_contract_events(tx_events)
-        log.debug(logs_from_contract)
-        return UST.to_amount(), Decimal(0)  # TODO: implement
+        balance_changes = TerraClient.extract_coin_balance_changes(info.logs)
+        arb_changes = balance_changes[self.client.address]
+        assert all(change.token == UST for change in arb_changes)
+        assert len(arb_changes) == 2
+        return max(arb_changes), arb_changes[0].amount + arb_changes[1].amount
 
 
 async def run(max_n_blocks: int = None):

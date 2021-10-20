@@ -187,6 +187,20 @@ class TerraClient(ITerraClient):
         return parsed_logs
 
     @staticmethod
+    def extract_coin_balance_changes(
+        logs: list[TxLog],
+    ) -> dict[AccAddress, list[TerraTokenAmount]]:
+        changes = defaultdict(list)
+        for tx_log in logs:
+            coins_spent = tx_log.events_by_type.get("coin_spent", {})
+            for address, str_amount in zip(coins_spent["spender"], coins_spent["amount"]):
+                changes[address].append(-TerraTokenAmount.from_str(str_amount))
+            coins_received = tx_log.events_by_type.get("coin_received", {})
+            for address, str_amount in zip(coins_received["receiver"], coins_received["amount"]):
+                changes[address].append(TerraTokenAmount.from_str(str_amount))
+        return dict(changes)
+
+    @staticmethod
     def parse_from_contract_events(
         events: list[dict],
     ) -> list[dict[str, list[dict[str, str]]]]:

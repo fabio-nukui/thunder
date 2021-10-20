@@ -22,6 +22,10 @@ class TerraTokenAmount(ITerraTokenAmount):
         assert isinstance(self.token, TerraNativeToken)
         return Coin(self.token.denom, self.int_amount)
 
+    @classmethod
+    def from_str(cls, data: str) -> TerraTokenAmount:
+        return cls.from_coin(Coin.from_str(data))
+
     async def has_allowance(
         self,
         client: ITerraClient,
