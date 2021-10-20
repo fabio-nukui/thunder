@@ -113,7 +113,11 @@ start: ## Start docker container running arbitrage strategy "$STRAT" (e.g.: make
 stop:  ## Stop docker conteiner running strategy "$STRAT" (e.g.: make stop STRAT=1)
 	docker stop $(ARBITRAGE_CONTAINER_NAME)
 
-restart: build stop start  ## Restart running strategy "$STRAT" with updated code
+restart: build  ## Restart running strategy "$STRAT" with updated code
+	docker rename $(ARBITRAGE_CONTAINER_NAME) $(ARBITRAGE_CONTAINER_NAME)_stopping
+	$(MAKE) start
+	sleep 2
+	docker stop $(ARBITRAGE_CONTAINER_NAME)_stopping
 
 upload-notebooks: ## Upload jupyter notebooks
 	aws s3 sync \
