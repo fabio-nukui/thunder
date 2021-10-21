@@ -35,7 +35,7 @@ from .common.default_params import (
 log = logging.getLogger(__name__)
 
 MIN_START_AMOUNT = UST.to_amount(200)
-ESTIMATED_GAS_USE = 1_620_000
+ESTIMATED_GAS_USE = 475_000
 
 
 class Direction(str, Enum):

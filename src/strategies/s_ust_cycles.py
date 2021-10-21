@@ -36,7 +36,9 @@ from .common.default_params import (
 log = logging.getLogger(__name__)
 
 
-def _estimated_gas_use(n_steps: int) -> int:
+def _estimated_gas_use(n_steps: int, use_router: bool) -> int:
+    if use_router:
+        return 1_620_000
     return 486_319 + (n_steps - 2) * 341_002
 
 
@@ -200,8 +202,8 @@ class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbit
         self.multi_routes = multi_routes
         self.routes = multi_routes.routes
         self.tokens = multi_routes.tokens[1:-1]
-        self.estimated_gas_use = _estimated_gas_use(multi_routes.n_steps)
         self.use_router = multi_routes.router_address is not None
+        self.estimated_gas_use = _estimated_gas_use(multi_routes.n_steps, self.use_router)
 
         super().__init__(client, pairs=multi_routes.pairs, filter_keys=multi_routes.pairs)
 
