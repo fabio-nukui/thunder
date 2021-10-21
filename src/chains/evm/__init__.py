@@ -5,6 +5,7 @@ from . import curve, lido, one_inch
 from .client import EVMClient
 from .core import ERC20Token, EVMNativeToken, EVMToken, EVMTokenAmount
 from .one_inch import OneInchExchange
+from .utils import get_erc20_addresses
 
 __all__ = [
     "curve",
@@ -17,6 +18,7 @@ __all__ = [
     "EVMToken",
     "EVMTokenAmount",
     "OneInchExchange",
+    "get_erc20_addresses",
 ]
 
 

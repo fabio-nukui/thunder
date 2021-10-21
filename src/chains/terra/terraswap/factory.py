@@ -42,7 +42,7 @@ def _check_cw20_whitelist(token: TerraToken) -> bool:
 class Factory:
     client: TerraClient
     addresses: dict[str, Any]
-    name: str
+    name: str | None
     contract_addr: AccAddress
     pair_code_id: int
     lp_token_code_id: int
@@ -55,7 +55,7 @@ class Factory:
         cls: type[_FactoryT],
         client: TerraClient,
         addresses: dict,
-        name: str,
+        name: str = None,
     ) -> _FactoryT:
         self = super().__new__(cls)
         self.client = client
