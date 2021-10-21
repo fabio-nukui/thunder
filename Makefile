@@ -36,10 +36,11 @@ LAB_IMAGE_NAME = thunder-lab
 DEV_CONTAINER_NAME = thunder-dev
 LAB_CONTAINER_NAME = thunder-lab
 ARBITRAGE_CONTAINER_NAME = thunder-strat-${STRATEGY}
-JUPYTER_PORT=8888
+JUPYTER_PORT = 8888
 DATA_SOURCE = s3://crypto-thunder
 PYTHON = python3
 GIT_BRANCH = $(shell git rev-parse --verify --short=12 HEAD)
+RESTART_SLEEP_TIME ?= 7
 
 ###################################################################################################
 ## GENERAL COMMANDS
@@ -116,7 +117,7 @@ stop:  ## Stop docker conteiner running strategy "$STRAT" (e.g.: make stop STRAT
 restart: build  ## Restart running strategy "$STRAT" with updated code
 	docker rename $(ARBITRAGE_CONTAINER_NAME) $(ARBITRAGE_CONTAINER_NAME)_stopping
 	$(MAKE) start
-	sleep 2
+	sleep $(RESTART_SLEEP_TIME)
 	docker stop $(ARBITRAGE_CONTAINER_NAME)_stopping
 
 upload-notebooks: ## Upload jupyter notebooks
