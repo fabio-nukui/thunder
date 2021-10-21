@@ -76,7 +76,6 @@ RUN apt-get -q update && \
 USER $USER
 
 RUN conda install --quiet --yes \
-        'autopep8==1.5.7' \
         'black==21.9b0' \
         'flake8==4.0.1' \
         'ipython==7.28.0' \

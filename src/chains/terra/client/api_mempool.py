@@ -17,7 +17,8 @@ from . import utils_rpc
 log = logging.getLogger(__name__)
 
 MAX_CONCURRENT_DECODE_REQUESTS = 5
-MAX_DECODER_ERRORS_PER_BLOCK = 10
+MAX_DECODER_ERRORS_PER_BLOCK = 20
+DECODE_TX_TIMEOUT = 0.02
 _T = TypeVar("_T")
 
 
@@ -133,7 +134,9 @@ class MempoolCacheManager:
 
     async def _decode_tx(self, raw_tx: str) -> dict:
         try:
-            response = await self._lcd_client.post("txs/decode", json={"tx": raw_tx}, timeout=1)
+            response = await self._lcd_client.post(
+                "txs/decode", json={"tx": raw_tx}, timeout=DECODE_TX_TIMEOUT
+            )
         except httpx.HTTPError:
             self._decoder_error_counter += 1
             if self._decoder_error_counter > MAX_DECODER_ERRORS_PER_BLOCK:
