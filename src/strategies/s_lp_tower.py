@@ -16,7 +16,7 @@ from terra_sdk.exceptions import LCDResponseError
 import utils
 from arbitrage.terra import (
     TerraArbParams,
-    TerraSingleTxArbitrage,
+    TerraRepeatedTxArbitrage,
     TerraswapLPReserveSimulationMixin,
     run_strategy,
 )
@@ -56,6 +56,7 @@ class ArbParams(TerraArbParams):
 
     initial_amount: TerraTokenAmount
     msgs: list[MsgExecuteContract]
+    n_repeat: int
     est_final_amount: TerraTokenAmount
     est_fee: StdFee
     est_net_profit_usd: Decimal
@@ -71,6 +72,7 @@ class ArbParams(TerraArbParams):
             "direction": self.direction,
             "initial_amount": self.initial_amount.to_data(),
             "msgs": [msg.to_data() for msg in self.msgs],
+            "n_repeat": self.n_repeat,
             "est_final_amount": self.est_final_amount.to_data(),
             "est_fee": self.est_fee.to_data(),
             "est_net_profit_usd": float(self.est_net_profit_usd),
@@ -96,7 +98,7 @@ def get_filters(
     }
 
 
-class LPTowerArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArbitrage):
+class LPTowerArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbitrage):
     def __init__(
         self,
         client: TerraClient,
@@ -182,6 +184,7 @@ class LPTowerArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArbitrage
             direction=direction,
             initial_amount=initial_amount,
             msgs=msgs,
+            n_repeat=1,
             est_final_amount=final_amount,
             est_fee=fee,
             est_net_profit_usd=net_profit_ust,

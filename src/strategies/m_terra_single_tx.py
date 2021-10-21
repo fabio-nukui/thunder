@@ -1,7 +1,7 @@
 import asyncio
 from typing import Sequence
 
-from arbitrage.terra import TerraSingleTxArbitrage, run_strategy
+from arbitrage.terra import TerraRepeatedTxArbitrage, run_strategy
 from chains.terra import TerraClient
 
 from . import s_lp_tower, s_luna_ust_market, s_ust_cycles
@@ -18,7 +18,7 @@ async def run(max_n_blocks: int = None):
         s_ust_cycles_filters = s_ust_cycles.get_filters(s_ust_cycles_arbs)
         s_lp_tower_filters = s_lp_tower.get_filters(s_lp_tower_arbs)
 
-        arb_routes: Sequence[TerraSingleTxArbitrage] = [
+        arb_routes: Sequence[TerraRepeatedTxArbitrage] = [
             *luna_market_arbs,
             *s_ust_cycles_arbs,
             *s_lp_tower_arbs,

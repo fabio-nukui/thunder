@@ -1,5 +1,5 @@
+import asyncio
 import logging
-import time
 from abc import ABC, abstractmethod
 from datetime import datetime
 from decimal import Decimal
@@ -14,39 +14,56 @@ from chains.terra import TerraClient, TerraTokenAmount
 from chains.terra.tx_filter import Filter
 from exceptions import BlockchainNewState, IsBusy
 
-from ..single_tx_arbitrage import ArbResult, ArbTx, BaseArbParams, SingleTxArbitrage, TxStatus
+from ..repeated_tx_arbitrage import ArbResult, ArbTx, BaseArbParams, RepeatedTxArbitrage, TxStatus
 
 log = logging.getLogger(__name__)
 
 MIN_CONFIRMATIONS = 1
-MAX_BLOCKS_WAIT_RECEIPT = 10
+MAX_BLOCKS_WAIT_RECEIPT = 4
 
 
 class TerraArbParams(BaseArbParams):
     timestamp_found: float
     block_found: int
 
+    n_repeat: int
     msgs: list[MsgExecuteContract]
     est_fee: StdFee
 
 
-class TerraSingleTxArbitrage(SingleTxArbitrage[TerraClient], ABC):
+class TerraRepeatedTxArbitrage(RepeatedTxArbitrage[TerraClient], ABC):
     def __init__(self, *args, filter_keys: Iterable, **kwargs):
         self.filter_keys = filter_keys
         super().__init__(*args, **kwargs)
 
-    async def _broadcast_tx(self, arb_params: TerraArbParams, height: int) -> ArbTx:
+    async def _broadcast_txs(self, arb_params: TerraArbParams, height: int) -> list[ArbTx]:
         if (latest_height := await self.client.get_latest_height()) != height:
             raise BlockchainNewState(f"{latest_height=} different from {height=}")
-        res = await self.client.tx.execute_msgs(arb_params.msgs, fee=arb_params.est_fee)
-        return ArbTx(timestamp_sent=time.time(), tx_hash=res.txhash)
+        results = await self.client.tx.execute_multi_msgs(
+            arb_params.msgs, arb_params.n_repeat, fee=arb_params.est_fee
+        )
+        return [ArbTx(timestamp_sent=timestamp, tx_hash=res.txhash) for timestamp, res in results]
 
-    async def _confirm_tx(self, height: int) -> ArbResult:
-        assert self.data.params is not None
-        assert self.data.tx is not None
-        tx_inclusion_delay = height - self.data.params.block_found
+    async def _confirm_txs(
+        self,
+        height: int,
+        params: TerraArbParams,
+        txs: list[ArbTx],
+    ) -> list[ArbResult]:
+        results = await asyncio.gather(
+            *(self._confirm_single_tx(height, params, tx.tx_hash) for tx in txs)
+        )
+        return list(results)
+
+    async def _confirm_single_tx(
+        self,
+        height: int,
+        params: TerraArbParams,
+        tx_hash: str,
+    ) -> ArbResult:
+        tx_inclusion_delay = height - params.block_found
         try:
-            info = await self.client.lcd.tx.tx_info(self.data.tx.tx_hash)
+            info = await self.client.lcd.tx.tx_info(tx_hash)
         except LCDResponseError as e:
             if e.response.status == 404:
                 if tx_inclusion_delay >= MAX_BLOCKS_WAIT_RECEIPT:
@@ -87,7 +104,7 @@ class TerraSingleTxArbitrage(SingleTxArbitrage[TerraClient], ABC):
 
 async def run_strategy(
     client: TerraClient,
-    arb_routes: Sequence[TerraSingleTxArbitrage],
+    arb_routes: Sequence[TerraRepeatedTxArbitrage],
     mempool_filters: Mapping[Any, Filter],
     max_n_blocks: int = None,
 ):

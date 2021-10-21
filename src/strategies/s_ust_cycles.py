@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import re
 import time
 from dataclasses import dataclass
@@ -15,7 +16,7 @@ from terra_sdk.exceptions import LCDResponseError
 import utils
 from arbitrage.terra import (
     TerraArbParams,
-    TerraSingleTxArbitrage,
+    TerraRepeatedTxArbitrage,
     TerraswapLPReserveSimulationMixin,
     run_strategy,
 )
@@ -24,6 +25,8 @@ from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
 from exceptions import TxError, UnprofitableArbitrage
 
 from .common.default_params import (
+    MAX_N_REPEATS,
+    MAX_SINGLE_ARBITRAGE_AMOUNT,
     MIN_PROFIT_UST,
     MIN_START_AMOUNT,
     MIN_UST_RESERVED_AMOUNT,
@@ -48,6 +51,7 @@ class ArbParams(TerraArbParams):
 
     initial_amount: TerraTokenAmount
     msgs: list[MsgExecuteContract]
+    n_repeat: int
     est_final_amount: TerraTokenAmount
     est_fee: StdFee
     est_net_profit_usd: Decimal
@@ -61,6 +65,7 @@ class ArbParams(TerraArbParams):
             "reverse": self.reverse,
             "initial_amount": self.initial_amount.to_data(),
             "msgs": [msg.to_data() for msg in self.msgs],
+            "n_repeat": self.n_repeat,
             "est_final_amount": self.est_final_amount.to_data(),
             "est_fee": self.est_fee.to_data(),
             "est_net_profit_usd": float(self.est_net_profit_usd),
@@ -187,7 +192,7 @@ async def _get_alte_terraswap_3cycle_routes(
     return routes
 
 
-class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArbitrage):
+class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbitrage):
     def __init__(self, client: TerraClient, multi_routes: terraswap.MultiRoutes):
         """Arbitrage with UST as starting point and a cycle of liquidity pairs"""
         assert multi_routes.tokens[0] == UST and multi_routes.is_cycle
@@ -196,6 +201,7 @@ class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArbitra
         self.routes = multi_routes.routes
         self.tokens = multi_routes.tokens[1:-1]
         self.estimated_gas_use = _estimated_gas_use(multi_routes.n_steps)
+        self.use_router = multi_routes.router_address is not None
 
         super().__init__(client, pairs=multi_routes.pairs, filter_keys=multi_routes.pairs)
 
@@ -237,6 +243,7 @@ class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArbitra
             reverse=best_param["reverse"],
             initial_amount=best_param["initial_amount"],
             msgs=best_param["msgs"],
+            n_repeat=best_param["n_repeat"],
             est_final_amount=best_param["final_amount"],
             est_fee=best_param["fee"],
             est_net_profit_usd=net_profit_ust,
@@ -246,8 +253,12 @@ class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArbitra
         self, route: terraswap.SingleRoute, ust_balance: Decimal
     ) -> dict:
         reverse = await route.should_reverse(MIN_START_AMOUNT)
-        initial_amount = await self._get_optimal_argitrage_amount(route, reverse, ust_balance)
-        final_amount, msgs = await route.op_swap(initial_amount, reverse, safety_margin=True)
+        initial_amount = await self._get_optimal_argitrage_amount(route, reverse)
+        single_initial_amount, n_repeat = self._check_repeats(initial_amount, ust_balance)
+        single_final_amount, msgs = await route.op_swap(
+            single_initial_amount, reverse, safety_margin=True
+        )
+        final_amount = single_final_amount * n_repeat
         try:
             fee = await self.client.tx.estimate_fee(
                 msgs,
@@ -261,7 +272,7 @@ class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArbitra
                 exc_info=True,
             )
             raise TxError(e)
-        gas_cost = TerraTokenAmount.from_coin(*fee.amount)
+        gas_cost = TerraTokenAmount.from_coin(*fee.amount) * n_repeat
         gas_cost_raw = gas_cost.amount / self.client.gas_adjustment
         net_profit_ust = (final_amount - initial_amount).amount - gas_cost_raw
         return {
@@ -269,6 +280,7 @@ class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArbitra
             "reverse": reverse,
             "initial_amount": initial_amount,
             "msgs": msgs,
+            "n_repeat": n_repeat,
             "final_amount": final_amount,
             "fee": fee,
             "net_profit_ust": net_profit_ust,
@@ -278,7 +290,6 @@ class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArbitra
         self,
         route: terraswap.SingleRoute,
         reverse: bool,
-        ust_balance: Decimal,
     ) -> TerraTokenAmount:
         profit = await self._get_gross_profit(MIN_START_AMOUNT, route, reverse)
         if profit < 0:
@@ -290,12 +301,6 @@ class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArbitra
             dx=MIN_START_AMOUNT.dx,
             tol=OPTIMIZATION_TOLERANCE.amount,
         )
-        if ust_amount > ust_balance:
-            log.warning(
-                "Not enough balance for full arbitrage: "
-                f"wanted UST {ust_amount:,.2f}, have UST {ust_balance:,.2f}"
-            )
-            return UST.to_amount(ust_balance - MIN_UST_RESERVED_AMOUNT)
         return UST.to_amount(ust_amount)
 
     async def _get_gross_profit(
@@ -317,6 +322,25 @@ class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArbitra
     ) -> Decimal:
         token_amount = UST.to_amount(amount_in)
         return (await self._get_gross_profit(token_amount, route, reverse, safety_round)).amount
+
+    def _check_repeats(
+        self,
+        initial_amount: TerraTokenAmount,
+        ust_balance: Decimal,
+    ) -> tuple[TerraTokenAmount, int]:
+        available_amount = ust_balance - MIN_UST_RESERVED_AMOUNT
+        if not self.use_router:
+            if initial_amount > available_amount:
+                log.warning(
+                    "Not enough balance for full arbitrage: "
+                    f"wanted UST {initial_amount:,.2f}, have UST {available_amount:,.2f}"
+                )
+                return UST.to_amount(available_amount), 1
+            return initial_amount, 1
+        max_amount = max(available_amount, MAX_SINGLE_ARBITRAGE_AMOUNT.amount)
+        n_repeat = math.ceil(initial_amount.amount / max_amount)
+        initial_amount = initial_amount / n_repeat
+        return initial_amount, min(n_repeat, MAX_N_REPEATS)
 
     async def _extract_returns_from_info(
         self,

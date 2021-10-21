@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import time
 from decimal import Decimal
 
 from terra_sdk.core import Coins
@@ -100,15 +101,43 @@ class TxApi(ITxApi):
         log.debug(f"Fallback gas fee estimation: {fee}")
         return fee
 
+    async def execute_multi_msgs(
+        self,
+        msgs: list[Msg],
+        n_repeat: int,
+        expect_logs_: bool = True,
+        account_number: int = None,
+        sequence: int = None,
+        **kwargs,
+    ) -> list[tuple[float, SyncTxBroadcastResult]]:
+        if "fee" not in kwargs:
+            kwargs["fee"] = self.estimate_fee(msgs)
+        if account_number is None:
+            account_number = await self.client.get_account_number()
+        if sequence is None:
+            sequence = await self.client.get_account_sequence()
+        log.debug(f"Executing messages {n_repeat} time(s): {msgs}")
+        results: list[tuple[float, SyncTxBroadcastResult]] = []
+        for i in range(1, n_repeat + 1):
+            log.debug(f"Executing message {i} if {n_repeat}")
+            res = await self.execute_msgs(
+                msgs, expect_logs_, account_number, sequence, log_=False, **kwargs
+            )
+            results.append((time.time(), res))
+            sequence += 1
+        return results
+
     async def execute_msgs(
         self,
         msgs: list[Msg],
         expect_logs_: bool = True,
         account_number: int = None,
         sequence: int = None,
+        log_: bool = True,
         **kwargs,
     ) -> SyncTxBroadcastResult:
-        log.debug(f"Sending tx: {msgs}")
+        if log_:
+            log.debug(f"Sending tx: {msgs}")
 
         # Fixes bug in terraswap_sdk==1.0.0b2
         if "fee" not in kwargs:

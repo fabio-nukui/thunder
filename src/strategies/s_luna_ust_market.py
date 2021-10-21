@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import time
 from dataclasses import dataclass
 from decimal import Decimal
@@ -15,7 +16,7 @@ from terra_sdk.exceptions import LCDResponseError
 import utils
 from arbitrage.terra import (
     TerraArbParams,
-    TerraSingleTxArbitrage,
+    TerraRepeatedTxArbitrage,
     TerraswapLPReserveSimulationMixin,
     run_strategy,
 )
@@ -23,7 +24,13 @@ from chains.terra import LUNA, UST, TerraClient, TerraTokenAmount, terraswap
 from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
 from exceptions import TxError, UnprofitableArbitrage
 
-from .common.default_params import MIN_PROFIT_UST, MIN_UST_RESERVED_AMOUNT, OPTIMIZATION_TOLERANCE
+from .common.default_params import (
+    MAX_N_REPEATS,
+    MAX_SINGLE_ARBITRAGE_AMOUNT,
+    MIN_PROFIT_UST,
+    MIN_UST_RESERVED_AMOUNT,
+    OPTIMIZATION_TOLERANCE,
+)
 
 log = logging.getLogger(__name__)
 
@@ -49,6 +56,7 @@ class ArbParams(TerraArbParams):
 
     initial_amount: TerraTokenAmount
     msgs: list[MsgExecuteContract]
+    n_repeat: int
     est_final_amount: TerraTokenAmount
     est_fee: StdFee
     est_net_profit_usd: Decimal
@@ -63,6 +71,7 @@ class ArbParams(TerraArbParams):
             "direction": self.direction,
             "initial_amount": self.initial_amount.to_data(),
             "msgs": [msg.to_data() for msg in self.msgs],
+            "n_repeat": self.n_repeat,
             "est_final_amount": self.est_final_amount.to_data(),
             "est_fee": self.est_fee.to_data(),
             "est_net_profit_usd": float(self.est_net_profit_usd),
@@ -87,7 +96,7 @@ def get_filters(
     }
 
 
-class LunaUstMarketArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArbitrage):
+class LunaUstMarketArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbitrage):
     def __init__(self, client: TerraClient, router: terraswap.Router) -> None:
         self.router = router
         (self.terraswap_pool,) = router.pairs.values()
@@ -125,10 +134,12 @@ class LunaUstMarketArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArb
                 route = self._route_terraswap_first
             ust_balance = (await UST.get_balance(self.client)).amount
 
-            initial_amount = await self._get_optimal_argitrage_amount(
-                route, terraswap_premium, ust_balance
+            initial_amount = await self._get_optimal_argitrage_amount(route, terraswap_premium)
+            single_initial_amount, n_repeat = self._check_repeats(initial_amount, ust_balance)
+            single_final_amount, msgs = await self._op_arbitrage(
+                single_initial_amount, route, safety_round=True
             )
-            final_amount, msgs = await self._op_arbitrage(initial_amount, route, safety_round=True)
+            final_amount = single_final_amount * n_repeat
             try:
                 fee = await self.client.tx.estimate_fee(
                     msgs,
@@ -148,7 +159,7 @@ class LunaUstMarketArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArb
                     exc_info=True,
                 )
                 raise TxError(e)
-        gas_cost = TerraTokenAmount.from_coin(*fee.amount)
+        gas_cost = TerraTokenAmount.from_coin(*fee.amount) * n_repeat
         gas_cost_raw = gas_cost.amount / self.client.lcd.gas_adjustment
         net_profit_ust = (final_amount - initial_amount).amount - gas_cost_raw
         if net_profit_ust < MIN_PROFIT_UST:
@@ -166,6 +177,7 @@ class LunaUstMarketArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArb
             direction=direction,
             initial_amount=initial_amount,
             msgs=msgs,
+            n_repeat=n_repeat,
             est_final_amount=final_amount,
             est_fee=fee,
             est_net_profit_usd=net_profit_ust,
@@ -184,7 +196,6 @@ class LunaUstMarketArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArb
         self,
         route: list[terraswap.RouteStep],
         terraswap_premium: Decimal,
-        ust_balance: Decimal,
     ) -> TerraTokenAmount:
         profit = await self._get_gross_profit(MIN_START_AMOUNT, route)
         if profit < 0:
@@ -196,12 +207,6 @@ class LunaUstMarketArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArb
             dx=MIN_START_AMOUNT.dx,
             tol=OPTIMIZATION_TOLERANCE.amount,
         )
-        if ust_amount > ust_balance:
-            log.warning(
-                "Not enough balance for full arbitrage: "
-                f"wanted UST {ust_amount:,.2f}, have UST {ust_balance:,.2f}"
-            )
-            return UST.to_amount(ust_balance - MIN_UST_RESERVED_AMOUNT)
         return UST.to_amount(ust_amount)
 
     async def _get_gross_profit(
@@ -231,6 +236,16 @@ class LunaUstMarketArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArb
         return await self.router.op_swap(
             self.client.address, initial_ust_amount, route, initial_ust_amount, safety_round
         )
+
+    def _check_repeats(
+        self,
+        initial_amount: TerraTokenAmount,
+        ust_balance: Decimal,
+    ) -> tuple[TerraTokenAmount, int]:
+        max_amount = max(ust_balance - MIN_UST_RESERVED_AMOUNT, MAX_SINGLE_ARBITRAGE_AMOUNT.amount)
+        n_repeat = math.ceil(initial_amount.amount / max_amount)
+        initial_amount = initial_amount / n_repeat
+        return initial_amount, min(n_repeat, MAX_N_REPEATS)
 
     async def _extract_returns_from_info(
         self,

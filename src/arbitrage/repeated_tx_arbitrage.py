@@ -33,6 +33,8 @@ class BaseArbParams(ABC):
     timestamp_found: float
     block_found: int
 
+    n_repeat: int
+
     @abstractmethod
     def to_data(self) -> dict:
         ...
@@ -80,23 +82,23 @@ class ArbResult:
 
 class ArbitrageData:
     params: Optional[BaseArbParams] = None
-    tx: Optional[ArbTx] = None
-    result: Optional[ArbResult] = None
+    txs: Optional[list[ArbTx]] = None
+    results: Optional[list[ArbResult]] = None
 
     def to_data(self) -> dict:
         return {
             "params": None if self.params is None else self.params.to_data(),
-            "tx": None if self.tx is None else self.tx.to_data(),
-            "result": None if self.result is None else self.result.to_data(),
+            "txs": None if self.txs is None else [tx.to_data() for tx in self.txs],
+            "results": None if self.results is None else [res.to_data() for res in self.results],
         }
 
     def reset(self):
         self.params = None
-        self.tx = None
-        self.result = None
+        self.txs = None
+        self.results = None
 
 
-class SingleTxArbitrage(Generic[_BlockchainClientT], ABC):
+class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
     def __init__(self, client: _BlockchainClientT):
         self.client = client
         self.data = ArbitrageData()
@@ -111,9 +113,9 @@ class SingleTxArbitrage(Generic[_BlockchainClientT], ABC):
     def state(self) -> State:
         if self.data.params is None:
             return State.ready_to_generate_parameters
-        if self.data.tx is None:
+        if self.data.txs is None:
             return State.ready_to_broadcast
-        if self.data.result is None:
+        if self.data.results is None:
             return State.waiting_confirmation
         return State.finished
 
@@ -126,10 +128,13 @@ class SingleTxArbitrage(Generic[_BlockchainClientT], ABC):
                     return
                 log.debug(f"{self} ({height=}) Looking for tx confirmation(s)")
                 try:
-                    self.data.result = await self._confirm_tx(height)
+                    params: BaseArbParams = self.data.params  # type: ignore
+                    txs: list[ArbTx] = self.data.txs  # type: ignore
+                    self.data.results = await self._confirm_txs(height, params, txs)
+                    profit = sum(res.net_profit_usd for res in self.data.results)
                     log.info(
-                        f"Arbitrage {self.data.result.tx_status}, "
-                        f"net_profit_usd={self.data.result.net_profit_usd:.2f}",
+                        f"Arbitrage {','.join(res.tx_status for res in self.data.results)}, "
+                        f"net_profit_usd={profit:.2f}",
                         extra={"data": self.data.to_data()},
                     )
                     self.data.reset()
@@ -149,7 +154,7 @@ class SingleTxArbitrage(Generic[_BlockchainClientT], ABC):
                 log.info(f"{self} ({height=}) Broadcasting transaction")
                 try:
                     arb_params: BaseArbParams = self.data.params  # type: ignore
-                    self.data.tx = await self._broadcast_tx(arb_params, height)
+                    self.data.txs = await self._broadcast_txs(arb_params, height)
                     log.debug("Arbitrage broadcasted", extra={"data": self.data.to_data()})
                 except BlockchainNewState as e:
                     log.warning(e)
@@ -167,9 +172,14 @@ class SingleTxArbitrage(Generic[_BlockchainClientT], ABC):
         ...
 
     @abstractmethod
-    async def _broadcast_tx(self, arb_params: BaseArbParams, height: int) -> ArbTx:
+    async def _broadcast_txs(self, arb_params: BaseArbParams, height: int) -> list[ArbTx]:
         ...
 
     @abstractmethod
-    async def _confirm_tx(self, height: int) -> ArbResult:
+    async def _confirm_txs(
+        self,
+        height: int,
+        params: BaseArbParams,
+        txs: list[ArbTx],
+    ) -> list[ArbResult]:
         ...
