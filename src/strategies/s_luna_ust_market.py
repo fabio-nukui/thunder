@@ -242,10 +242,9 @@ class LunaUstMarketArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxA
         initial_amount: TerraTokenAmount,
         ust_balance: Decimal,
     ) -> tuple[TerraTokenAmount, int]:
-        max_amount = max(ust_balance - MIN_UST_RESERVED_AMOUNT, MAX_SINGLE_ARBITRAGE_AMOUNT.amount)
+        max_amount = min(ust_balance - MIN_UST_RESERVED_AMOUNT, MAX_SINGLE_ARBITRAGE_AMOUNT.amount)
         n_repeat = math.ceil(initial_amount.amount / max_amount)
-        initial_amount = initial_amount / n_repeat
-        return initial_amount, min(n_repeat, MAX_N_REPEATS)
+        return initial_amount / n_repeat, min(n_repeat, MAX_N_REPEATS)
 
     async def _extract_returns_from_info(
         self,

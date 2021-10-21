@@ -339,10 +339,9 @@ class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbit
                 )
                 return UST.to_amount(available_amount), 1
             return initial_amount, 1
-        max_amount = max(available_amount, MAX_SINGLE_ARBITRAGE_AMOUNT.amount)
+        max_amount = min(available_amount, MAX_SINGLE_ARBITRAGE_AMOUNT.amount)
         n_repeat = math.ceil(initial_amount.amount / max_amount)
-        initial_amount = initial_amount / n_repeat
-        return initial_amount, min(n_repeat, MAX_N_REPEATS)
+        return initial_amount / n_repeat, min(n_repeat, MAX_N_REPEATS)
 
     async def _extract_returns_from_info(
         self,
