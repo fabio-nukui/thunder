@@ -151,7 +151,8 @@ class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
                     log.warning(e)
                     return
             if self.state == State.ready_to_broadcast:
-                log.info(f"{self} ({height=}) Broadcasting transaction")
+                n_txs = self.data.params.n_repeat  # type: ignore
+                log.info(f"{self} ({height=}) Broadcasting {n_txs} transaction(s)")
                 try:
                     arb_params: BaseArbParams = self.data.params  # type: ignore
                     self.data.txs = await self._broadcast_txs(arb_params, height)
