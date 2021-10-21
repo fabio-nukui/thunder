@@ -137,6 +137,11 @@ class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
                         f"net_profit_usd={profit:.2f}",
                         extra={"data": self.data.to_data()},
                     )
+                    if any(
+                        res.tx_err_log and "out of gas" in res.tx_err_log
+                        for res in self.data.results
+                    ):
+                        log.warning(f"{self} out of gas")
                     self.data.reset()
                 except IsBusy:
                     return
