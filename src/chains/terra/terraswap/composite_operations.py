@@ -3,8 +3,10 @@ from __future__ import annotations
 import asyncio
 import itertools
 from decimal import Decimal
+from functools import cache
 from typing import Iterable
 
+from terra_sdk.core.strings import AccAddress
 from terra_sdk.core.wasm.msgs import MsgExecuteContract
 
 from common.token import Token
@@ -12,6 +14,7 @@ from common.token import Token
 from ..client import TerraClient
 from ..token import TerraToken, TerraTokenAmount
 from .liquidity_pair import LiquidityPair
+from .router import Router, RouteStepTerraswap
 from .utils import Operation
 
 
@@ -41,16 +44,19 @@ class MultiRoutes:
         client: TerraClient,
         start_token: TerraToken,
         list_steps: list[list[LiquidityPair]],
+        router_address: AccAddress = None,
     ):
         self.client = client
         self.list_steps = list_steps
+        self.router_address = router_address
         self.pairs = [pair for step in list_steps for pair in step]
         self.tokens = _extract_tokens_from_routes(start_token, list_steps)
         self.n_steps = len(list_steps)
 
         self.is_cycle = self.tokens[0] == self.tokens[-1]
         self.routes = [
-            SingleRoute(client, self.tokens, pairs) for pairs in itertools.product(*list_steps)
+            SingleRoute(client, self.tokens, pairs, router_address)
+            for pairs in itertools.product(*list_steps)
         ]
         self.n_routes = len(self.routes)
 
@@ -68,10 +74,12 @@ class SingleRoute:
         client: TerraClient,
         tokens: Iterable[TerraToken],
         pairs: Iterable[LiquidityPair],
+        router_address: AccAddress = None,
     ):
         self.client = client
         self.tokens = list(tokens)
         self.pairs = list(pairs)
+        self.router = Router(router_address, pairs, client) if router_address is not None else None
         self.is_cycle = self.tokens[0] == self.tokens[-1]
 
     def __repr__(self) -> str:
@@ -91,7 +99,18 @@ class SingleRoute:
         reverse: bool = False,
         max_slippage: Decimal = None,
         safety_margin: bool | int = True,
+        min_amount_out: TerraTokenAmount = None,
     ) -> Operation:
+        if self.router is not None:
+            if min_amount_out is None:
+                if self.is_cycle:
+                    min_amount_out = amount_in
+                else:
+                    raise TypeError("Missing min_amount_out")
+            route = self._get_route_steps(reverse)
+            return await self.router.op_swap(
+                self.client.address, amount_in, route, min_amount_out, safety_margin
+            )
         pairs = self.pairs if not reverse else reversed(self.pairs)
         step_amount = amount_in
         msgs: list[MsgExecuteContract] = []
@@ -101,6 +120,18 @@ class SingleRoute:
             )
             msgs.extend(step_msgs)
         return step_amount, msgs
+
+    @cache
+    def _get_route_steps(self, reverse: bool) -> list[RouteStepTerraswap]:
+        pairs, token_in = (
+            (self.pairs, self.tokens[0]) if not reverse else (reversed(self.pairs), self.tokens[-1])
+        )
+        steps = []
+        for pair in pairs:
+            token_out = pair.tokens[0] if token_in == pair.tokens[1] else pair.tokens[1]
+            steps.append(RouteStepTerraswap(token_in, token_out))
+            token_in = token_out
+        return steps
 
     async def get_swap_amount_out(
         self,

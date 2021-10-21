@@ -101,7 +101,12 @@ async def _get_terraswap_priority_3cycle_routes(
         ["BETH-UST", "mETH-BETH", "UST-mETH"]
     )
     return [
-        terraswap.MultiRoutes(client, UST, [[beth_ust_pair], [meth_beth_pair], [ust_meth_pair]])
+        terraswap.MultiRoutes(
+            client=client,
+            start_token=UST,
+            list_steps=[[beth_ust_pair], [meth_beth_pair], [ust_meth_pair]],
+            router_address=terraswap_factory.addresses["router"],
+        )
     ]
 
 

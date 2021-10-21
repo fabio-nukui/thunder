@@ -228,7 +228,7 @@ class LunaUstMarketArbitrage(TerraswapLPReserveSimulationMixin, TerraSingleTxArb
         route: list[terraswap.RouteStep],
         safety_round: bool,
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
-        return await self.router.op_route_swap(
+        return await self.router.op_swap(
             self.client.address, initial_ust_amount, route, initial_ust_amount, safety_round
         )
 

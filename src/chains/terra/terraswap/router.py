@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Iterable
+from typing import Iterable, Sequence
 
 from terra_sdk.core import AccAddress
 from terra_sdk.core.wasm import MsgExecuteContract
@@ -74,11 +74,11 @@ class Router:
         self.contract_addr = contract_addr
         self.client = client
 
-    async def op_route_swap(
+    async def op_swap(
         self,
         sender: AccAddress,
         amount_in: TerraTokenAmount,
-        route: list[RouteStep],
+        route: Sequence[RouteStep],
         min_amount_out: TerraTokenAmount,
         safety_margin: bool | int = True,
     ) -> Operation:
