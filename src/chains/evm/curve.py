@@ -49,7 +49,7 @@ class CurvePool:
     @property
     def reserves(self) -> tuple[EVMTokenAmount, ...]:
         for reserve, balance in zip(self._reserves, self._get_balances()):
-            reserve.int_amount = balance
+            reserve.set_int_amount(balance)
         return self._reserves
 
     def get_amount_out(self, amount_in: EVMTokenAmount, token_out: EVMToken) -> EVMTokenAmount:

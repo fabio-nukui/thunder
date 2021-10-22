@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import base64
 import json
+from abc import ABC, abstractmethod
 from typing import Iterable
 
 from . import terraswap
-from .interfaces import IFilter
 from .token import TerraNativeToken
 
 
@@ -13,7 +13,11 @@ def _decode_msg(raw_msg: str) -> dict:
     return json.loads(base64.b64decode(raw_msg))
 
 
-class Filter(IFilter):
+class Filter(ABC):
+    @abstractmethod
+    def match_msgs(self, msgs: list[dict]) -> bool:
+        ...
+
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}"
 

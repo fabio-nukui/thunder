@@ -46,6 +46,9 @@ class RouteStepTerraswap(RouteStep):
 
 
 class RouteStepNative(RouteStep):
+    token_in: TerraNativeToken
+    token_out: TerraNativeToken
+
     def __init__(
         self,
         token_in: TerraNativeToken,

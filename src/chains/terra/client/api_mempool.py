@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from asyncio.futures import Future
-from typing import AsyncIterable, Mapping, TypeVar
+from typing import TYPE_CHECKING, AsyncIterable, Mapping, TypeVar
 
 import httpx
 
@@ -11,8 +11,12 @@ import configs
 import utils
 from exceptions import BlockchainNewState
 
-from ..interfaces import IFilter, IMempoolApi, ITerraClient
+from ..tx_filter import Filter
 from . import utils_rpc
+from .base_api import Api
+
+if TYPE_CHECKING:
+    from .async_client import TerraClient
 
 log = logging.getLogger(__name__)
 
@@ -60,7 +64,7 @@ class MempoolCacheManager:
     async def filter_new_height_mempool(
         self,
         height: int,
-        filters: Mapping[_T, IFilter],
+        filters: Mapping[_T, Filter],
         new_block_only: bool = False,
     ) -> tuple[int, dict[_T, list[list[dict]]]]:
         while True:
@@ -93,7 +97,7 @@ class MempoolCacheManager:
                 self.height = data
                 del as_completed_events
             else:
-                self._txs_cache = data
+                self._txs_cache = data  # type: ignore
                 self._running_thread_update_height = True
                 fut_next_height: Future[int] = next(as_completed_events)  # type: ignore
                 asyncio.create_task(self._update_height(fut_next_height))
@@ -150,8 +154,8 @@ class MempoolCacheManager:
         self._running_thread_update_height = False
 
 
-class MempoolApi(IMempoolApi):
-    def __init__(self, client: ITerraClient):
+class MempoolApi(Api):
+    def __init__(self, client: "TerraClient"):
         super().__init__(client)
         self.new_block_only = False
         self._rpc_websocket_uri = str(client.rpc_http_client.base_url)
@@ -171,7 +175,7 @@ class MempoolApi(IMempoolApi):
 
     async def iter_height_mempool(
         self,
-        filters: Mapping[_T, IFilter],
+        filters: Mapping[_T, Filter],
     ) -> AsyncIterable[tuple[int, dict[_T, list[list[dict]]]]]:
         while True:
             try:

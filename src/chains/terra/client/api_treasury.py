@@ -1,20 +1,27 @@
 from decimal import Decimal
+from enum import Enum
 
 from utils.cache import CacheGroup, ttl_cache
 
-from ..interfaces import ITreasuryApi, TaxPayer
-from ..token import TerraNativeToken, TerraToken, TerraTokenAmount
+from ..denoms import LUNA
+from ..token import TerraNativeToken, TerraTokenAmount
+from .base_api import Api
 
 TERRA_TAX_CACHE_TTL = 7200
 
 
-class TreasuryApi(ITreasuryApi):
+class TaxPayer(str, Enum):
+    account = "account"
+    contract = "contract"
+
+
+class TreasuryApi(Api):
     @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=TERRA_TAX_CACHE_TTL)
     async def get_tax_rate(self) -> Decimal:
         return Decimal(str(await self.client.lcd.treasury.tax_rate()))
 
     @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=TERRA_TAX_CACHE_TTL)
-    async def get_tax_caps(self) -> dict[TerraToken, TerraTokenAmount]:
+    async def get_tax_caps(self) -> dict[TerraNativeToken, TerraTokenAmount]:
         res = await self.client.lcd_http_client.get("/terra/treasury/v1beta1/tax_caps")
         caps = {}
         for cap in res.json()["tax_caps"]:
@@ -28,7 +35,7 @@ class TreasuryApi(ITreasuryApi):
         payer: TaxPayer = TaxPayer.contract,
     ) -> TerraTokenAmount:
         tax_caps = await self.get_tax_caps()
-        if amount.token not in tax_caps:
+        if not isinstance(amount.token, TerraNativeToken) or amount.token == LUNA:
             return amount.token.to_amount(0)
 
         tax_rate = await self.get_tax_rate()

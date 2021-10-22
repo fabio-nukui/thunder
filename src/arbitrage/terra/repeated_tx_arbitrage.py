@@ -36,7 +36,11 @@ class TerraRepeatedTxArbitrage(RepeatedTxArbitrage[TerraClient], ABC):
         self.filter_keys = filter_keys
         super().__init__(*args, **kwargs)
 
-    async def _broadcast_txs(self, arb_params: TerraArbParams, height: int) -> list[ArbTx]:
+    async def _broadcast_txs(  # type: ignore[override]
+        self,
+        arb_params: TerraArbParams,
+        height: int,
+    ) -> list[ArbTx]:
         if (latest_height := await self.client.get_latest_height()) != height:
             raise BlockchainNewState(f"{latest_height=} different from {height=}")
         results = await self.client.tx.execute_multi_msgs(
@@ -44,7 +48,7 @@ class TerraRepeatedTxArbitrage(RepeatedTxArbitrage[TerraClient], ABC):
         )
         return [ArbTx(timestamp_sent=timestamp, tx_hash=res.txhash) for timestamp, res in results]
 
-    async def _confirm_txs(
+    async def _confirm_txs(  # type: ignore[override]
         self,
         height: int,
         params: TerraArbParams,

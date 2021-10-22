@@ -17,7 +17,7 @@ from chains.terra.token import TerraNativeToken, TerraTokenAmount
 from exceptions import EstimateFeeError
 from utils.cache import CacheGroup, ttl_cache
 
-from ..interfaces import ITxApi
+from .base_api import Api
 
 log = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class NoLogError(Exception):
         self.message = message
 
 
-class TxApi(ITxApi):
+class TxApi(Api):
     @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=TERRA_GAS_PRICE_CACHE_TTL)
     async def get_gas_prices(self) -> Coins:
         res = await self.client.fcd_client.get("v1/txs/gas_prices")

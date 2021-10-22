@@ -99,7 +99,7 @@ endif
 rm-dev: ## Remove stopped dev container
 	docker rm $(DEV_CONTAINER_NAME)
 
-build: check-all ## Build docker prod image
+build: clean check-all ## Build docker prod image
 	echo $(GIT_BRANCH) > docker/git_commit
 	docker build --target prod -t $(IMAGE_NAME) -f docker/Dockerfile .
 
@@ -132,7 +132,7 @@ download-notebooks: ## Download jupyter notebooks
 get-env: ## Download .env files
 	aws s3 sync $(DATA_SOURCE)/env env
 
-check-all: lint-check test check-clean-tree ## Run all checks and tests
+check-all: qa test check-clean-tree ## Run all checks and tests
 
 check-clean-tree: ## Fail if git tree has unstaged/uncommited changes
 ifneq ($(shell git status -s),)
@@ -140,13 +140,19 @@ ifneq ($(shell git status -s),)
 endif
 	@exit 0
 
-lint-check: ## Run linter checks
+clean: ## remove Python file artifacts
+	find . -name '*.pyc' -exec rm -f {} +
+	find . -name '*.pyo' -exec rm -f {} +
+	find . -name '*~' -exec rm -f {} +
+	find . -name '__pycache__' -exec rm -fr {} +
+
+qa: ## Run linter checks
 	docker exec $(DEV_CONTAINER_NAME) isort -c src scripts tests app.py
 	docker exec $(DEV_CONTAINER_NAME) black --check src scripts tests app.py
 	docker exec $(DEV_CONTAINER_NAME) flake8 src scripts tests app.py
-	docker exec $(DEV_CONTAINER_NAME) pyright
+	docker exec $(DEV_CONTAINER_NAME) mypy src scripts tests app.py
 
-lint-fix: ## Run linters and auto-fix code style
+fix: ## Run linters and auto-fix code style
 	docker exec $(DEV_CONTAINER_NAME) isort src scripts tests app.py
 	docker exec $(DEV_CONTAINER_NAME) black --safe src scripts tests app.py
 

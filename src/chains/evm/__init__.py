@@ -11,6 +11,7 @@ __all__ = [
     "curve",
     "lido",
     "one_inch",
+    "EVMClient",
     "EthereumClient",
     "BSCClient",
     "ERC20Token",

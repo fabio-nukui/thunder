@@ -263,7 +263,7 @@ class LiquidityPair:
             return
         if belief_price is not None:
             expected_return = amount_in / belief_price
-            amount_spread = max(0, expected_return - amount_out_before_fees)
+            amount_spread = max(Decimal(0), expected_return - amount_out_before_fees)
             if (
                 amount_out_before_fees < expected_return
                 and amount_spread / expected_return > max_spread

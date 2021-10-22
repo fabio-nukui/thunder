@@ -1,1 +1,1 @@
-make lint-check
+make qa

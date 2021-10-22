@@ -5,13 +5,13 @@ from decimal import Decimal
 from utils.cache import CacheGroup, ttl_cache
 
 from ..denoms import LUNA, SDT
-from ..interfaces import IMarketApi
 from ..token import TerraNativeToken, TerraTokenAmount
+from .base_api import Api
 
 MARKET_PARAMETERS_TTL = 600
 
 
-class MarketApi(IMarketApi):
+class MarketApi(Api):
     async def get_amount_out(
         self,
         offer_amount: TerraTokenAmount,
@@ -76,5 +76,5 @@ class MarketApi(IMarketApi):
     ) -> TerraTokenAmount:
         rates = await self.client.oracle.get_exchange_rates()
         return ask_denom.to_amount(
-            offer_amount.amount * rates[ask_denom] / rates[offer_amount.token]  # type: ignore
+            offer_amount.amount * rates[ask_denom] / rates[offer_amount.token]
         )

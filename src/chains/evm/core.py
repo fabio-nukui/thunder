@@ -161,7 +161,12 @@ class BaseEVMClient(SyncBlockchainClient, ABC):
     address: str
 
     @abstractmethod
-    def get_gas_price(self) -> int:
+    def get_gas_price(
+        self,
+        gas_multiplier: float = None,
+        base_fee_multiplier: float = None,
+        force_legacy_tx: bool = False,
+    ) -> dict[str, int]:
         ...
 
     @abstractmethod

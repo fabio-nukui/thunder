@@ -70,11 +70,11 @@ class Factory:
         return self
 
     async def fetch_all_pair_infos(self) -> list[dict]:
-        infos = []
-        query_params = {}
+        infos: list[dict] = []
+        query_params: dict[str, Any] = {}
         while True:
             page = await self.client.contract_query(self.contract_addr, {"pairs": query_params})
-            data = page["pairs"]
+            data: list[dict] = page["pairs"]
             if not data:
                 return infos
             infos.extend(data)
@@ -119,7 +119,7 @@ class Factory:
         return addresses
 
     async def get_pairs(self, pairs_names: Iterable[str]) -> Tuple[LiquidityPair, ...]:
-        return await asyncio.gather(*(self.get_pair(pair) for pair in pairs_names))
+        return await asyncio.gather(*(self.get_pair(pair) for pair in pairs_names))  # type: ignore
 
     async def get_pair(self, pair_name: str) -> LiquidityPair:
         try:

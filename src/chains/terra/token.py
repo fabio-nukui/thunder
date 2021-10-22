@@ -1,16 +1,21 @@
 from __future__ import annotations
 
-from typing import TypeVar, Union
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING, TypeVar, Union
 
 from terra_sdk.core import AccAddress, Coin
 from terra_sdk.core.wasm import MsgExecuteContract
 
-from .interfaces import ICW20Token, ITerraClient, ITerraNativeToken, ITerraTokenAmount
+from common.token import Token, TokenAmount
+
+if TYPE_CHECKING:
+    from .client import TerraClient
+
 
 _CW20TokenT = TypeVar("_CW20TokenT", bound="CW20Token")
 
 
-class TerraTokenAmount(ITerraTokenAmount):
+class TerraTokenAmount(TokenAmount):
     token: TerraToken
 
     @classmethod
@@ -28,7 +33,7 @@ class TerraTokenAmount(ITerraTokenAmount):
 
     async def has_allowance(
         self,
-        client: ITerraClient,
+        client: "TerraClient",
         spender: AccAddress,
         owner: AccAddress = None,
     ) -> bool:
@@ -46,7 +51,24 @@ class TerraTokenAmount(ITerraTokenAmount):
         return self.token.build_msg_increase_allowance(spender, owner, self.int_amount)
 
 
-class TerraNativeToken(ITerraNativeToken[TerraTokenAmount]):
+class BaseTerraToken(Token[TerraTokenAmount], ABC):
+    amount_class: type[TerraTokenAmount]
+
+    @abstractmethod
+    async def get_balance(
+        self,
+        client: "TerraClient",
+        address: AccAddress = None,
+    ) -> TerraTokenAmount:
+        ...
+
+    def __lt__(self, other) -> bool:
+        if isinstance(other, BaseTerraToken):
+            return self._id < other._id
+        return NotImplemented
+
+
+class TerraNativeToken(BaseTerraToken):
     amount_class = TerraTokenAmount
 
     def __init__(self, denom: str):
@@ -63,16 +85,16 @@ class TerraNativeToken(ITerraNativeToken[TerraTokenAmount]):
 
     async def get_balance(
         self,
-        client: ITerraClient,
+        client: "TerraClient",
         address: AccAddress = None,
-    ):  # -> TerraTokenAmount
+    ) -> TerraTokenAmount:
         balances = await client.get_bank([self.denom], address)
         if not balances:
             return self.to_amount(0)
         return balances[0]
 
 
-class CW20Token(ICW20Token[TerraTokenAmount]):
+class CW20Token(BaseTerraToken):
     amount_class = TerraTokenAmount
 
     def __init__(self, contract_addr: AccAddress, symbol: str, decimals: int):
@@ -88,23 +110,23 @@ class CW20Token(ICW20Token[TerraTokenAmount]):
     async def from_contract(
         cls: type[_CW20TokenT],
         contract_addr: AccAddress,
-        client: ITerraClient,
+        client: "TerraClient",
     ) -> _CW20TokenT:
         res = await client.contract_query(contract_addr, {"token_info": {}})
         return cls(contract_addr, res["symbol"], res["decimals"])
 
-    async def get_balance(self, client: ITerraClient, address: str = None) -> TerraTokenAmount:
+    async def get_balance(self, client: "TerraClient", address: str = None) -> TerraTokenAmount:
         address = client.address if address is None else address
         res = await client.contract_query(self.contract_addr, {"balance": {"address": address}})
         return self.to_amount(int_amount=res["balance"])
 
-    async def get_supply(self, client: ITerraClient) -> TerraTokenAmount:
+    async def get_supply(self, client: "TerraClient") -> TerraTokenAmount:
         res = await client.contract_query(self.contract_addr, {"token_info": {}})
         return self.to_amount(int_amount=res["total_supply"])
 
     async def get_allowance(
         self,
-        client: ITerraClient,
+        client: "TerraClient",
         spender: AccAddress,
         owner: AccAddress = None,
     ) -> TerraTokenAmount:

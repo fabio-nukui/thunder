@@ -4,11 +4,12 @@ import logging
 from typing import Iterable
 
 import httpx
-from httpx._types import TimeoutTypes
+from httpx._types import URLTypes
 
 log = logging.getLogger(__name__)
 
 
+DEFAULT_TIMEOUT = 5.0
 DEFAULT_N_TRIES = 3
 DEFAULT_BACKOFF_FACTOR = 0.5
 DEFAULT_STATUS_FORCELIST = (500, 502, 503, 504)
@@ -17,62 +18,51 @@ DEFAULT_STATUS_FORCELIST = (500, 502, 503, 504)
 class AsyncClient(httpx.AsyncClient):
     def __init__(
         self,
-        *args,
         n_tries: int = DEFAULT_N_TRIES,
         backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
         status_forcelist: Iterable[int] = DEFAULT_STATUS_FORCELIST,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
         self.n_tries = n_tries
         self.backoff_factor = backoff_factor
         self.status_forcelist = status_forcelist
 
     async def get(
         self,
-        url: str,
-        *args,
-        timeout: TimeoutTypes = 5.0,
+        url: URLTypes,
         n_tries: int = DEFAULT_N_TRIES,
         **kwargs,
     ) -> httpx.Response:
         """httpx GET with default retries"""
-        return await request(
-            "GET", url, *args, timeout=timeout, n_tries=n_tries, httpx_client=self, **kwargs
-        )
+        return await request("GET", url, n_tries=n_tries, httpx_client=self, **kwargs)
 
     async def post(
         self,
-        url: str,
-        *args,
-        timeout: TimeoutTypes = 5.0,
+        url: URLTypes,
         n_tries: int = DEFAULT_N_TRIES,
         **kwargs,
     ) -> httpx.Response:
         """httpx POST with default retries"""
-        return await request(
-            "POST", url, *args, timeout=timeout, n_tries=n_tries, httpx_client=self, **kwargs
-        )
+        return await request("POST", url, n_tries=n_tries, httpx_client=self, **kwargs)
 
 
 _DEFAULT_CLIENT = AsyncClient()
 
 
-async def get(url: str, *args, **kwargs) -> httpx.Response:
+async def get(url: str, **kwargs) -> httpx.Response:
     """httpx GET with default retries"""
-    return await _DEFAULT_CLIENT.get(url, *args, **kwargs)
+    return await _DEFAULT_CLIENT.get(url, **kwargs)
 
 
-async def post(url: str, *args, **kwargs) -> httpx.Response:
+async def post(url: str, **kwargs) -> httpx.Response:
     """httpx POST with default retries"""
-    return await _DEFAULT_CLIENT.post(url, *args, **kwargs)
+    return await _DEFAULT_CLIENT.post(url, **kwargs)
 
 
 async def request(
     method: str,
-    url: str,
-    *args,
-    timeout: TimeoutTypes = 5.0,
+    url: URLTypes,
     n_tries: int = DEFAULT_N_TRIES,
     backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
     status_forcelist: Iterable[int] = DEFAULT_STATUS_FORCELIST,
@@ -80,23 +70,22 @@ async def request(
     httpx_client: httpx.AsyncClient = None,
     **kwargs,
 ) -> httpx.Response:
+    kwargs.setdefault("timeout", DEFAULT_TIMEOUT)
     if httpx_client is not None:
         return await _send_request(
             httpx_client,
             method,
             url,
-            *args,
             n_tries=n_tries,
             backoff_factor=backoff_factor,
             status_forcelist=status_forcelist,
             **kwargs,
         )
-    async with httpx.AsyncClient(http2=http2, timeout=timeout) as client:
+    async with httpx.AsyncClient(http2=http2, timeout=kwargs["timeout"]) as client:
         return await _send_request(
             client,
             method,
             url,
-            *args,
             n_tries=n_tries,
             backoff_factor=backoff_factor,
             status_forcelist=status_forcelist,
@@ -107,8 +96,7 @@ async def request(
 async def _send_request(
     client: httpx.AsyncClient,
     method: str,
-    url: str,
-    *args,
+    url: URLTypes,
     n_tries: int,
     backoff_factor: float,
     status_forcelist: Iterable[int],
@@ -118,7 +106,7 @@ async def _send_request(
     inspired by https://www.peterbe.com/plog/best-practice-with-retries-with-requests"""
     for i in range(n_tries):
         try:
-            res = await client.request(method, url, *args, **kwargs)
+            res = await client.request(method, url, **kwargs)
             res.raise_for_status()
             return res
         except httpx.HTTPStatusError as e:

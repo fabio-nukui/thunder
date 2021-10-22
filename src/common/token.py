@@ -67,12 +67,12 @@ class TokenAmount:
         self.token = token
         self.dx = Decimal(str(10 ** -self.decimals))
 
-        self._amount = Decimal("NaN")
+        self.amount = Decimal("NaN")
 
         if amount is not None:
-            self.amount = amount
+            self.amount = Decimal(amount)
         elif int_amount is not None:
-            self.int_amount = int_amount
+            self.set_int_amount(int_amount)
 
     def __repr__(self) -> str:
         decimals = min(_MAX_DECIMALS_REPR, self.decimals)
@@ -93,25 +93,12 @@ class TokenAmount:
         return self.token.decimals
 
     @property
-    def amount(self) -> Decimal:
-        return self._amount
-
-    @amount.setter
-    def amount(self, value: DecInput):  # type: ignore
-        self._amount = Decimal(value)
-
-    @property
-    def round_amount(self) -> Decimal:
-        return self.token.round(self._amount)
-
-    @property
     def int_amount(self) -> int:
         assert not self.is_empty()
         return int(self.amount * 10 ** self.decimals)
 
-    @int_amount.setter
-    def int_amount(self, value: int | str):  # type: ignore
-        self._amount = self.token.decimalize(value)
+    def set_int_amount(self, value: int | str):
+        self.amount = self.token.decimalize(value)
 
     def safe_margin(self: _TokenAmountT, margin: bool | int = True) -> _TokenAmountT:
         if margin is False:

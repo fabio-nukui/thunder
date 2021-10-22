@@ -16,7 +16,7 @@ class TerraswapLPReserveSimulationMixin:
         self._simulating_reserve_changes = False
         self._mempool_reserve_changes = self._get_initial_mempool_params()
 
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)  # type: ignore
 
     def _get_initial_mempool_params(self) -> dict[terraswap.LiquidityPair, AmountTuple]:
         return {

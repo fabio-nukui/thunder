@@ -30,13 +30,13 @@ def _get_addresses(chain_id: str, name: str) -> dict:
 
 class TerraswapFactory(Factory):
     @classmethod
-    async def new(cls, client: TerraClient) -> TerraswapFactory:
+    async def new(cls, client: TerraClient) -> TerraswapFactory:  # type: ignore[override]
         addresses = _get_addresses(client.chain_id, "terraswap")
         return await super().new(client, addresses, "terraswap")
 
 
 class LoopFactory(Factory):
     @classmethod
-    async def new(cls, client: TerraClient) -> LoopFactory:
+    async def new(cls, client: TerraClient) -> LoopFactory:  # type: ignore[override]
         addresses = _get_addresses(client.chain_id, "loop")
         return await super().new(client, addresses, "loop")

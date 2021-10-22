@@ -10,6 +10,7 @@ from decimal import Decimal
 from typing import AsyncIterable
 
 from terra_sdk.client.lcd import AsyncLCDClient
+from terra_sdk.client.lcd.wallet import AsyncWallet
 from terra_sdk.core import AccAddress, Coins
 from terra_sdk.core.auth import TxLog
 from terra_sdk.exceptions import LCDResponseError
@@ -18,11 +19,11 @@ from terra_sdk.key.mnemonic import MnemonicKey
 import auth_secrets
 import configs
 import utils
+from common.blockchain_client import AsyncBlockchainClient
 from exceptions import NotContract
 from utils.cache import CacheGroup, ttl_cache
 
 from ..denoms import UST
-from ..interfaces import ITerraClient
 from ..token import TerraTokenAmount
 from . import utils_rpc
 from .api_market import MarketApi
@@ -39,7 +40,22 @@ CONTRACT_INFO_CACHE_TTL = 86400  # Contract info should not change; 24h ttl
 _pat_contract_not_found = re.compile(r"contract terra1(\w+): not found")
 
 
-class TerraClient(ITerraClient):
+class TerraClient(AsyncBlockchainClient):
+    lcd_http_client: utils.ahttp.AsyncClient
+    fcd_client: utils.ahttp.AsyncClient
+    rpc_http_client: utils.ahttp.AsyncClient
+    rpc_websocket_uri: str
+    broadcast_lcd_clients: list[utils.ahttp.AsyncClient]
+    chain_id: str
+    key: MnemonicKey
+    lcd: AsyncLCDClient
+    wallet: AsyncWallet
+    address: AccAddress
+    fee_denom: str
+    gas_adjustment: Decimal
+    height: int
+    account_sequence: int
+
     market: MarketApi
     oracle: OracleApi
     mempool: MempoolApi
@@ -47,7 +63,7 @@ class TerraClient(ITerraClient):
     tx: TxApi
 
     @classmethod
-    async def new(
+    async def new(  # type: ignore[override]
         cls,
         hd_wallet: dict = None,
         lcd_uri: str = configs.TERRA_LCD_URI,

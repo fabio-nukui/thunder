@@ -27,7 +27,7 @@ class SyncBlockchainClient(BlockchainClient, ABC):
         return self.close()
 
     @abstractmethod
-    def close():
+    def close(self):
         pass
 
     @property
@@ -52,7 +52,7 @@ class AsyncBlockchainClient(BlockchainClient, ABC):
         return await self.close()
 
     @abstractmethod
-    async def close():
+    async def close(self):
         pass
 
     async def init(self, raise_on_syncing: bool = False):
