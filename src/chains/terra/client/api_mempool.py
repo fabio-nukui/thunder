@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 
 MAX_CONCURRENT_DECODE_REQUESTS = 5
 MAX_DECODER_ERRORS_PER_BLOCK = 20
-DECODE_TX_TIMEOUT = 0.02
+DECODE_TX_TIMEOUT = 0.1
 _T = TypeVar("_T")
 
 
