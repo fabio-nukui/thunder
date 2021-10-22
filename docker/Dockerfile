@@ -36,7 +36,7 @@ RUN conda install --quiet --yes \
 
 RUN pip install --no-cache-dir \
         'python-binance==1.0.15' \
-        'terra-sdk==1.0.0b3' && \
+        'https://github.com/fabio-nukui/terra.py/releases/download/1.0.0dev1/terra_sdk-1.0.0.dev1-py3-none-any.whl' && \
     fix-permissions $HOME $CONDA_DIR
 
 ENV PATH="${HOME}/.local/bin:${PATH}"
