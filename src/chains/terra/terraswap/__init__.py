@@ -6,13 +6,14 @@ from ..client import TerraClient
 from .composite_operations import MultiRoutes, SingleRoute
 from .factory import Factory
 from .liquidity_pair import Action, LiquidityPair
-from .router import Router, RouteStep, RouteStepNative, RouteStepTerraswap
+from .router import HybridLiquidityPair, Router, RouteStep, RouteStepNative, RouteStepTerraswap
 
 __all__ = [
     "MultiRoutes",
     "SingleRoute",
     "Action",
     "LiquidityPair",
+    "HybridLiquidityPair",
     "RouteStep",
     "RouteStepNative",
     "RouteStepTerraswap",

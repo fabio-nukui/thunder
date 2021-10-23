@@ -18,6 +18,7 @@ from exceptions import InsufficientLiquidity, MaxSpreadAssertion, NotContract
 from utils.cache import CacheGroup, ttl_cache
 
 from ..client import TerraClient
+from ..native_liquidity_pair import BaseTerraLiquidityPair
 from ..token import CW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
 from .utils import Operation, token_to_data
 
@@ -83,12 +84,10 @@ def _token_amount_to_data(token_amount: TerraTokenAmount) -> dict:
     }
 
 
-class LiquidityPair:
+class LiquidityPair(BaseTerraLiquidityPair):
     contract_addr: AccAddress
-    client: TerraClient
     fee_rate: Decimal
     factory_name: str | None
-    tokens: tuple[TerraToken, TerraToken]
     lp_token: LPToken
     stop_updates: bool
     _reserves: AmountTuple
@@ -119,12 +118,9 @@ class LiquidityPair:
         return self
 
     def __repr__(self) -> str:
-        factory_name_str = "" if self.factory_name is None else f", factory={self.factory_name!r}"
-        return f"{self.__class__.__name__}({self.repr_symbol}{factory_name_str})"
-
-    @property
-    def repr_symbol(self) -> str:
-        return f"{self.tokens[0].repr_symbol}/{self.tokens[1].repr_symbol}"
+        if self.factory_name is None:
+            return super().__repr__()
+        return f"{self.__class__.__name__}({self.repr_symbol}, factory={self.factory_name!r})"
 
     async def get_reserves(self) -> AmountTuple:
         if not self.stop_updates:
@@ -138,12 +134,6 @@ class LiquidityPair:
             self.tokens[0].to_amount(int_amount=data["assets"][0]["amount"]),
             self.tokens[1].to_amount(int_amount=data["assets"][1]["amount"]),
         )
-
-    @property
-    def sorted_tokens(self) -> tuple[TerraToken, TerraToken]:
-        if self.tokens[0] < self.tokens[1]:
-            return self.tokens[0], self.tokens[1]
-        return self.tokens[1], self.tokens[0]
 
     @asynccontextmanager
     async def simulate_reserve_change(self, amounts: AmountTuple):

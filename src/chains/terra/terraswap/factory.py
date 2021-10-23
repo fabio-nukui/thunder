@@ -14,7 +14,7 @@ from exceptions import NotContract
 
 from ..client import TerraClient
 from .liquidity_pair import LiquidityPair, LPToken, pair_tokens_from_data
-from .router import Router
+from .router import HybridLiquidityPair, Router
 
 _FactoryT = TypeVar("_FactoryT", bound="Factory")
 
@@ -126,7 +126,7 @@ class Factory:
             contract_addr = self.addresses["pairs"][pair_name]
         except KeyError:
             raise Exception(f"{self}: {pair_name} not in pairs addresses")
-        assert self.is_pair(contract_addr)
+        assert await self.is_pair(contract_addr)
         return await LiquidityPair.new(
             contract_addr,
             self.client,
@@ -134,7 +134,7 @@ class Factory:
             factory_name=self.name,
         )
 
-    def get_router(self, liquidity_pairs: Iterable[LiquidityPair]) -> Router:
+    def get_router(self, liquidity_pairs: Iterable[HybridLiquidityPair]) -> Router:
         if "router" not in self.addresses:
             raise Exception(f"{self}: no router address")
         return Router(self.addresses["router"], liquidity_pairs, self.client)

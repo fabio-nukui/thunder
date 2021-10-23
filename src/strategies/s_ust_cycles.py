@@ -92,12 +92,14 @@ async def get_arbitrages(client: TerraClient) -> list[UstCyclesArbitrage]:
 
 def get_filters(
     arb_routes: list[UstCyclesArbitrage],
-) -> dict[terraswap.LiquidityPair, FilterSingleSwapTerraswapPair]:
-    return {
-        pair: FilterSingleSwapTerraswapPair(pair)
-        for arb_route in arb_routes
-        for pair in arb_route.pairs
-    }
+) -> dict[terraswap.HybridLiquidityPair, FilterSingleSwapTerraswapPair]:
+    filters: dict[terraswap.HybridLiquidityPair, FilterSingleSwapTerraswapPair] = {}
+    for arb_route in arb_routes:
+        for pair in arb_route.pairs:
+            if not isinstance(pair, terraswap.LiquidityPair):
+                raise NotImplementedError
+            filters[pair] = FilterSingleSwapTerraswapPair(pair)
+    return filters
 
 
 async def _get_terraswap_priority_3cycle_routes(
@@ -219,7 +221,7 @@ class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbit
     async def _get_arbitrage_params(
         self,
         height: int,
-        filtered_mempool: dict[terraswap.LiquidityPair, list[list[dict]]] = None,
+        filtered_mempool: dict[terraswap.HybridLiquidityPair, list[list[dict]]] = None,
     ) -> ArbParams:
         ust_balance = (await UST.get_balance(self.client)).amount
 

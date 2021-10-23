@@ -20,7 +20,7 @@ from arbitrage.terra import (
     TerraswapLPReserveSimulationMixin,
     run_strategy,
 )
-from chains.terra import LUNA, UST, TerraClient, TerraTokenAmount, terraswap
+from chains.terra import LUNA, UST, NativeLiquidityPair, TerraClient, TerraTokenAmount, terraswap
 from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
 from exceptions import TxError, UnprofitableArbitrage
 
@@ -81,25 +81,34 @@ class ArbParams(TerraArbParams):
 async def get_arbitrages(client: TerraClient) -> list[LunaUstMarketArbitrage]:
     factory = await terraswap.TerraswapFactory.new(client)
 
-    pair = await factory.get_pair("UST-LUNA")
-    router = factory.get_router([pair])
-    return [LunaUstMarketArbitrage(client, router)]
+    terraswap_pair = await factory.get_pair("UST-LUNA")
+    native_pair = NativeLiquidityPair(client, (UST, LUNA))
+    router = factory.get_router([terraswap_pair, native_pair])
+
+    return [LunaUstMarketArbitrage(client, router, terraswap_pair)]
 
 
 def get_filters(
     arb_routes: list[LunaUstMarketArbitrage],
-) -> dict[terraswap.LiquidityPair, FilterSingleSwapTerraswapPair]:
-    return {
-        pair: FilterSingleSwapTerraswapPair(pair)
-        for arb_route in arb_routes
-        for pair in arb_route.pairs
-    }
+) -> dict[terraswap.HybridLiquidityPair, FilterSingleSwapTerraswapPair]:
+    filters: dict[terraswap.HybridLiquidityPair, FilterSingleSwapTerraswapPair] = {}
+    for arb_route in arb_routes:
+        for pair in arb_route.pairs:
+            if not isinstance(pair, terraswap.LiquidityPair):
+                raise NotImplementedError
+            filters[pair] = FilterSingleSwapTerraswapPair(pair)
+    return filters
 
 
 class LunaUstMarketArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbitrage):
-    def __init__(self, client: TerraClient, router: terraswap.Router) -> None:
+    def __init__(
+        self,
+        client: TerraClient,
+        router: terraswap.Router,
+        terraswap_pool: terraswap.LiquidityPair,
+    ):
         self.router = router
-        (self.terraswap_pool,) = router.pairs.values()
+        self.terraswap_pool = terraswap_pool
         self._route_native_first: list[terraswap.RouteStep] = [
             terraswap.RouteStepNative(UST, LUNA),
             terraswap.RouteStepTerraswap(LUNA, UST),
@@ -136,8 +145,12 @@ class LunaUstMarketArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxA
 
             initial_amount = await self._get_optimal_argitrage_amount(route, terraswap_premium)
             single_initial_amount, n_repeat = self._check_repeats(initial_amount, ust_balance)
-            single_final_amount, msgs = await self._op_arbitrage(
-                single_initial_amount, route, safety_round=True
+            single_final_amount, msgs = await self.router.op_swap(
+                self.client.address,
+                single_initial_amount,
+                route,
+                min_amount_out=single_initial_amount,
+                safety_margin=True,
             )
             final_amount = single_final_amount * n_repeat
             try:
@@ -215,7 +228,7 @@ class LunaUstMarketArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxA
         route: list[terraswap.RouteStep],
         safety_round: bool = False,
     ) -> TerraTokenAmount:
-        amount_out, _ = await self._op_arbitrage(initial_lp_amount, route, safety_round)
+        amount_out = await self.router.get_swap_amount_out(initial_lp_amount, route, safety_round)
         return amount_out - initial_lp_amount
 
     async def _get_gross_profit_dec(
@@ -226,16 +239,6 @@ class LunaUstMarketArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxA
     ) -> Decimal:
         token_amount = UST.to_amount(amount)
         return (await self._get_gross_profit(token_amount, route, safety_round)).amount
-
-    async def _op_arbitrage(
-        self,
-        initial_ust_amount: TerraTokenAmount,
-        route: list[terraswap.RouteStep],
-        safety_round: bool,
-    ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
-        return await self.router.op_swap(
-            self.client.address, initial_ust_amount, route, initial_ust_amount, safety_round
-        )
 
     def _check_repeats(
         self,

@@ -76,5 +76,5 @@ class MarketApi(Api):
     ) -> TerraTokenAmount:
         rates = await self.client.oracle.get_exchange_rates()
         return ask_denom.to_amount(
-            offer_amount.amount * rates[ask_denom] / rates[offer_amount.token]
+            offer_amount.amount * rates[ask_denom] / rates[offer_amount.token]  # type: ignore
         )

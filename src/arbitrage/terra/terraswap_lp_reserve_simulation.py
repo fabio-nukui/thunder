@@ -1,5 +1,6 @@
 import logging
 from contextlib import AsyncExitStack, asynccontextmanager
+from typing import Sequence
 
 from chains.terra import terraswap
 from chains.terra.token import TerraTokenAmount
@@ -11,14 +12,14 @@ AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
 
 
 class TerraswapLPReserveSimulationMixin:
-    def __init__(self, *args, pairs: list[terraswap.LiquidityPair], **kwargs):
+    def __init__(self, *args, pairs: Sequence[terraswap.HybridLiquidityPair], **kwargs):
         self.pairs = pairs
         self._simulating_reserve_changes = False
         self._mempool_reserve_changes = self._get_initial_mempool_params()
 
         super().__init__(*args, **kwargs)  # type: ignore
 
-    def _get_initial_mempool_params(self) -> dict[terraswap.LiquidityPair, AmountTuple]:
+    def _get_initial_mempool_params(self) -> dict[terraswap.HybridLiquidityPair, AmountTuple]:
         return {
             pair: (pair.tokens[0].to_amount(0), pair.tokens[1].to_amount(0)) for pair in self.pairs
         }
@@ -29,7 +30,7 @@ class TerraswapLPReserveSimulationMixin:
     @asynccontextmanager
     async def _simulate_reserve_changes(
         self,
-        filtered_mempool: dict[terraswap.LiquidityPair, list[list[dict]]] = None,
+        filtered_mempool: dict[terraswap.HybridLiquidityPair, list[list[dict]]] = None,
     ):
         if filtered_mempool is None:
             yield

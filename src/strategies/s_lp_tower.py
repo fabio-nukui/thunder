@@ -90,12 +90,14 @@ async def get_arbitrages(client: TerraClient) -> list[LPTowerArbitrage]:
 
 def get_filters(
     arb_routes: list[LPTowerArbitrage],
-) -> dict[terraswap.LiquidityPair, FilterSingleSwapTerraswapPair]:
-    return {
-        pair: FilterSingleSwapTerraswapPair(pair)
-        for arb_route in arb_routes
-        for pair in arb_route.pairs
-    }
+) -> dict[terraswap.HybridLiquidityPair, FilterSingleSwapTerraswapPair]:
+    filters: dict[terraswap.HybridLiquidityPair, FilterSingleSwapTerraswapPair] = {}
+    for arb_route in arb_routes:
+        for pair in arb_route.pairs:
+            if not isinstance(pair, terraswap.LiquidityPair):
+                raise NotImplementedError
+            filters[pair] = FilterSingleSwapTerraswapPair(pair)
+    return filters
 
 
 class LPTowerArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbitrage):

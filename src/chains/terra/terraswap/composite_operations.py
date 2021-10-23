@@ -4,7 +4,7 @@ import asyncio
 import itertools
 from decimal import Decimal
 from functools import cache
-from typing import Iterable
+from typing import Iterable, Sequence
 
 from terra_sdk.core.strings import AccAddress
 from terra_sdk.core.wasm.msgs import MsgExecuteContract
@@ -14,13 +14,12 @@ from common.token import Token
 from ..client import TerraClient
 from ..token import TerraToken, TerraTokenAmount
 from .liquidity_pair import LiquidityPair
-from .router import Router, RouteStepTerraswap
+from .router import HybridLiquidityPair, Router, RouteStep, RouteStepNative, RouteStepTerraswap
 from .utils import Operation
 
 
 def _extract_tokens_from_routes(
-    start_token: TerraToken,
-    list_routes: list[list[LiquidityPair]],
+    start_token: TerraToken, list_routes: Sequence[Sequence[HybridLiquidityPair]]
 ) -> tuple[TerraToken, ...]:
     token_from = start_token
     tokens = [token_from]
@@ -43,7 +42,7 @@ class MultiRoutes:
         self,
         client: TerraClient,
         start_token: TerraToken,
-        list_steps: list[list[LiquidityPair]],
+        list_steps: Sequence[Sequence[HybridLiquidityPair]],
         router_address: AccAddress = None,
     ):
         self.client = client
@@ -73,7 +72,7 @@ class SingleRoute:
         self,
         client: TerraClient,
         tokens: Iterable[TerraToken],
-        pairs: Iterable[LiquidityPair],
+        pairs: Iterable[HybridLiquidityPair],
         router_address: AccAddress = None,
     ):
         self.client = client
@@ -87,9 +86,9 @@ class SingleRoute:
 
     async def should_reverse(self, amount_in: TerraTokenAmount) -> bool:
         assert self.is_cycle, "Reversion testing only applicable to cycles"
-        (amount_forward, _), (amount_reverse, _) = await asyncio.gather(
-            self.op_swap(amount_in, reverse=False, safety_margin=False),
-            self.op_swap(amount_in, reverse=True, safety_margin=False),
+        amount_forward, amount_reverse = await asyncio.gather(
+            self.get_swap_amount_out(amount_in, reverse=False, safety_margin=False),
+            self.get_swap_amount_out(amount_in, reverse=True, safety_margin=False),
         )
         return amount_reverse > amount_forward
 
@@ -102,11 +101,7 @@ class SingleRoute:
         min_amount_out: TerraTokenAmount = None,
     ) -> Operation:
         if self.router is not None:
-            if min_amount_out is None:
-                if self.is_cycle:
-                    min_amount_out = amount_in
-                else:
-                    raise TypeError("Missing min_amount_out")
+            min_amount_out = self._ensure_min_amount_out(amount_in, min_amount_out)
             route = self._get_route_steps(reverse)
             return await self.router.op_swap(
                 self.client.address, amount_in, route, min_amount_out, safety_margin
@@ -115,21 +110,38 @@ class SingleRoute:
         step_amount = amount_in
         msgs: list[MsgExecuteContract] = []
         for pair in pairs:
+            if not isinstance(pair, LiquidityPair):
+                raise NotImplementedError("SingleRoute.op_swap() only implemented for Router swaps")
             step_amount, step_msgs = await pair.op_swap(
                 self.client.address, step_amount, max_slippage, safety_margin
             )
             msgs.extend(step_msgs)
         return step_amount, msgs
 
+    def _ensure_min_amount_out(
+        self,
+        amount_in: TerraTokenAmount,
+        min_amount_out: TerraTokenAmount | None,
+    ) -> TerraTokenAmount:
+        if min_amount_out is None:
+            if self.is_cycle:
+                return amount_in
+            else:
+                raise TypeError("Missing min_amount_out")
+        return min_amount_out
+
     @cache
-    def _get_route_steps(self, reverse: bool) -> list[RouteStepTerraswap]:
+    def _get_route_steps(self, reverse: bool) -> Sequence[RouteStep]:
         pairs, token_in = (
             (self.pairs, self.tokens[0]) if not reverse else (reversed(self.pairs), self.tokens[-1])
         )
-        steps = []
+        steps: list[RouteStepNative | RouteStepTerraswap] = []
         for pair in pairs:
             token_out = pair.tokens[0] if token_in == pair.tokens[1] else pair.tokens[1]
-            steps.append(RouteStepTerraswap(token_in, token_out))
+            if isinstance(pair, LiquidityPair):
+                steps.append(RouteStepTerraswap(token_in, token_out))
+            else:
+                steps.append(RouteStepNative(token_in, token_out))  # type: ignore
             token_in = token_out
         return steps
 

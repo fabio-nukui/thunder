@@ -5,6 +5,7 @@ import logging
 import re
 import time
 from decimal import Decimal
+from typing import Sequence
 
 from terra_sdk.core import Coins
 from terra_sdk.core.auth import StdFee
@@ -45,7 +46,7 @@ class TxApi(Api):
 
     async def estimate_fee(
         self,
-        msgs: list[Msg],
+        msgs: Sequence[Msg],
         gas_adjustment: Decimal = None,
         use_fallback_estimate: bool = False,
         estimated_gas_use: int = None,
@@ -103,7 +104,7 @@ class TxApi(Api):
 
     async def execute_multi_msgs(
         self,
-        msgs: list[Msg],
+        msgs: Sequence[Msg],
         n_repeat: int,
         expect_logs_: bool = True,
         account_number: int = None,
@@ -129,7 +130,7 @@ class TxApi(Api):
 
     async def execute_msgs(
         self,
-        msgs: list[Msg],
+        msgs: Sequence[Msg],
         expect_logs_: bool = True,
         account_number: int = None,
         sequence: int = None,
