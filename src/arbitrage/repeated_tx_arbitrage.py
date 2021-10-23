@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from collections import Counter
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
@@ -50,6 +51,11 @@ class ArbTx:
             "timestamp_sent": self.timestamp_sent,
             "tx_hash": self.tx_hash,
         }
+
+
+def _format_status_logs(results: list[ArbResult]) -> str:
+    counts = Counter(res.tx_status for res in results)
+    return ",".join(f"{status}({counts[status]}x)" for status in TxStatus if counts[status])
 
 
 @dataclass
@@ -133,7 +139,7 @@ class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
                     self.data.results = await self._confirm_txs(height, params, txs)
                     profit = sum(res.net_profit_usd for res in self.data.results)
                     log.info(
-                        f"Arbitrage {','.join(res.tx_status for res in self.data.results)}, "
+                        f"Arbitrage {_format_status_logs(self.data.results)}, "
                         f"net_profit_usd={profit:.2f}",
                         extra={"data": self.data.to_data()},
                     )
