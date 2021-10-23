@@ -11,6 +11,7 @@ reportUnusedImport = false
 reportUnusedVariable = false
 reportDuplicateImport = false
 reportUndefinedVariable = false
+reportTypedDictNotRequiredAccess = false
 
 [tool.black]
 line-length = 100

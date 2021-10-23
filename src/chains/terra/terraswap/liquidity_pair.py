@@ -11,6 +11,7 @@ from decimal import Decimal
 from enum import Enum
 
 from terra_sdk.core import AccAddress
+from terra_sdk.core.coins import Coins
 from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.exceptions import LCDResponseError
 
@@ -310,13 +311,13 @@ class LiquidityPair(BaseTerraLiquidityPair):
                     "msg": TerraClient.encode_msg({Action.swap: swap_msg}),
                 }
             }
-            coins = []
+            coins = Coins()
         else:
             contract = self.contract_addr
             execute_msg = {
                 Action.swap: {"offer_asset": _token_amount_to_data(amount_in), **swap_msg}
             }
-            coins = [amount_in.to_coin()]
+            coins = Coins([amount_in.to_coin()])
 
         return MsgExecuteContract(
             sender=sender, contract=contract, execute_msg=execute_msg, coins=coins
@@ -515,7 +516,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
                 sender=sender,
                 contract=self.contract_addr,
                 execute_msg=execute_msg,
-                coins=coins,
+                coins=Coins(coins),
             )
         )
         return msgs

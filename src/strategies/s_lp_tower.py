@@ -166,7 +166,7 @@ class LPTowerArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbitra
                 )
                 raise TxError(e)
         gas_cost = TerraTokenAmount.from_coin(*fee.amount)
-        gas_cost_raw = gas_cost.amount / self.client.lcd.gas_adjustment
+        gas_cost_raw = gas_cost.amount / self.client.gas_adjustment
         net_profit_ust = (final_amount - initial_amount).amount * lp_ust_price - gas_cost_raw
         if net_profit_ust < MIN_PROFIT_UST:
             raise UnprofitableArbitrage(

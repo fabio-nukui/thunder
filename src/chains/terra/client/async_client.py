@@ -152,7 +152,9 @@ class TerraClient(AsyncBlockchainClient):
 
     @ttl_cache(CacheGroup.TERRA)
     async def get_bank(
-        self, denoms: list[str] = None, address: str = None
+        self,
+        denoms: list[str] = None,
+        address: AccAddress = None,
     ) -> list[TerraTokenAmount]:
         address = self.address if address is None else address
         coins_balance = await self.lcd.bank.balance(address)
@@ -194,7 +196,9 @@ class TerraClient(AsyncBlockchainClient):
             yield height
 
     @staticmethod
-    def extract_log_events(logs: list[TxLog]) -> list[dict]:
+    def extract_log_events(logs: list[TxLog] | None) -> list[dict]:
+        if not logs:
+            return []
         parsed_logs = []
         for tx_log in logs:
             event_types = [e["type"] for e in tx_log.events]
@@ -204,8 +208,10 @@ class TerraClient(AsyncBlockchainClient):
 
     @staticmethod
     def extract_coin_balance_changes(
-        logs: list[TxLog],
+        logs: list[TxLog] | None,
     ) -> dict[AccAddress, list[TerraTokenAmount]]:
+        if not logs:
+            return {}
         changes = defaultdict(list)
         for tx_log in logs:
             coins_spent = tx_log.events_by_type.get("coin_spent", {})

@@ -173,7 +173,7 @@ class LunaUstMarketArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxA
                 )
                 raise TxError(e)
         gas_cost = TerraTokenAmount.from_coin(*fee.amount) * n_repeat
-        gas_cost_raw = gas_cost.amount / self.client.lcd.gas_adjustment
+        gas_cost_raw = gas_cost.amount / self.client.gas_adjustment
         net_profit_ust = (final_amount - initial_amount).amount - gas_cost_raw
         if net_profit_ust < MIN_PROFIT_UST:
             raise UnprofitableArbitrage(

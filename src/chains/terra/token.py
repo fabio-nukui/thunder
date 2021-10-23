@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, TypeVar, Union
+from decimal import Decimal
+from typing import TYPE_CHECKING, Optional, TypeVar, Union
 
 from terra_sdk.core import AccAddress, Coin
+from terra_sdk.core.numeric import Dec
 from terra_sdk.core.wasm import MsgExecuteContract
 
-from common.token import Token, TokenAmount
+from common.token import DecInput, Token, TokenAmount
 
 if TYPE_CHECKING:
     from .client import TerraClient
@@ -17,6 +19,18 @@ _CW20TokenT = TypeVar("_CW20TokenT", bound="CW20Token")
 
 class TerraTokenAmount(TokenAmount):
     token: TerraToken
+
+    def __init__(
+        self,
+        token: Token,
+        amount: DecInput | Dec = None,
+        int_amount: Optional[int | str | Dec] = None,
+    ):
+        if isinstance(amount, Dec):
+            amount = Decimal(str(amount))
+        if isinstance(int_amount, Dec):
+            int_amount = int(int_amount)
+        super().__init__(token, amount, int_amount)
 
     @classmethod
     def from_coin(cls, coin: Coin) -> TerraTokenAmount:

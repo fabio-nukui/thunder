@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Iterable, Sequence, Union
 
 from terra_sdk.core import AccAddress
+from terra_sdk.core.coins import Coins
 from terra_sdk.core.wasm import MsgExecuteContract
 
 from ..client import TerraClient
@@ -120,11 +121,11 @@ class Router:
                     "msg": self.client.encode_msg(swap_msg),
                 }
             }
-            coins = []
+            coins = Coins()
         else:
             contract = self.contract_addr
             execute_msg = swap_msg
-            coins = [amount_in.to_coin()]
+            coins = Coins([amount_in.to_coin()])
         msg = MsgExecuteContract(
             sender=sender,
             contract=contract,

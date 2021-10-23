@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from copy import copy
-from typing import Literal
+from typing import Literal, cast
 
 import web3.middleware
 from eth_account.datastructures import SignedTransaction
@@ -73,11 +73,13 @@ class EVMClient(BaseEVMClient):
 
     @property
     def syncing(self) -> bool:
-        return self.w3.eth.syncing
+        if isinstance((syncing := self.w3.eth.syncing), bool):
+            return syncing
+        return syncing["currentBlock"] >= syncing["highestBlock"]
 
     def close(self):
         if isinstance(self.w3.provider, WebsocketProvider) and self.w3.provider.conn.ws is not None:
-            asyncio.get_event_loop().run_until_complete(self.w3.provider.conn.ws())
+            asyncio.get_event_loop().run_until_complete(self.w3.provider.conn.ws.close())
         if isinstance(self.w3.provider, HTTPProvider):
             for session in web3_http_sessions_cache.values():
                 session.close()
@@ -93,12 +95,12 @@ class EVMClient(BaseEVMClient):
         base_fee_multiplier = base_fee_multiplier or self.base_fee_multiplier
 
         if force_legacy_tx or not self.eip_1559:
-            return {"gasPrice": round(self.w3.eth.gas_price * gas_multiplier)}
+            return {"gasPrice": round(cast(int, self.w3.eth.gas_price) * gas_multiplier)}
 
         base_fee = self.w3.eth.get_block("pending")["baseFeePerGas"]
         return {
-            "maxFeePerGas": round(base_fee * base_fee_multiplier),
-            "maxPriorityFeePerGas": round(self.w3.eth.max_priority_fee * gas_multiplier),
+            "maxFeePerGas": round(cast(int, base_fee) * base_fee_multiplier),
+            "maxPriorityFeePerGas": round(cast(int, self.w3.eth.max_priority_fee) * gas_multiplier),
             "type": 2,
         }
 
@@ -110,7 +112,7 @@ class EVMClient(BaseEVMClient):
         if "nonce" not in tx:
             tx["nonce"] = self.w3.eth.get_transaction_count(self.address)
         if "gasPrice" not in tx or self.eip_1559 and "maxFeePerGas" not in tx:
-            tx.update(self.get_gas_price())
+            tx.update(self.get_gas_price())  # type: ignore
 
         signed_tx: SignedTransaction = self.account.sign_transaction(tx)
         tx_hash = signed_tx.hash.hex()
@@ -126,15 +128,14 @@ class EVMClient(BaseEVMClient):
         gas_multiplier: float = None,
         base_fee_multiplier: float = None,
     ) -> str:
-        tx = contract_call.buildTransaction(
-            {
-                "from": self.address,
-                "value": value,
-                "chainId": self.chain_id,
-                "gas": DEFAULT_MAX_GAS if max_gas is None else max_gas,
-                **self.get_gas_price(gas_multiplier, base_fee_multiplier),
-            }
-        )
+        tx_params = {
+            "from": self.address,
+            "value": value,
+            "chainId": self.chain_id,
+            "gas": DEFAULT_MAX_GAS if max_gas is None else max_gas,
+            **self.get_gas_price(gas_multiplier, base_fee_multiplier),
+        }
+        tx = contract_call.buildTransaction(TxParams(**tx_params))
         return self.sign_and_send_tx(tx)
 
 

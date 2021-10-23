@@ -91,4 +91,4 @@ class OneInchExchange:
         tx.update(self.client.get_gas_price(gas_multiplier, base_fee_multiplier))
         tx["to"] = Web3.toChecksumAddress(tx["to"])
 
-        return self.client.sign_and_send_tx(tx)
+        return self.client.sign_and_send_tx(tx)  # type: ignore

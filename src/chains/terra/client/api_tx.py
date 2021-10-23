@@ -87,7 +87,7 @@ class TxApi(Api):
 
         gas_adjustment = self.client.gas_adjustment if gas_adjustment is None else gas_adjustment
         gas_adjustment += FALLBACK_EXTRA_GAS_ADJUSTMENT
-        adjusted_gas_use = estimated_gas_use * gas_adjustment
+        adjusted_gas_use = round(estimated_gas_use * gas_adjustment)
 
         tax = await self.client.treasury.calculate_tax(native_amount)
         gas_price = next(
