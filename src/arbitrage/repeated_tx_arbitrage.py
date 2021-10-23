@@ -137,7 +137,7 @@ class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
                     params: BaseArbParams = self.data.params  # type: ignore
                     txs: list[ArbTx] = self.data.txs  # type: ignore
                     self.data.results = await self._confirm_txs(height, params, txs)
-                    profit = sum(res.net_profit_usd for res in self.data.results)
+                    profit = sum(res.net_profit_usd or 0 for res in self.data.results)
                     log.info(
                         f"Arbitrage {_format_status_logs(self.data.results)}, "
                         f"net_profit_usd={profit:.2f}",
