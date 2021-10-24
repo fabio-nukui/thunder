@@ -28,7 +28,7 @@ class MarketApi(Api):
             vp_terra, vp_luna = await self.get_virtual_pools()
             vp_offer, vp_ask = (vp_terra, vp_luna) if ask_denom == LUNA else (vp_luna, vp_terra)
 
-            offer_amount_sdr = (await self._compute_swap_no_spread(offer_amount, SDT)).amount
+            offer_amount_sdr = (await self.compute_swap_no_spread(offer_amount, SDT)).amount
             ask_amount_sdr = vp_ask * (offer_amount_sdr / (offer_amount_sdr + vp_offer))
             vp_spread = (offer_amount_sdr - ask_amount_sdr) / offer_amount_sdr
 
@@ -37,7 +37,7 @@ class MarketApi(Api):
             tobin_taxes = await self.get_tobin_taxes()
             spread = max(tobin_taxes[offer_amount.token], tobin_taxes[ask_denom])
 
-        ask_amount = await self._compute_swap_no_spread(offer_amount, ask_denom)
+        ask_amount = await self.compute_swap_no_spread(offer_amount, ask_denom)
         return (ask_amount * (1 - spread)).safe_margin(safety_margin)
 
     @ttl_cache(CacheGroup.TERRA, maxsize=1)
@@ -69,7 +69,7 @@ class MarketApi(Api):
         params = await self.client.lcd.market.parameters()
         return {k: Decimal(v) for k, v in params.items()}
 
-    async def _compute_swap_no_spread(
+    async def compute_swap_no_spread(
         self,
         offer_amount: TerraTokenAmount,
         ask_denom: TerraNativeToken,

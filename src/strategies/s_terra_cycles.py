@@ -8,6 +8,7 @@ import time
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
+from typing import Sequence
 
 from terra_sdk.core.auth import StdFee, TxInfo
 from terra_sdk.core.wasm import MsgExecuteContract
@@ -21,6 +22,7 @@ from arbitrage.terra import (
     run_strategy,
 )
 from chains.terra import LUNA, UST, NativeLiquidityPair, TerraClient, TerraTokenAmount, terraswap
+from chains.terra.token import TerraNativeToken
 from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
 from exceptions import TxError, UnprofitableArbitrage
 
@@ -29,11 +31,12 @@ from .common.default_params import (
     MAX_SINGLE_ARBITRAGE_AMOUNT,
     MIN_PROFIT_UST,
     MIN_START_AMOUNT,
-    MIN_UST_RESERVED_AMOUNT,
     OPTIMIZATION_TOLERANCE,
 )
 
 log = logging.getLogger(__name__)
+
+MIN_RESERVED_AMOUNT = UST.to_amount(10)
 
 
 def _estimated_gas_use(n_steps: int, use_router: bool) -> int:
@@ -47,7 +50,7 @@ class ArbParams(TerraArbParams):
     timestamp_found: float
     block_found: int
 
-    ust_balance: Decimal
+    initial_balance: TerraTokenAmount
     route: terraswap.SingleRoute
     reverse: bool
 
@@ -62,7 +65,7 @@ class ArbParams(TerraArbParams):
         return {
             "timestamp_found": self.timestamp_found,
             "block_found": self.block_found,
-            "ust_balance": float(self.ust_balance),
+            "initial_balance": self.initial_balance.to_data(),
             "route": str(self.route),
             "reverse": self.reverse,
             "initial_amount": self.initial_amount.to_data(),
@@ -74,41 +77,41 @@ class ArbParams(TerraArbParams):
         }
 
 
-async def get_arbitrages(client: TerraClient) -> list[UstCyclesArbitrage]:
+async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
     terraswap_factory, loop_factory = await asyncio.gather(
         terraswap.TerraswapFactory.new(client), terraswap.LoopFactory.new(client)
     )
-    list_routes = await asyncio.gather(
-        _get_native_terraswap_routes(client, terraswap_factory),
-        _get_terraswap_priority_3cycle_routes(client, terraswap_factory),
+    list_route_groups = await asyncio.gather(
+        _get_ust_native_routes(client, terraswap_factory),
+        _get_luna_native_routes(client, terraswap_factory),
+        _get_ust_terraswap_3cycle_routes(client, terraswap_factory),
         _get_ust_loop_3cycle_routes(client, loop_factory, terraswap_factory),
-        _get_loopdex_terraswap_2cycle_routes(client, loop_factory, terraswap_factory),
-        _get_alte_terraswap_3cycle_routes(client, terraswap_factory),
+        _get_ust_loopdex_terraswap_2cycle_routes(client, loop_factory, terraswap_factory),
+        _get_ust_alte_3cycle_routes(client, terraswap_factory),
     )
-    routes = [route for list_route in list_routes for route in list_route]
-    arb_routes = [UstCyclesArbitrage(client, multi_routes) for multi_routes in routes]
-
-    return arb_routes
+    return [
+        TerraCyclesArbitrage(client, multi_routes)
+        for route_group in list_route_groups
+        for multi_routes in route_group
+    ]
 
 
 def get_filters(
-    arb_routes: list[UstCyclesArbitrage],
+    arb_routes: list[TerraCyclesArbitrage],
 ) -> dict[terraswap.HybridLiquidityPair, FilterSingleSwapTerraswapPair]:
     filters: dict[terraswap.HybridLiquidityPair, FilterSingleSwapTerraswapPair] = {}
     for arb_route in arb_routes:
         for pair in arb_route.pairs:
             if not isinstance(pair, terraswap.LiquidityPair):
-                raise NotImplementedError
+                continue
             filters[pair] = FilterSingleSwapTerraswapPair(pair)
     return filters
 
 
-async def _get_native_terraswap_routes(
+async def _get_ust_native_routes(
     client: TerraClient,
     factory: terraswap.TerraswapFactory,
 ) -> list[terraswap.MultiRoutes]:
-    factory = await terraswap.TerraswapFactory.new(client)
-
     terraswap_pair = await factory.get_pair("UST-LUNA")
     native_pair = NativeLiquidityPair(client, (UST, LUNA))
 
@@ -122,7 +125,27 @@ async def _get_native_terraswap_routes(
     ]
 
 
-async def _get_terraswap_priority_3cycle_routes(
+async def _get_luna_native_routes(
+    client: TerraClient,
+    factory: terraswap.TerraswapFactory,
+) -> list[terraswap.MultiRoutes]:
+    pat_token_symbol = re.compile(r"^[A-Z]+-LUNA$")
+
+    routes: list[terraswap.MultiRoutes] = []
+    for pair_symbol in factory.addresses["pairs"]:
+        if not (match := pat_token_symbol.match(pair_symbol)) or pair_symbol == "UST-LUNA":
+            continue
+        terraswap_pair = await factory.get_pair(match.group())
+        if not isinstance(terraswap_pair.tokens[0], TerraNativeToken):
+            continue
+        native_pair = NativeLiquidityPair(client, terraswap_pair.tokens)  # type: ignore
+        list_steps: Sequence[Sequence] = [[terraswap_pair], [native_pair]]
+
+        routes.append(terraswap.MultiRoutes(client, LUNA, list_steps))
+    return routes
+
+
+async def _get_ust_terraswap_3cycle_routes(
     client: TerraClient,
     terraswap_factory: terraswap.TerraswapFactory,
 ) -> list[terraswap.MultiRoutes]:
@@ -167,7 +190,7 @@ async def _get_ust_loop_3cycle_routes(
     return routes
 
 
-async def _get_loopdex_terraswap_2cycle_routes(
+async def _get_ust_loopdex_terraswap_2cycle_routes(
     client: TerraClient,
     loop_factory: terraswap.LoopFactory,
     terraswap_factory: terraswap.TerraswapFactory,
@@ -191,7 +214,7 @@ async def _get_loopdex_terraswap_2cycle_routes(
     return routes
 
 
-async def _get_alte_terraswap_3cycle_routes(
+async def _get_ust_alte_3cycle_routes(
     client: TerraClient,
     factory: terraswap.TerraswapFactory,
 ) -> list[terraswap.MultiRoutes]:
@@ -216,18 +239,37 @@ async def _get_alte_terraswap_3cycle_routes(
     return routes
 
 
-class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbitrage):
+class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbitrage):
     def __init__(self, client: TerraClient, multi_routes: terraswap.MultiRoutes):
         """Arbitrage with UST as starting point and a cycle of liquidity pairs"""
-        assert multi_routes.tokens[0] == UST and multi_routes.is_cycle
+        assert isinstance(multi_routes.tokens[0], TerraNativeToken) and multi_routes.is_cycle
 
         self.multi_routes = multi_routes
         self.routes = multi_routes.routes
-        self.tokens = multi_routes.tokens[1:-1]
+        self.start_token = multi_routes.tokens[0]
         self.use_router = multi_routes.router_address is not None
         self.estimated_gas_use = _estimated_gas_use(multi_routes.n_steps, self.use_router)
 
-        super().__init__(client, pairs=multi_routes.pairs, filter_keys=multi_routes.pairs)
+        (
+            self.min_start_amount,
+            self.min_reserved_amount,
+            self.max_single_arbitrage,
+            self.optimization_tolerance,
+        ) = asyncio.get_event_loop().run_until_complete(
+            asyncio.gather(
+                client.market.compute_swap_no_spread(MIN_START_AMOUNT, self.start_token),
+                client.market.compute_swap_no_spread(MIN_RESERVED_AMOUNT, self.start_token),
+                client.market.compute_swap_no_spread(MAX_SINGLE_ARBITRAGE_AMOUNT, self.start_token),
+                client.market.compute_swap_no_spread(OPTIMIZATION_TOLERANCE, self.start_token),
+            )
+        )
+
+        super().__init__(
+            client,
+            pairs=multi_routes.pairs,
+            filter_keys=multi_routes.pairs,
+            fee_denom=self.start_token,
+        )
 
     def __repr__(self) -> str:
         return (
@@ -243,26 +285,29 @@ class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbit
         height: int,
         filtered_mempool: dict[terraswap.HybridLiquidityPair, list[list[dict]]] = None,
     ) -> ArbParams:
-        ust_balance = (await UST.get_balance(self.client)).amount
+        initial_balance = await self.start_token.get_balance(self.client)
 
         params: list[dict] = []
         errors: list[Exception] = []
         async with self._simulate_reserve_changes(filtered_mempool):
             for route in self.routes:
                 try:
-                    params.append(await self._get_params_single_route(route, ust_balance))
+                    params.append(await self._get_params_single_route(route, initial_balance))
                 except (TxError, UnprofitableArbitrage) as e:
                     errors.append(e)
         if not params:
             raise UnprofitableArbitrage(errors)
-        best_param = max(params, key=lambda x: x["net_profit_ust"])
-        if (net_profit_ust := best_param["net_profit_ust"]) < MIN_PROFIT_UST:
-            raise UnprofitableArbitrage(f"Low profitability: USD {net_profit_ust:.2f}")
+        best_param = max(params, key=lambda x: x["net_profit"])
+        net_profit_ust = await self.client.market.compute_swap_no_spread(
+            best_param["net_profit"], UST
+        )
+        if net_profit_ust < MIN_PROFIT_UST:
+            raise UnprofitableArbitrage(f"Low profitability: USD {net_profit_ust.amount:.2f}")
 
         return ArbParams(
             timestamp_found=time.time(),
             block_found=height,
-            ust_balance=ust_balance,
+            initial_balance=initial_balance,
             route=best_param["route"],
             reverse=best_param["reverse"],
             initial_amount=best_param["initial_amount"],
@@ -270,16 +315,18 @@ class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbit
             n_repeat=best_param["n_repeat"],
             est_final_amount=best_param["final_amount"],
             est_fee=best_param["fee"],
-            est_net_profit_usd=net_profit_ust,
+            est_net_profit_usd=net_profit_ust.amount,
         )
 
     async def _get_params_single_route(
-        self, route: terraswap.SingleRoute, ust_balance: Decimal
+        self,
+        route: terraswap.SingleRoute,
+        initial_balance: TerraTokenAmount,
     ) -> dict:
-        reverse = await route.should_reverse(MIN_START_AMOUNT)
+        reverse = await route.should_reverse(self.min_start_amount)
         initial_amount = await self._get_optimal_argitrage_amount(route, reverse)
         final_amount, msgs = await route.op_swap(initial_amount, reverse, safety_margin=True)
-        single_initial_amount, n_repeat = self._check_repeats(initial_amount, ust_balance)
+        single_initial_amount, n_repeat = self._check_repeats(initial_amount, initial_balance)
         if n_repeat > 1:
             _, msgs = await route.op_swap(single_initial_amount, reverse, safety_margin=True)
         try:
@@ -287,6 +334,7 @@ class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbit
                 msgs,
                 use_fallback_estimate=self._simulating_reserve_changes,
                 estimated_gas_use=self.estimated_gas_use,
+                fee_denom=self.fee_denom,
             )
         except LCDResponseError as e:
             log.debug(
@@ -296,8 +344,8 @@ class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbit
             )
             raise TxError(e)
         gas_cost = TerraTokenAmount.from_coin(*fee.amount) * n_repeat
-        gas_cost_raw = gas_cost.amount / self.client.gas_adjustment
-        net_profit_ust = (final_amount - initial_amount).amount - gas_cost_raw
+        gas_cost_raw = gas_cost / self.client.gas_adjustment
+        net_profit = final_amount - initial_amount - gas_cost_raw
         return {
             "route": route,
             "reverse": reverse,
@@ -306,7 +354,7 @@ class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbit
             "n_repeat": n_repeat,
             "final_amount": final_amount,
             "fee": fee,
-            "net_profit_ust": net_profit_ust,
+            "net_profit": net_profit,
         }
 
     async def _get_optimal_argitrage_amount(
@@ -314,14 +362,14 @@ class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbit
         route: terraswap.SingleRoute,
         reverse: bool,
     ) -> TerraTokenAmount:
-        profit = await self._get_gross_profit(MIN_START_AMOUNT, route, reverse)
+        profit = await self._get_gross_profit(self.min_start_amount, route, reverse)
         if profit < 0:
             raise UnprofitableArbitrage("No profitability")
         func = partial(self._get_gross_profit_dec, route=route, reverse=reverse)
         ust_amount, _ = await utils.aoptimization.optimize(
             func,
-            x0=MIN_START_AMOUNT.amount,
-            dx=MIN_START_AMOUNT.dx,
+            x0=self.min_start_amount.amount,
+            dx=self.min_start_amount.dx,
             tol=OPTIMIZATION_TOLERANCE.amount,
         )
         return UST.to_amount(ust_amount)
@@ -349,18 +397,18 @@ class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbit
     def _check_repeats(
         self,
         initial_amount: TerraTokenAmount,
-        ust_balance: Decimal,
+        initial_balance: TerraTokenAmount,
     ) -> tuple[TerraTokenAmount, int]:
-        available_amount = ust_balance - MIN_UST_RESERVED_AMOUNT
+        available_amount = initial_balance - self.min_reserved_amount
         if not self.use_router:
             if initial_amount > available_amount:
                 log.warning(
                     "Not enough balance for full arbitrage: "
                     f"wanted UST {initial_amount:,.2f}, have UST {available_amount:,.2f}"
                 )
-                return UST.to_amount(available_amount), 1
+                return available_amount, 1
             return initial_amount, 1
-        max_amount = min(available_amount, MAX_SINGLE_ARBITRAGE_AMOUNT.amount)
+        max_amount = min(available_amount.amount, self.max_single_arbitrage.amount)
         n_repeat = math.ceil(initial_amount.amount / max_amount)
         if n_repeat > MAX_N_REPEATS:
             log.warning(f"{n_repeat=} is too hight, reducing to {MAX_N_REPEATS}")
