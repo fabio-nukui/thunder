@@ -51,13 +51,15 @@ class TxApi(Api):
         use_fallback_estimate: bool = False,
         estimated_gas_use: int = None,
         native_amount: TerraTokenAmount = None,
+        fee_denom: str = None,
     ) -> StdFee:
+        fee_denom = self.client.fee_denom if fee_denom is None else fee_denom
         try:
             return await self.client.lcd.tx.estimate_fee(
                 self.client.address,
                 msgs,
                 gas_adjustment=gas_adjustment,
-                fee_denoms=[self.client.fee_denom],
+                fee_denoms=[fee_denom],
             )
         except LCDResponseError as e:
             if not (use_fallback_estimate or "account sequence mismatch" in e.message):
@@ -74,16 +76,18 @@ class TxApi(Api):
                     native_amount = TerraTokenAmount.from_coin(coins_send.to_list()[0])
                 else:
                     raise EstimateFeeError("Could not get native_amount from msg", e)
-        return await self.fallback_fee_estimation(estimated_gas_use, native_amount, gas_adjustment)
+        return await self._fallback_fee_estimation(
+            estimated_gas_use, native_amount, fee_denom, gas_adjustment
+        )
 
-    async def fallback_fee_estimation(
+    async def _fallback_fee_estimation(
         self,
         estimated_gas_use: int,
         native_amount: TerraTokenAmount,
+        fee_denom: str,
         gas_adjustment: Decimal = None,
     ) -> StdFee:
         assert isinstance(native_amount.token, TerraNativeToken)
-        assert native_amount.token.denom == self.client.fee_denom
 
         gas_adjustment = self.client.gas_adjustment if gas_adjustment is None else gas_adjustment
         gas_adjustment += FALLBACK_EXTRA_GAS_ADJUSTMENT
@@ -91,12 +95,10 @@ class TxApi(Api):
 
         tax = await self.client.treasury.calculate_tax(native_amount)
         gas_price = next(
-            coin
-            for coin in self.client.lcd.gas_prices.to_list()
-            if coin.denom == self.client.fee_denom
+            coin for coin in self.client.lcd.gas_prices.to_list() if coin.denom == fee_denom
         )
         gas_fee = int(gas_price.amount * adjusted_gas_use)
-        amount = Coins({self.client.fee_denom: tax.int_amount + gas_fee})
+        amount = Coins({fee_denom: tax.int_amount + gas_fee})
 
         fee = StdFee(gas=adjusted_gas_use, amount=amount)
         log.debug(f"Fallback gas fee estimation: {fee}")
@@ -109,6 +111,7 @@ class TxApi(Api):
         expect_logs_: bool = True,
         account_number: int = None,
         sequence: int = None,
+        fee_denom: str = None,
         **kwargs,
     ) -> list[tuple[float, SyncTxBroadcastResult]]:
         if "fee" not in kwargs:
@@ -122,7 +125,7 @@ class TxApi(Api):
         for i in range(1, n_repeat + 1):
             log.debug(f"Executing message {i} if {n_repeat}")
             res = await self.execute_msgs(
-                msgs, expect_logs_, account_number, sequence, log_=False, **kwargs
+                msgs, expect_logs_, account_number, sequence, fee_denom, log_=False, **kwargs
             )
             results.append((time.time(), res))
             sequence += 1
@@ -134,11 +137,13 @@ class TxApi(Api):
         expect_logs_: bool = True,
         account_number: int = None,
         sequence: int = None,
+        fee_denom: str = None,
         log_: bool = True,
         **kwargs,
     ) -> SyncTxBroadcastResult:
         if log_:
             log.debug(f"Sending tx: {msgs}")
+        fee_denom = self.client.fee_denom if fee_denom is None else fee_denom
 
         # Fixes bug in terraswap_sdk==1.0.0b2
         if "fee" not in kwargs:
@@ -150,7 +155,7 @@ class TxApi(Api):
         for i in range(1, MAX_BROADCAST_TRIES + 1):
             signed_tx = await self.client.wallet.create_and_sign_tx(
                 msgs,
-                fee_denoms=[self.client.fee_denom],
+                fee_denoms=[fee_denom],
                 account_number=account_number,
                 sequence=sequence,
                 **kwargs,

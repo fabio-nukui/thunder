@@ -105,8 +105,10 @@ class ArbitrageData:
 
 
 class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
-    def __init__(self, client: _BlockchainClientT):
+    def __init__(self, client: _BlockchainClientT, broadcast_kwargs: dict = None):
         self.client = client
+        self.broadcast_kwargs = broadcast_kwargs or {}
+
         self.data = ArbitrageData()
         log.info(f"Initialized {self} at height={self.client.height}")
         self.last_run_height = 0
@@ -163,7 +165,9 @@ class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
                 log.info(f"{self} ({height=}) Broadcasting {n_txs} transaction(s)")
                 try:
                     arb_params: BaseArbParams = self.data.params  # type: ignore
-                    self.data.txs = await self._broadcast_txs(arb_params, height)
+                    self.data.txs = await self._broadcast_txs(
+                        arb_params, height, **self.broadcast_kwargs
+                    )
                     log.debug("Arbitrage broadcasted", extra={"data": self.data.to_data()})
                 except BlockchainNewState as e:
                     log.warning(e)
@@ -181,7 +185,7 @@ class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
         ...
 
     @abstractmethod
-    async def _broadcast_txs(self, arb_params: BaseArbParams, height: int) -> list[ArbTx]:
+    async def _broadcast_txs(self, arb_params: BaseArbParams, height: int, **kwargs) -> list[ArbTx]:
         ...
 
     @abstractmethod
