@@ -8,7 +8,7 @@ from ..denoms import LUNA, SDT
 from ..token import TerraNativeToken, TerraTokenAmount
 from .base_api import Api
 
-MARKET_PARAMETERS_TTL = 600
+MARKET_PARAMETERS_TTL = 3600
 
 
 class MarketApi(Api):

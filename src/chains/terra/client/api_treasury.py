@@ -7,7 +7,7 @@ from ..denoms import LUNA
 from ..token import TerraNativeToken, TerraTokenAmount
 from .base_api import Api
 
-TERRA_TAX_CACHE_TTL = 7200
+TERRA_TAX_CACHE_TTL = 3600
 
 
 class TaxPayer(str, Enum):
