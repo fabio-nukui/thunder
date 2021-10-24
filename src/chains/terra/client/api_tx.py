@@ -94,9 +94,12 @@ class TxApi(Api):
         adjusted_gas_use = round(estimated_gas_use * gas_adjustment)
 
         tax = await self.client.treasury.calculate_tax(native_amount)
-        gas_price = next(
-            coin for coin in self.client.lcd.gas_prices.to_list() if coin.denom == fee_denom
-        )
+        try:
+            gas_price = next(
+                coin for coin in self.client.lcd.gas_prices.to_list() if coin.denom == fee_denom
+            )
+        except StopIteration:
+            raise TypeError(f"Invalid {fee_denom=}")
         gas_fee = int(gas_price.amount * adjusted_gas_use)
         amount = Coins({fee_denom: tax.int_amount + gas_fee})
 
