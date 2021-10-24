@@ -39,12 +39,6 @@ log = logging.getLogger(__name__)
 MIN_RESERVED_AMOUNT = UST.to_amount(10)
 
 
-def _estimated_gas_use(n_steps: int, use_router: bool) -> int:
-    if use_router:
-        return 1_620_000
-    return 486_319 + (n_steps - 2) * 341_002
-
-
 @dataclass
 class ArbParams(TerraArbParams):
     timestamp_found: float
@@ -141,7 +135,11 @@ async def _get_luna_native_routes(
         native_pair = NativeLiquidityPair(client, terraswap_pair.tokens)  # type: ignore
         list_steps: Sequence[Sequence] = [[terraswap_pair], [native_pair]]
 
-        routes.append(terraswap.MultiRoutes(client, LUNA, list_steps))
+        routes.append(
+            terraswap.MultiRoutes(
+                client, LUNA, list_steps, router_address=factory.addresses["router"]
+            )
+        )
     return routes
 
 
@@ -264,7 +262,6 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
         self.routes = multi_routes.routes
         self.start_token = multi_routes.tokens[0]
         self.use_router = multi_routes.router_address is not None
-        self.estimated_gas_use = _estimated_gas_use(multi_routes.n_steps, self.use_router)
 
         (
             self.min_start_amount,
@@ -284,6 +281,7 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
             filter_keys=multi_routes.pairs,
             fee_denom=self.start_token.denom,
         )
+        self.estimated_gas_use = await self._estimate_gas_use()
         return self
 
     def __repr__(self) -> str:
@@ -294,6 +292,16 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
 
     def _reset_mempool_params(self):
         super()._reset_mempool_params()
+
+    async def _estimate_gas_use(self) -> int:
+        list_gas: list[int] = []
+        for route in self.routes:
+            _, msgs = await route.op_swap(
+                self.min_start_amount, min_amount_out=self.start_token.to_amount(0)
+            )
+            fee = await self.client.tx.estimate_fee(msgs)
+            list_gas.append(fee.gas)
+        return max(list_gas)
 
     async def _get_arbitrage_params(
         self,
