@@ -22,7 +22,7 @@ from arbitrage.terra import (
     run_strategy,
 )
 from chains.terra import LUNA, UST, NativeLiquidityPair, TerraClient, TerraTokenAmount, terraswap
-from chains.terra.token import TerraNativeToken
+from chains.terra.token import TerraNativeToken, TerraToken
 from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
 from exceptions import TxError, UnprofitableArbitrage
 
@@ -90,7 +90,7 @@ async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
         _get_ust_alte_3cycle_routes(client, terraswap_factory),
     )
     return [
-        TerraCyclesArbitrage(client, multi_routes)
+        await TerraCyclesArbitrage.new(client, multi_routes)
         for route_group in list_route_groups
         for multi_routes in route_group
     ]
@@ -240,8 +240,24 @@ async def _get_ust_alte_3cycle_routes(
 
 
 class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbitrage):
-    def __init__(self, client: TerraClient, multi_routes: terraswap.MultiRoutes):
+    multi_routes: terraswap.MultiRoutes
+    routes: list[terraswap.SingleRoute]
+    start_token: TerraToken
+    use_router: bool
+    estimated_gas_use: int
+    min_start_amount: TerraTokenAmount
+    min_reserved_amount: TerraTokenAmount
+    max_single_arbitrage: TerraTokenAmount
+    optimization_tolerance: TerraTokenAmount
+
+    @classmethod
+    async def new(
+        cls,
+        client: TerraClient,
+        multi_routes: terraswap.MultiRoutes,
+    ) -> TerraCyclesArbitrage:
         """Arbitrage with UST as starting point and a cycle of liquidity pairs"""
+        self = super().__new__(cls)
         assert isinstance(multi_routes.tokens[0], TerraNativeToken) and multi_routes.is_cycle
 
         self.multi_routes = multi_routes
@@ -255,21 +271,20 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
             self.min_reserved_amount,
             self.max_single_arbitrage,
             self.optimization_tolerance,
-        ) = asyncio.get_event_loop().run_until_complete(
-            asyncio.gather(
-                client.market.compute_swap_no_spread(MIN_START_AMOUNT, self.start_token),
-                client.market.compute_swap_no_spread(MIN_RESERVED_AMOUNT, self.start_token),
-                client.market.compute_swap_no_spread(MAX_SINGLE_ARBITRAGE_AMOUNT, self.start_token),
-                client.market.compute_swap_no_spread(OPTIMIZATION_TOLERANCE, self.start_token),
-            )
+        ) = await asyncio.gather(
+            client.market.compute_swap_no_spread(MIN_START_AMOUNT, self.start_token),
+            client.market.compute_swap_no_spread(MIN_RESERVED_AMOUNT, self.start_token),
+            client.market.compute_swap_no_spread(MAX_SINGLE_ARBITRAGE_AMOUNT, self.start_token),
+            client.market.compute_swap_no_spread(OPTIMIZATION_TOLERANCE, self.start_token),
         )
 
-        super().__init__(
+        self.__init__(
             client,
             pairs=multi_routes.pairs,
             filter_keys=multi_routes.pairs,
             fee_denom=self.start_token,
         )
+        return self
 
     def __repr__(self) -> str:
         return (
