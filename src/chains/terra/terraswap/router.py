@@ -149,8 +149,8 @@ class Router:
         return next_amount_in
 
     def _get_pair(self, step: RouteStep) -> HybridLiquidityPair:
-        if step.sorted_tokens in self.terraswap_pairs:
+        if isinstance(step, RouteStepTerraswap) and step.sorted_tokens in self.terraswap_pairs:
             return self.terraswap_pairs[step.sorted_tokens]
-        if step.sorted_tokens in self.native_pairs:
+        if isinstance(step, RouteStepNative) and step.sorted_tokens in self.native_pairs:
             return self.native_pairs[step.sorted_tokens]
         raise Exception(f"No liquidity pair found for {step.sorted_tokens}")
