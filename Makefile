@@ -157,4 +157,4 @@ fix: ## Run linters and auto-fix code style
 	docker exec $(DEV_CONTAINER_NAME) black --safe src scripts tests app.py
 
 test: ## Run test cases in tests directory
-	docker exec $(DEV_CONTAINER_NAME) pytest -v tests
+	docker exec $(DEV_CONTAINER_NAME) pytest tests
