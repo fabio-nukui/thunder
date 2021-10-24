@@ -258,11 +258,10 @@ class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbit
     ) -> dict:
         reverse = await route.should_reverse(MIN_START_AMOUNT)
         initial_amount = await self._get_optimal_argitrage_amount(route, reverse)
+        final_amount, msgs = await route.op_swap(initial_amount, reverse, safety_margin=True)
         single_initial_amount, n_repeat = self._check_repeats(initial_amount, ust_balance)
-        single_final_amount, msgs = await route.op_swap(
-            single_initial_amount, reverse, safety_margin=True
-        )
-        final_amount = single_final_amount * n_repeat
+        if n_repeat > 1:
+            _, msgs = await route.op_swap(single_initial_amount, reverse, safety_margin=True)
         try:
             fee = await self.client.tx.estimate_fee(
                 msgs,
@@ -343,7 +342,10 @@ class UstCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbit
             return initial_amount, 1
         max_amount = min(available_amount, MAX_SINGLE_ARBITRAGE_AMOUNT.amount)
         n_repeat = math.ceil(initial_amount.amount / max_amount)
-        return initial_amount / n_repeat, min(n_repeat, MAX_N_REPEATS)
+        if n_repeat > MAX_N_REPEATS:
+            log.warning(f"{n_repeat=} is too hight, reducing to {MAX_N_REPEATS}")
+            n_repeat = MAX_N_REPEATS
+        return initial_amount / n_repeat, n_repeat
 
     async def _extract_returns_from_info(
         self,

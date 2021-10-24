@@ -144,15 +144,22 @@ class LunaUstMarketArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxA
             ust_balance = (await UST.get_balance(self.client)).amount
 
             initial_amount = await self._get_optimal_argitrage_amount(route, terraswap_premium)
-            single_initial_amount, n_repeat = self._check_repeats(initial_amount, ust_balance)
-            single_final_amount, msgs = await self.router.op_swap(
+            final_amount, msgs = await self.router.op_swap(
                 self.client.address,
-                single_initial_amount,
+                initial_amount,
                 route,
-                min_amount_out=single_initial_amount,
+                min_amount_out=initial_amount,
                 safety_margin=True,
             )
-            final_amount = single_final_amount * n_repeat
+            single_initial_amount, n_repeat = self._check_repeats(initial_amount, ust_balance)
+            if n_repeat > 1:
+                _, msgs = await self.router.op_swap(
+                    self.client.address,
+                    single_initial_amount,
+                    route,
+                    min_amount_out=single_initial_amount,
+                    safety_margin=True,
+                )
             try:
                 fee = await self.client.tx.estimate_fee(
                     msgs,
@@ -247,7 +254,10 @@ class LunaUstMarketArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxA
     ) -> tuple[TerraTokenAmount, int]:
         max_amount = min(ust_balance - MIN_UST_RESERVED_AMOUNT, MAX_SINGLE_ARBITRAGE_AMOUNT.amount)
         n_repeat = math.ceil(initial_amount.amount / max_amount)
-        return initial_amount / n_repeat, min(n_repeat, MAX_N_REPEATS)
+        if n_repeat > MAX_N_REPEATS:
+            log.warning(f"{n_repeat=} is too hight, reducing to {MAX_N_REPEATS}")
+            n_repeat = MAX_N_REPEATS
+        return initial_amount / n_repeat, n_repeat
 
     async def _extract_returns_from_info(
         self,
