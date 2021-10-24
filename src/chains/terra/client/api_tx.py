@@ -66,7 +66,7 @@ class TxApi(Api):
                 raise e
             if estimated_gas_use is None:
                 raise EstimateFeeError(
-                    "Could not use fallback fee estimaion without estimated_gas_use", e
+                    "Could not use fallback fee estimation without estimated_gas_use", e
                 )
             if native_amount is None:
                 coins_send: Coins | None = getattr(msgs[0], "coins", None)

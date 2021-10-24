@@ -282,7 +282,7 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
             client,
             pairs=multi_routes.pairs,
             filter_keys=multi_routes.pairs,
-            fee_denom=self.start_token,
+            fee_denom=self.start_token.denom,
         )
         return self
 
