@@ -20,7 +20,7 @@ from arbitrage.terra import (
     TerraswapLPReserveSimulationMixin,
     run_strategy,
 )
-from chains.terra import UST, TerraClient, TerraTokenAmount, terraswap
+from chains.terra import LUNA, UST, NativeLiquidityPair, TerraClient, TerraTokenAmount, terraswap
 from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
 from exceptions import TxError, UnprofitableArbitrage
 
@@ -79,9 +79,10 @@ async def get_arbitrages(client: TerraClient) -> list[UstCyclesArbitrage]:
         terraswap.TerraswapFactory.new(client), terraswap.LoopFactory.new(client)
     )
     list_routes = await asyncio.gather(
+        _get_native_terraswap_routes(client, terraswap_factory),
         _get_terraswap_priority_3cycle_routes(client, terraswap_factory),
         _get_ust_loop_3cycle_routes(client, loop_factory, terraswap_factory),
-        _get_ust_2cycle_routes(client, loop_factory, terraswap_factory),
+        _get_loopdex_terraswap_2cycle_routes(client, loop_factory, terraswap_factory),
         _get_alte_terraswap_3cycle_routes(client, terraswap_factory),
     )
     routes = [route for list_route in list_routes for route in list_route]
@@ -100,6 +101,25 @@ def get_filters(
                 raise NotImplementedError
             filters[pair] = FilterSingleSwapTerraswapPair(pair)
     return filters
+
+
+async def _get_native_terraswap_routes(
+    client: TerraClient,
+    factory: terraswap.TerraswapFactory,
+) -> list[terraswap.MultiRoutes]:
+    factory = await terraswap.TerraswapFactory.new(client)
+
+    terraswap_pair = await factory.get_pair("UST-LUNA")
+    native_pair = NativeLiquidityPair(client, (UST, LUNA))
+
+    return [
+        terraswap.MultiRoutes(
+            client=client,
+            start_token=UST,
+            list_steps=[[terraswap_pair], [native_pair]],
+            router_address=factory.addresses["router"],
+        )
+    ]
 
 
 async def _get_terraswap_priority_3cycle_routes(
@@ -147,7 +167,7 @@ async def _get_ust_loop_3cycle_routes(
     return routes
 
 
-async def _get_ust_2cycle_routes(
+async def _get_loopdex_terraswap_2cycle_routes(
     client: TerraClient,
     loop_factory: terraswap.LoopFactory,
     terraswap_factory: terraswap.TerraswapFactory,
