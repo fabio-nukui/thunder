@@ -37,6 +37,7 @@ from .common.default_params import (
 log = logging.getLogger(__name__)
 
 MIN_RESERVED_AMOUNT = UST.to_amount(10)
+MIN_N_ARBITRAGES = 20
 
 
 @dataclass
@@ -90,6 +91,7 @@ async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
                 arbs.append(await TerraCyclesArbitrage.new(client, multi_routes))
             except EstimateFeeError as e:
                 log.info(f"Error when initializing arbitrage with {multi_routes}: {e}")
+    assert len(arbs) >= MIN_N_ARBITRAGES
     return arbs
 
 
