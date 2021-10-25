@@ -30,8 +30,9 @@ _pat_sequence_error = re.compile(r"account sequence mismatch, expected (\d+)")
 
 
 class NoLogError(Exception):
-    def __init__(self, message: str):
-        self.message = message
+    def __init__(self, *args):
+        self.message = ""
+        super().__init__(*args)
 
 
 class TxApi(Api):
@@ -172,7 +173,7 @@ class TxApi(Api):
                 res = await self.client.lcd_http_client.post("txs", json=payload)
                 data: dict = res.json()
                 if expect_logs_ and data.get("logs") is None:
-                    raise NoLogError(data.get("raw_log", ""))
+                    raise NoLogError(data)
             except (NoLogError, LCDResponseError) as e:
                 if i == MAX_BROADCAST_TRIES:
                     raise Exception(f"Broadcast failed after {i} tries", e)
