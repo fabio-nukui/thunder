@@ -451,23 +451,11 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
         self,
         info: TxInfo,
     ) -> tuple[TerraTokenAmount, Decimal]:
-        tx_events = TerraClient.extract_log_events(info.logs)
-        logs_from_contract = TerraClient.parse_from_contract_events(tx_events)
-
-        (first_msg,) = list(logs_from_contract[0].values())[0]
-        assert first_msg["action"] == terraswap.Action.swap
-        assert first_msg["sender"] == self.client.address
-        assert first_msg["offer_asset"] == self.start_token.denom
-        amount_sent = self.start_token.to_amount(int_amount=first_msg["offer_amount"])
-
-        (last_msg,) = list(logs_from_contract[-1].values())[-1]
-        assert last_msg["action"] == terraswap.Action.swap
-        assert last_msg["receiver"] == self.client.address
-        assert last_msg["ask_asset"] == self.start_token.denom
-        amount_received = self.start_token.to_amount(
-            int_amount=int(last_msg["return_amount"]) - int(last_msg["tax_amount"])
-        )
-        return amount_received, (amount_received - amount_sent).amount
+        balance_changes = TerraClient.extract_coin_balance_changes(info.logs)
+        arb_changes = balance_changes[self.client.address]
+        assert all(change.token == self.start_token for change in arb_changes)
+        assert len(arb_changes) == 2
+        return max(arb_changes), arb_changes[0].amount + arb_changes[1].amount
 
 
 async def run(max_n_blocks: int = None):
