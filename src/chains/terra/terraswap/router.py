@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from decimal import Decimal
 from typing import Iterable, Sequence, Union
 
 from terra_sdk.core import AccAddress
@@ -14,6 +15,9 @@ from .liquidity_pair import LiquidityPair
 from .utils import Operation, token_to_data
 
 HybridLiquidityPair = Union[LiquidityPair, NativeLiquidityPair]
+
+
+ROUTER_EFFICIENCY = Decimal("0.99965")
 
 
 class RouteStep(ABC):
@@ -103,7 +107,7 @@ class Router:
             pair = self._get_pair(step)
             next_amount_in = await pair.get_swap_amount_out(next_amount_in, safety_margin)
             swap_operations.append(step.to_data())
-        amount_out: TerraTokenAmount = next_amount_in
+        amount_out: TerraTokenAmount = next_amount_in * ROUTER_EFFICIENCY
 
         swap_msg = {
             "execute_swap_operations": {
@@ -145,8 +149,10 @@ class Router:
         next_amount_in = await self.client.treasury.deduct_tax(amount_in)
         for step in route:
             pair = self._get_pair(step)
+            if isinstance(pair, RouteStepNative) and step == route[-1]:
+                next_amount_in = await self.client.treasury.deduct_tax(next_amount_in)
             next_amount_in = await pair.get_swap_amount_out(next_amount_in, safety_margin)
-        return next_amount_in
+        return next_amount_in * ROUTER_EFFICIENCY
 
     def _get_pair(self, step: RouteStep) -> HybridLiquidityPair:
         if isinstance(step, RouteStepTerraswap) and step.sorted_tokens in self.terraswap_pairs:
