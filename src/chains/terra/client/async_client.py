@@ -214,12 +214,12 @@ class TerraClient(AsyncBlockchainClient):
             return {}
         changes = defaultdict(list)
         for tx_log in logs:
-            coins_spent = tx_log.events_by_type.get("coin_spent", {})
-            for address, str_amount in zip(coins_spent["spender"], coins_spent["amount"]):
-                changes[address].append(-TerraTokenAmount.from_str(str_amount))
-            coins_received = tx_log.events_by_type.get("coin_received", {})
-            for address, str_amount in zip(coins_received["receiver"], coins_received["amount"]):
-                changes[address].append(TerraTokenAmount.from_str(str_amount))
+            if coins_spent := tx_log.events_by_type.get("coin_spent"):
+                for addr, str_amount in zip(coins_spent["spender"], coins_spent["amount"]):
+                    changes[addr].append(-TerraTokenAmount.from_str(str_amount))
+            if coins_received := tx_log.events_by_type.get("coin_received"):
+                for addr, str_amount in zip(coins_received["receiver"], coins_received["amount"]):
+                    changes[addr].append(TerraTokenAmount.from_str(str_amount))
         return dict(changes)
 
     @staticmethod
