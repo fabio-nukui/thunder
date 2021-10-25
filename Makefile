@@ -99,7 +99,7 @@ endif
 rm-dev: ## Remove stopped dev container
 	docker rm $(DEV_CONTAINER_NAME)
 
-build: clean check-all ## Build docker prod image
+build: check-all ## Build docker prod image
 	echo $(GIT_BRANCH) > docker/git_commit
 	docker build --target prod -t $(IMAGE_NAME) -f docker/Dockerfile .
 
