@@ -155,7 +155,7 @@ class TxApi(Api):
                 msgs, expect_logs_, account_number, sequence, fee_denom, log_=False, **kwargs
             )
             results.append((time.time(), res))
-            sequence += 1
+            sequence = max(self.client.account_sequence, sequence + 1)
         return results
 
     async def execute_msgs(
