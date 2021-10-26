@@ -99,7 +99,7 @@ endif
 rm-dev: ## Remove stopped dev container
 	docker rm $(DEV_CONTAINER_NAME)
 
-build: check-all ## Build docker prod images
+build: check-all ## Build docker main image
 	echo $(GIT_BRANCH) > docker/git_commit
 	docker build --target main -t $(MAIN_IMAGE_NAME) -f docker/Dockerfile .
 
@@ -113,6 +113,12 @@ start: ## Start docker container running arbitrage strategy "$STRAT" (e.g.: make
 
 stop:  ## Stop docker conteiner running strategy "$STRAT" (e.g.: make stop STRAT=1)
 	docker stop $(ARBITRAGE_CONTAINER_NAME)
+
+start-terra-broadcaster:  ## Build and start terra-broadcast/ngnix containers/volumes
+	docker-compose up --build terra_broadcaster nginx
+
+rm-terra-broadcaster:  ## Remove terra-broadcast/ngnix containers/volumes
+	docker-compose down -v
 
 restart: build  ## Restart running strategy "$STRAT" with updated code
 	docker rename $(ARBITRAGE_CONTAINER_NAME) $(ARBITRAGE_CONTAINER_NAME)_stopping

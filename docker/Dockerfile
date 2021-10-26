@@ -65,6 +65,28 @@ COPY --chown=$USER:$GID app/main.py ${HOME}/work/app.py
 
 CMD ["python", "app.py"]
 
+# #################################### TERRA_BROADCASTER ###########################################
+FROM prod as terra_broadcaster
+
+RUN conda install --quiet --yes \
+        'flask==2.0.2' \
+        'uwsgi==2.0.20' && \
+    conda clean --all -f -y && \
+    fix-permissions $HOME $CONDA_DIR
+
+COPY --chown=$USER:$GID app/terra_broadcaster.py ${HOME}/work/
+
+COPY --chown=$USER:$GID docker/terra_broadcaster/uwsgi.ini ${HOME}/work/
+
+RUN mkdir shared
+
+CMD ["uwsgi", "--ini", "uwsgi.ini"]
+
+########################################### NGINX ##################################################
+FROM nginx:1.21.3 as nginx
+
+COPY docker/terra_broadcaster/nginx.conf /etc/nginx/conf.d/
+
 ############################################ DEV ###################################################
 FROM base as dev
 
@@ -125,8 +147,9 @@ RUN jupyter labextension install -y \
     rm -rf $HOME/.local && \
     fix-permissions $HOME $CONDA_DIR
 
-COPY docker/lab/jupyter_lab_config.py $HOME/.jupyter/
+COPY docker/lab $HOME/.jupyter/
 
-COPY docker/lab/tracker.jupyterlab-settings $HOME/.jupyter/lab/user-settings/@jupyterlab/notebook-extension/
-
-COPY docker/lab/shortcuts.jupyterlab-settings $HOME/.jupyter/lab/user-settings/@jupyterlab/shortcuts-extension/
+RUN mv $HOME/.jupyter/tracker.jupyterlab-settings \
+        $HOME/.jupyter/lab/user-settings/@jupyterlab/notebook-extension/ && \
+    mv $HOME/.jupyter/shortcuts.jupyterlab-settings \
+        $HOME/.jupyter/lab/user-settings/@jupyterlab/shortcuts-extension/
