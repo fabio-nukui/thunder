@@ -29,8 +29,8 @@ export PRINT_HELP_PYSCRIPT
 ## VARIABLES
 ###################################################################################################
 
-IMAGE_NAME = thunder
 CONTAINER_USER = thunder
+MAIN_IMAGE_NAME = thunder-main
 DEV_IMAGE_NAME = thunder-dev
 LAB_IMAGE_NAME = thunder-lab
 DEV_CONTAINER_NAME = thunder-dev
@@ -99,9 +99,9 @@ endif
 rm-dev: ## Remove stopped dev container
 	docker rm $(DEV_CONTAINER_NAME)
 
-build: check-all ## Build docker prod image
+build: check-all ## Build docker prod images
 	echo $(GIT_BRANCH) > docker/git_commit
-	docker build --target prod -t $(IMAGE_NAME) -f docker/Dockerfile .
+	docker build --target main -t $(MAIN_IMAGE_NAME) -f docker/Dockerfile .
 
 start: ## Start docker container running arbitrage strategy "$STRAT" (e.g.: make start STRAT=1)
 	docker run --rm -d \
@@ -109,7 +109,7 @@ start: ## Start docker container running arbitrage strategy "$STRAT" (e.g.: make
 		-v $(PWD)/logs:/home/$(CONTAINER_USER)/work/logs \
 		--name $(ARBITRAGE_CONTAINER_NAME) \
 		--env-file $(ENV_FILE) \
-		$(IMAGE_NAME)
+		$(MAIN_IMAGE_NAME)
 
 stop:  ## Stop docker conteiner running strategy "$STRAT" (e.g.: make stop STRAT=1)
 	docker stop $(ARBITRAGE_CONTAINER_NAME)
@@ -147,14 +147,14 @@ clean: ## remove Python file artifacts
 	find . -name '__pycache__' -exec rm -fr {} +
 
 qa: ## Run linter checks
-	docker exec $(DEV_CONTAINER_NAME) isort -c src scripts tests app.py
-	docker exec $(DEV_CONTAINER_NAME) black --check src scripts tests app.py
-	docker exec $(DEV_CONTAINER_NAME) flake8 src scripts tests app.py
-	docker exec $(DEV_CONTAINER_NAME) mypy src scripts tests app.py
+	docker exec $(DEV_CONTAINER_NAME) isort -c src scripts tests app
+	docker exec $(DEV_CONTAINER_NAME) black --check src scripts tests app
+	docker exec $(DEV_CONTAINER_NAME) flake8 src scripts tests app
+	docker exec $(DEV_CONTAINER_NAME) mypy src scripts tests app
 
 fix: ## Run linters and auto-fix code style
-	docker exec $(DEV_CONTAINER_NAME) isort src scripts tests app.py
-	docker exec $(DEV_CONTAINER_NAME) black --safe src scripts tests app.py
+	docker exec $(DEV_CONTAINER_NAME) isort src scripts tests app
+	docker exec $(DEV_CONTAINER_NAME) black --safe src scripts tests app
 
 test: ## Run test cases in tests directory
 	docker exec $(DEV_CONTAINER_NAME) pytest tests

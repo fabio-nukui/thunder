@@ -50,15 +50,18 @@ WORKDIR ${HOME}/work
 # ########################################### PROD #################################################
 FROM base as prod
 
-COPY --chown=$USER:$GID app.py logging_config.yaml ${HOME}/work/
+COPY --chown=$USER:$GID logging_config.yaml ${HOME}/work/
 
 COPY --chown=$USER:$GID resources ${HOME}/work/resources
-
-# COPY --chown=$USER:$GID deployed_contracts ${HOME}/work/deployed_contracts
 
 COPY --chown=$USER:$GID src ${HOME}/work/src
 
 COPY --chown=$USER:$GID docker/git_commit ${HOME}/work/git_commit
+
+# ########################################### MAIN #################################################
+FROM prod as main
+
+COPY --chown=$USER:$GID app/main.py ${HOME}/work/app.py
 
 CMD ["python", "app.py"]
 
