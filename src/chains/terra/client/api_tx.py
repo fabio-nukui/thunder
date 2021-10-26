@@ -15,7 +15,7 @@ from terra_sdk.exceptions import LCDResponseError
 
 import configs
 from chains.terra.token import TerraNativeToken, TerraTokenAmount
-from exceptions import EstimateFeeError
+from exceptions import EstimateFeeError, TxAlreadyBroadcasted
 from utils.cache import CacheGroup, ttl_cache
 
 from .base_api import Api
@@ -73,6 +73,7 @@ class TxApi(Api):
                 if match := _pat_sequence_error.search(e.message):
                     if i == MAX_FEE_ESTIMATION_TRIES:
                         raise Exception(f"Fee estimation failed after {i} tries", e)
+                    await self._check_msgs_in_mempool(msgs)
                     sequence = int(match.group(1))
                     log.debug(f"Retrying fee estimation with updated {sequence=}")
                     continue
@@ -97,6 +98,12 @@ class TxApi(Api):
                 self.client.account_sequence = sequence
                 return fee
         raise Exception("Should never reach")
+
+    async def _check_msgs_in_mempool(self, msgs: Sequence[Msg]):
+        mempool = await self.client.mempool.fetch_mempool_msgs()
+        data = [msg.to_data() for msg in msgs]
+        if data in mempool:
+            raise TxAlreadyBroadcasted
 
     async def _fallback_fee_estimation(
         self,
@@ -193,6 +200,7 @@ class TxApi(Api):
                 if i == MAX_BROADCAST_TRIES:
                     raise Exception(f"Broadcast failed after {i} tries", e)
                 if match := _pat_sequence_error.search(e.message):
+                    await self._check_msgs_in_mempool(msgs)
                     sequence = int(match.group(1))
                     log.debug(f"Retrying broadcast with updated {sequence=}")
                 else:

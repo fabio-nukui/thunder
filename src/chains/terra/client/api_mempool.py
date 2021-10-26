@@ -42,7 +42,7 @@ class MempoolCacheManager:
         self._txs_cache: dict[str, dict] = {}
         self._read_txs: set[str] = set()
         self._running_thread_update_height = False
-        self._new_blockchain_state = False
+        self.new_blockchain_state = False
         self._decoder_error_counter = 0
 
     async def close(self):
@@ -58,7 +58,7 @@ class MempoolCacheManager:
     @height.setter
     def height(self, value: int):
         self._height = value
-        self._new_blockchain_state = False
+        self.new_blockchain_state = False
         self._decoder_error_counter = 0
 
     async def filter_new_height_mempool(
@@ -83,7 +83,7 @@ class MempoolCacheManager:
         new_block_only: bool,
     ) -> tuple[int, list[list[dict]]]:
         cor_next_height = utils_rpc.wait_next_block_height(self._rpc_websocket_uri)
-        cor_mempool_txs = self._fetch_mempool_txs()
+        cor_mempool_txs = self.fetch_mempool_txs()
         if height != self.height or new_block_only:
             self.height = await cor_next_height
             self._txs_cache = await cor_mempool_txs
@@ -101,7 +101,7 @@ class MempoolCacheManager:
                 self._running_thread_update_height = True
                 fut_next_height: Future[int] = next(as_completed_events)  # type: ignore
                 asyncio.create_task(self._update_height(fut_next_height))
-        if self._new_blockchain_state:
+        if self.new_blockchain_state:
             raise BlockchainNewState
         unread_txs_msgs = [
             tx["msg"] for key, tx in self._txs_cache.items() if key not in self._read_txs
@@ -109,7 +109,7 @@ class MempoolCacheManager:
         self._read_txs = set(self._txs_cache)
         return self.height, unread_txs_msgs
 
-    async def _fetch_mempool_txs(self) -> dict[str, dict]:
+    async def fetch_mempool_txs(self) -> dict[str, dict]:
         n_txs = len(self._txs_cache)
         while True:
             res = await self._rpc_client.get("unconfirmed_txs")
@@ -120,7 +120,7 @@ class MempoolCacheManager:
 
         if not self._read_txs.issubset(raw_txs):
             # Some txs were removed from mempool, a new block has arrived
-            self._new_blockchain_state = True
+            self.new_blockchain_state = True
             self._txs_cache = {key: tx for key, tx in self._txs_cache.items() if key in raw_txs}
             self._read_txs = set()
 
@@ -169,6 +169,12 @@ class MempoolApi(Api):
 
     async def close(self):
         await self._cache_manager.close()
+
+    async def fetch_mempool_msgs(self) -> list[list[dict]]:
+        txs = await self._cache_manager.fetch_mempool_txs()
+        if self._cache_manager.new_blockchain_state:
+            raise BlockchainNewState
+        return [tx["msg"] for tx in txs.values()]
 
     async def get_height_mempool(self, height: int) -> tuple[int, list[list[dict]]]:
         return await self._cache_manager.get_new_height_mempool(height, new_block_only=False)

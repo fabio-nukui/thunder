@@ -9,7 +9,14 @@ from enum import Enum
 from typing import Any, Generic, Optional, TypeVar
 
 from common import BlockchainClient, TokenAmount
-from exceptions import BlockchainNewState, IsBusy, OptimizationError, TxError, UnprofitableArbitrage
+from exceptions import (
+    BlockchainNewState,
+    IsBusy,
+    OptimizationError,
+    TxAlreadyBroadcasted,
+    TxError,
+    UnprofitableArbitrage,
+)
 
 log = logging.getLogger(__name__)
 
@@ -157,7 +164,13 @@ class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
                 log.debug(f"{self} ({height=}) Generating arbitrage parameters")
                 try:
                     self.data.params = await self._get_arbitrage_params(height, filtered_mempool)
-                except (UnprofitableArbitrage, TxError, OptimizationError) as e:
+                except (
+                    UnprofitableArbitrage,
+                    TxError,
+                    OptimizationError,
+                    TxAlreadyBroadcasted,
+                    BlockchainNewState,
+                ) as e:
                     log.debug(e)
                     return
             if self.state == State.ready_to_broadcast:
@@ -169,6 +182,9 @@ class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
                         arb_params, height, **self.broadcast_kwargs
                     )
                     log.debug("Arbitrage broadcasted", extra={"data": self.data.to_data()})
+                except TxAlreadyBroadcasted as e:
+                    log.debug(e)
+                    self.data.reset()
                 except BlockchainNewState as e:
                     log.warning(e)
                     self.data.reset()

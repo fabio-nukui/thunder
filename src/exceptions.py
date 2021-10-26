@@ -32,6 +32,10 @@ class OptimizationError(Exception):
     pass
 
 
+class TxAlreadyBroadcasted(Exception):
+    pass
+
+
 class TxError(Exception):
     pass
 
