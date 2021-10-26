@@ -173,7 +173,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
             if reserve.token == reference_token:
                 amount_per_lp_token = reserve.amount / supply.amount
                 return amount_per_lp_token * exchange_rate * 2
-        raise Exception  # Should never reach
+        raise Exception("Should never reach")
 
     async def op_swap(
         self,

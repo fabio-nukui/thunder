@@ -25,6 +25,7 @@ log = logging.getLogger(__name__)
 TERRA_GAS_PRICE_CACHE_TTL = 3600
 FALLBACK_EXTRA_GAS_ADJUSTMENT = Decimal("0.20")
 MAX_BROADCAST_TRIES = 10
+MAX_FEE_ESTIMATION_TRIES = 5
 
 _pat_sequence_error = re.compile(r"account sequence mismatch, expected (\d+)")
 
@@ -53,33 +54,49 @@ class TxApi(Api):
         estimated_gas_use: int = None,
         native_amount: TerraTokenAmount = None,
         fee_denom: str = None,
+        account_number: int = None,
+        sequence: int = None,
     ) -> StdFee:
         fee_denom = self.client.fee_denom if fee_denom is None else fee_denom
-        try:
-            return await self.client.lcd.tx.estimate_fee(
-                self.client.address,
-                msgs,
-                gas_adjustment=gas_adjustment,
-                fee_denoms=[fee_denom],
-            )
-        except LCDResponseError as e:
-            if not (use_fallback_estimate or "account sequence mismatch" in e.message):
-                raise e
-            if estimated_gas_use is None:
-                raise EstimateFeeError(
-                    "Could not use fallback fee estimation without estimated_gas_use", e
+        account_number, sequence = await self.client._valid_account_params(account_number, sequence)
+        for i in range(1, MAX_FEE_ESTIMATION_TRIES + 1):
+            try:
+                fee = await self.client.lcd.tx.estimate_fee(
+                    self.client.address,
+                    msgs,
+                    gas_adjustment=gas_adjustment,
+                    fee_denoms=[fee_denom],
+                    account_number=account_number,
+                    sequence=sequence,
                 )
-            if native_amount is None:
-                coins_send: Coins | None = getattr(msgs[0], "coins", None)
-                if coins_send:
-                    if not len(coins_send) == 1:
-                        raise NotImplementedError
-                    native_amount = TerraTokenAmount.from_coin(coins_send.to_list()[0])
-                else:
-                    raise EstimateFeeError("Could not get native_amount from msg", e)
-        return await self._fallback_fee_estimation(
-            estimated_gas_use, native_amount, fee_denom, gas_adjustment
-        )
+            except LCDResponseError as e:
+                if match := _pat_sequence_error.search(e.message):
+                    if i == MAX_FEE_ESTIMATION_TRIES:
+                        raise Exception(f"Fee estimation failed after {i} tries", e)
+                    sequence = int(match.group(1))
+                    log.debug(f"Retrying fee estimation with updated {sequence=}")
+                    continue
+                if not use_fallback_estimate:
+                    raise e
+                if estimated_gas_use is None:
+                    raise EstimateFeeError(
+                        "Could not use fallback fee estimation without estimated_gas_use", e
+                    )
+                if native_amount is None:
+                    coins_send: Coins | None = getattr(msgs[0], "coins", None)
+                    if coins_send:
+                        if not len(coins_send) == 1:
+                            raise NotImplementedError
+                        native_amount = TerraTokenAmount.from_coin(coins_send.to_list()[0])
+                    else:
+                        raise EstimateFeeError("Could not get native_amount from msg", e)
+                return await self._fallback_fee_estimation(
+                    estimated_gas_use, native_amount, fee_denom, gas_adjustment
+                )
+            else:
+                self.client.account_sequence = sequence
+                return fee
+        raise Exception("Should never reach")
 
     async def _fallback_fee_estimation(
         self,
@@ -118,12 +135,11 @@ class TxApi(Api):
         fee_denom: str = None,
         **kwargs,
     ) -> list[tuple[float, SyncTxBroadcastResult]]:
+        account_number, sequence = await self.client._valid_account_params(account_number, sequence)
         if "fee" not in kwargs:
-            kwargs["fee"] = self.estimate_fee(msgs)
-        if account_number is None:
-            account_number = await self.client.get_account_number()
-        if sequence is None:
-            sequence = await self.client.get_account_sequence()
+            kwargs["fee"] = self.estimate_fee(
+                msgs, account_number=account_number, sequence=sequence
+            )
         log.debug(f"Executing messages {n_repeat} time(s): {msgs}")
         results: list[tuple[float, SyncTxBroadcastResult]] = []
         for i in range(1, n_repeat + 1):
@@ -149,13 +165,12 @@ class TxApi(Api):
             log.debug(f"Sending tx: {msgs}")
         fee_denom = self.client.fee_denom if fee_denom is None else fee_denom
 
+        account_number, sequence = await self.client._valid_account_params(account_number, sequence)
         # Fixes bug in terraswap_sdk==1.0.0b2
         if "fee" not in kwargs:
-            kwargs["fee"] = self.estimate_fee(msgs)
-        if account_number is None:
-            account_number = await self.client.get_account_number()
-        if sequence is None:
-            sequence = await self.client.get_account_sequence()
+            kwargs["fee"] = self.estimate_fee(
+                msgs, account_number=account_number, sequence=sequence
+            )
         for i in range(1, MAX_BROADCAST_TRIES + 1):
             signed_tx = await self.client.wallet.create_and_sign_tx(
                 msgs,
@@ -179,7 +194,7 @@ class TxApi(Api):
                     raise Exception(f"Broadcast failed after {i} tries", e)
                 if match := _pat_sequence_error.search(e.message):
                     sequence = int(match.group(1))
-                    log.debug(f"Retrying with updated sequence={sequence}")
+                    log.debug(f"Retrying broadcast with updated {sequence=}")
                 else:
                     raise e
             else:

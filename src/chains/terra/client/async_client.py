@@ -13,6 +13,7 @@ from terra_sdk.client.lcd import AsyncLCDClient
 from terra_sdk.client.lcd.wallet import AsyncWallet
 from terra_sdk.core import AccAddress, Coins
 from terra_sdk.core.auth import TxLog
+from terra_sdk.core.auth.data.account import Account
 from terra_sdk.exceptions import LCDResponseError
 from terra_sdk.key.mnemonic import MnemonicKey
 
@@ -165,13 +166,15 @@ class TerraClient(AsyncBlockchainClient):
         ]
 
     @ttl_cache(CacheGroup.TERRA)
-    async def get_account_number(self, address: AccAddress = None) -> int:
+    async def get_account_data(self, address: AccAddress = None) -> Account:
         address = self.address if address is None else address
-        return (await self.lcd.auth.account_info(address)).account_number
+        return await self.lcd.auth.account_info(address)
+
+    async def get_account_number(self, address: AccAddress = None) -> int:
+        return (await self.get_account_data(address)).account_number
 
     async def get_account_sequence(self, address: AccAddress = None) -> int:
-        address = self.address if address is None else address
-        on_chain = (await self.lcd.auth.account_info(address)).sequence
+        on_chain = (await self.get_account_data(address)).sequence
         local = self.account_sequence
         if on_chain == local:
             return on_chain
@@ -181,6 +184,17 @@ class TerraClient(AsyncBlockchainClient):
             return on_chain
         log.debug(f"Using higher local sequence value ({local=}, {on_chain=})")
         return self.account_sequence
+
+    async def _valid_account_params(
+        self,
+        account_number: int | None,
+        sequence: int | None,
+    ) -> tuple[int, int]:
+        if account_number is None:
+            account_number = await self.get_account_number()
+        if sequence is None:
+            sequence = await self.get_account_sequence()
+        return account_number, sequence
 
     @staticmethod
     def encode_msg(msg: dict) -> str:
