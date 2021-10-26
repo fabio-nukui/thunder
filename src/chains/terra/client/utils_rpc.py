@@ -55,6 +55,5 @@ async def wait_next_block_height(rpc_websocket_uri: str) -> int:
     async with websockets.client.connect(rpc_websocket_uri) as client:
         await client.send(json.dumps(subscription_msg))
         await _get_jsonrpc_subscription_ack(client, subscription_msg["id"])
-        while True:
-            response = json.loads(await client.recv())
-            return int(response["result"]["data"]["value"]["header"]["height"])
+        response = json.loads(await client.recv())
+        return int(response["result"]["data"]["value"]["header"]["height"])
