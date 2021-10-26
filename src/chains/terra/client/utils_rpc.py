@@ -15,13 +15,14 @@ class SubscriptionMsg(TypedDict):
     params: list[str]
 
 
-async def _get_jsonrpc_subscription_ack(
+async def _subscribe_rpc(
     client: websockets.client.WebSocketClientProtocol,
-    subscription_id: int,
+    subscription_msg: SubscriptionMsg,
 ):
+    await client.send(json.dumps(subscription_msg))
     while True:
         response = json.loads(await client.recv())
-        if response["id"] == subscription_id:
+        if response["id"] == subscription_msg["id"]:
             return
 
 
@@ -35,8 +36,7 @@ async def loop_latest_height(rpc_websocket_uri: str) -> AsyncIterable[int]:
     while True:
         try:
             async with websockets.client.connect(rpc_websocket_uri) as client:
-                await client.send(json.dumps(subscription_msg))
-                await _get_jsonrpc_subscription_ack(client, subscription_msg["id"])
+                await _subscribe_rpc(client, subscription_msg)
                 while True:
                     response = json.loads(await client.recv())
                     yield int(response["result"]["data"]["value"]["header"]["height"])
@@ -53,7 +53,6 @@ async def wait_next_block_height(rpc_websocket_uri: str) -> int:
         "params": ["tm.event='NewBlockHeader'"],
     }
     async with websockets.client.connect(rpc_websocket_uri) as client:
-        await client.send(json.dumps(subscription_msg))
-        await _get_jsonrpc_subscription_ack(client, subscription_msg["id"])
+        await _subscribe_rpc(client, subscription_msg)
         response = json.loads(await client.recv())
         return int(response["result"]["data"]["value"]["header"]["height"])
