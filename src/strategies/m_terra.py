@@ -8,7 +8,7 @@ from . import s_lp_tower, s_terra_cycles
 
 
 async def run(max_n_blocks: int = None):
-    async with await TerraClient.new() as client:
+    async with TerraClient() as client:
         terra_cycle_arbs, s_lp_tower_arbs = await asyncio.gather(
             s_terra_cycles.get_arbitrages(client),
             s_lp_tower.get_arbitrages(client),

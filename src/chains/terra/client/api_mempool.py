@@ -158,13 +158,13 @@ class MempoolApi(Api):
     def __init__(self, client: "TerraClient"):
         super().__init__(client)
         self.new_block_only = False
-        self._rpc_websocket_uri = str(client.rpc_http_client.base_url)
+        self._rpc_websocket_uri = str(client.rpc_http_uri)
 
         self._cache_manager = MempoolCacheManager(
             client.height,
             client.rpc_websocket_uri,
             self._rpc_websocket_uri,
-            str(client.lcd_http_client.base_url),
+            str(client.lcd_uri),
         )
 
     async def close(self):

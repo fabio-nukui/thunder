@@ -31,12 +31,12 @@ async def write_to_file(factory: terraswap.Factory, name: str, router_address: s
 
 
 async def main():
-    client = await TerraClient.new()
-    terraswap_factory = await terraswap.TerraswapFactory.new(client)
-    await write_to_file(terraswap_factory, "terraswap", _TERRASWAP_DEX_ROUTER)
+    async with TerraClient() as client:
+        terraswap_factory = await terraswap.TerraswapFactory.new(client)
+        await write_to_file(terraswap_factory, "terraswap", _TERRASWAP_DEX_ROUTER)
 
-    loop_factory = await terraswap.LoopFactory.new(client)
-    await write_to_file(loop_factory, "loop")
+        loop_factory = await terraswap.LoopFactory.new(client)
+        await write_to_file(loop_factory, "loop")
 
 
 if __name__ == "__main__":

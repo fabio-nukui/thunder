@@ -40,12 +40,22 @@ _AsyncBlockchainClientT = TypeVar("_AsyncBlockchainClientT", bound="AsyncBlockch
 
 
 class AsyncBlockchainClient(BlockchainClient, ABC):
-    @classmethod
+    raise_on_syncing: bool
+    started: bool = False
+
     @abstractmethod
-    async def new(cls: type[_AsyncBlockchainClientT], *args, **kwargs) -> _AsyncBlockchainClientT:
+    def __init__(self, raise_on_syncing: bool):
         ...
 
+    @classmethod
+    async def new(cls: type[_AsyncBlockchainClientT], *args, **kwargs) -> _AsyncBlockchainClientT:
+        self = cls(*args, **kwargs)
+        await self.start()
+        return self
+
     async def __aenter__(self):
+        if not self.started:
+            await self.start()
         return self
 
     async def __aexit__(self, *args):
@@ -55,12 +65,13 @@ class AsyncBlockchainClient(BlockchainClient, ABC):
     async def close(self):
         pass
 
-    async def init(self, raise_on_syncing: bool = False):
-        if raise_on_syncing and await self.is_syncing():
+    async def start(self):
+        if self.raise_on_syncing and await self.is_syncing():
             assert isinstance(self.height, int), f"Unexpected height={self.height}, expected int"
             raise NodeSyncing(self.height)
 
-        log.info(f"Initialized {self} at height={self.height}")
+        self.started = True
+        log.info(f"Started {self} at height={self.height}")
 
     @abstractmethod
     async def is_syncing(self) -> bool:

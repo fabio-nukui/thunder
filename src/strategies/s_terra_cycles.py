@@ -461,7 +461,7 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
 
 
 async def run(max_n_blocks: int = None):
-    async with await TerraClient.new() as client:
+    async with TerraClient() as client:
         arb_routes = await get_arbitrages(client)
         mempool_filters = get_filters(arb_routes)
         await run_strategy(client, arb_routes, mempool_filters, max_n_blocks)
