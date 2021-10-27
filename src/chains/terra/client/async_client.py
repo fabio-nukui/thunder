@@ -9,6 +9,8 @@ from collections import defaultdict
 from decimal import Decimal
 from typing import AsyncIterable
 
+import aiohttp
+from aiohttp.client_exceptions import ServerDisconnectedError
 from terra_sdk.client.lcd import AsyncLCDClient
 from terra_sdk.core import AccAddress, Coins
 from terra_sdk.core.auth import TxLog
@@ -38,6 +40,28 @@ log = logging.getLogger(__name__)
 TERRA_CONTRACT_QUERY_CACHE_SIZE = 10_000
 CONTRACT_INFO_CACHE_TTL = 86400  # Contract info should not change; 24h ttl
 _pat_contract_not_found = re.compile(r"contract terra1(\w+): not found")
+
+
+class ReconnectingLCDClient(AsyncLCDClient):
+    async def _get(self, *args, **kwargs):
+        try:
+            return await super()._get(*args, **kwargs)
+        except ServerDisconnectedError:
+            asyncio.create_task(self.session.close())
+            self.session = aiohttp.ClientSession(
+                headers={"Accept": "application/json"}, loop=self.loop
+            )
+            return await super()._get(*args, **kwargs)
+
+    async def _post(self, *args, **kwargs):
+        try:
+            return await super()._post(*args, **kwargs)
+        except ServerDisconnectedError:
+            asyncio.create_task(self.session.close())
+            self.session = aiohttp.ClientSession(
+                headers={"Accept": "application/json"}, loop=self.loop
+            )
+            return await super()._post(*args, **kwargs)
 
 
 class TerraClient(AsyncBlockchainClient):
@@ -85,7 +109,9 @@ class TerraClient(AsyncBlockchainClient):
         self.broadcast_lcd_clients = [
             utils.ahttp.AsyncClient(base_url=url) for url in self.broadcast_lcd_uris if url
         ]
-        self.lcd = AsyncLCDClient(self.lcd_uri, self.chain_id, self.gas_prices, self.gas_adjustment)
+        self.lcd = ReconnectingLCDClient(
+            self.lcd_uri, self.chain_id, self.gas_prices, self.gas_adjustment
+        )
         self.wallet = self.lcd.wallet(self.key)
         self.address = self.wallet.key.acc_address
 
