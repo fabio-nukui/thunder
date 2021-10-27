@@ -17,7 +17,7 @@ from .utils import Operation, token_to_data
 HybridLiquidityPair = Union[LiquidityPair, NativeLiquidityPair]
 
 
-ROUTER_EFFICIENCY = Decimal("0.9985")
+ROUTER_EFFICIENCY = Decimal("0.99965")
 
 
 class RouteStep(ABC):
