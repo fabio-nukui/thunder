@@ -7,26 +7,9 @@ services:
       dockerfile: docker/Dockerfile
       target: terra_broadcaster
     image: thunder-terra_broadcaster
+    container_name: thunder-terra_broadcaster
+    env_file: env/.env-terra_broadcaster
     volumes:
       - ./logs:/home/thunder/work/logs
-      - thunder-terra_broadcaster-nginx:/home/thunder/work/shared
-    restart: on-failure
-    container_name: thunder-terra_broadcaster
     network_mode: "host"
-
-  nginx:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-      target: nginx
-    image: thunder-nginx
-    volumes:
-      - thunder-terra_broadcaster-nginx:/var/www/shared
     restart: on-failure
-    container_name: thunder-nginx
-    image: nginx
-    ports:
-      - 1318:1318
-
-volumes:
-  thunder-terra_broadcaster-nginx:

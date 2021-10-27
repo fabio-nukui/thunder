@@ -29,6 +29,7 @@ RUN conda install --quiet --yes \
         'httpx==0.20.0' \
         'python-json-logger==2.0.1' \
         'pyyaml==6.0' \
+        'quart==0.15.1' \
         'watchtower==1.0.6' \
         'web3==5.24.0' && \
     conda clean --all -f -y && \
@@ -68,24 +69,11 @@ CMD ["python", "app.py"]
 # #################################### TERRA_BROADCASTER ###########################################
 FROM prod as terra_broadcaster
 
-RUN conda install --quiet --yes \
-        'flask==2.0.2' \
-        'uwsgi==2.0.20' && \
-    conda clean --all -f -y && \
-    fix-permissions $HOME $CONDA_DIR
-
 COPY --chown=$USER:$GID app/terra_broadcaster.py ${HOME}/work/
 
-COPY --chown=$USER:$GID docker/terra_broadcaster/uwsgi.ini ${HOME}/work/
+COPY --chown=$USER:$GID docker/terra_broadcaster/hypercorn.toml ${HOME}/work/
 
-RUN mkdir shared
-
-CMD ["uwsgi", "--ini", "uwsgi.ini"]
-
-########################################### NGINX ##################################################
-FROM nginx:1.21.3 as nginx
-
-COPY docker/terra_broadcaster/nginx.conf /etc/nginx/conf.d/
+CMD ["hypercorn", "--config", "hypercorn.toml", "terra_broadcaster:app"]
 
 ############################################ DEV ###################################################
 FROM base as dev
