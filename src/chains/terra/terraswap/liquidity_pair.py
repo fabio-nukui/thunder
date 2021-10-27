@@ -138,9 +138,13 @@ class LiquidityPair(BaseTerraLiquidityPair):
         )
 
     @asynccontextmanager
-    async def simulate_reserve_change(self, amounts: AmountTuple) -> AsyncIterator[bool]:
+    async def simulate_reserve_change(
+        self,
+        amounts: AmountTuple,
+        check_repeats: bool = True,
+    ) -> AsyncIterator[bool]:
         amounts = self._fix_amounts_order(amounts)
-        if self.n_simulations > 0:
+        if check_repeats and self.n_simulations > 0:
             expected = self._reserves[0] - self._res_bak[0], self._reserves[1] - self._res_bak[1]
             if not expected == amounts:
                 raise Exception(f"Error on liquidity pair simulation: {expected=}, {amounts=}")
@@ -348,7 +352,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
             amount_keep, amount_swap = amounts["amounts_out"]
         else:
             amount_swap, amount_keep = amounts["amounts_out"]
-        async with self.simulate_reserve_change(amounts["pool_change"]):
+        async with self.simulate_reserve_change(amounts["pool_change"], check_repeats=False):
             amount_out, msgs_swap = await self.op_swap(
                 sender, amount_swap, max_slippage, safety_margin
             )
@@ -449,7 +453,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
             amounts_swap["amounts_out"][1].safe_margin(safety_margin),
         )
 
-        async with self.simulate_reserve_change(amounts_swap["pool_change"]):
+        async with self.simulate_reserve_change(amounts_swap["pool_change"], check_repeats=False):
             amount_out, msgs_add_liquidity = await self.op_add_liquidity(
                 sender, amounts_add, slippage_tolerance, safety_margin
             )
