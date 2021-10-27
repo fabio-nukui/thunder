@@ -59,7 +59,9 @@ class TerraswapLPReserveSimulationMixin:
             pair_changes = self._mempool_reserve_changes[pair]
             if any(amount for amount in pair_changes):
                 self.log.debug(f"Simulation of reserve changes: {pair}: {pair_changes}")
-            simulations[pair] = await pair.simulate_reserve_change(pair_changes)
+                simulations[pair] = await pair.simulate_reserve_change(pair_changes)
+            else:
+                simulations[pair] = pair
         pairs = self.pairs
         try:
             self.pairs = simulations.values()

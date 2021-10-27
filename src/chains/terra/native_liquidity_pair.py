@@ -54,6 +54,7 @@ class NativeLiquidityPair(BaseTerraLiquidityPair):
     def __init__(self, client: TerraClient, tokens: tuple[TerraNativeToken, TerraNativeToken]):
         self.client = client
         self.tokens = tokens
+        self._stop_updates = False
 
     async def get_swap_amount_out(
         self,
@@ -65,8 +66,6 @@ class NativeLiquidityPair(BaseTerraLiquidityPair):
         return await self.client.market.get_amount_out(amount_in, token_out, safety_margin)
 
     async def simulate_reserve_change(self, amounts: AmountTuple) -> NativeLiquidityPair:
-        if amounts[0].amount == amounts[1].amount == 0:
-            return self
         raise NotImplementedError
 
     async def get_reserve_changes_from_msg(self, msg: dict) -> AmountTuple:

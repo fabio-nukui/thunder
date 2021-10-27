@@ -137,9 +137,6 @@ class LiquidityPair(BaseTerraLiquidityPair):
     async def simulate_reserve_change(self, amounts: AmountTuple) -> LiquidityPair:
         simulation = copy(self)
         simulation._stop_updates = True
-        if amounts[0].amount == amounts[1].amount == 0:
-            return simulation
-
         amounts = self._fix_amounts_order(amounts)
         reserves = await self.get_reserves()
         simulation._reserves = reserves[0] + amounts[0], reserves[1] + amounts[1]
