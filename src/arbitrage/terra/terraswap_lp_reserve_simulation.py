@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import logging
 from contextlib import asynccontextmanager
-from typing import AsyncIterator, Iterable
+from typing import AsyncIterator, Callable, Iterable, Sequence
 
 import utils
 from chains.terra import terraswap
@@ -10,13 +12,25 @@ from exceptions import MaxSpreadAssertion
 log = logging.getLogger(__name__)
 
 AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
+PairsCls = Callable[
+    [Iterable[terraswap.HybridLiquidityPair]], Sequence[terraswap.HybridLiquidityPair]
+]
 
 
 class TerraswapLPReserveSimulationMixin:
     log: utils.logger.ReformatedLogger
 
-    def __init__(self, *args, pairs: Iterable[terraswap.HybridLiquidityPair], **kwargs):
+    def __init__(
+        self,
+        *args,
+        pairs: Sequence[terraswap.HybridLiquidityPair],
+        pairs_cls: PairsCls = list,
+        routes: list[terraswap.SingleRoute] = None,
+        **kwargs,
+    ):
         self.pairs = pairs
+        self.pairs_cls = pairs_cls
+        self.routes = routes
         self._mempool_reserve_changes = self._get_initial_mempool_params()
 
         super().__init__(*args, **kwargs)  # type: ignore
@@ -64,7 +78,7 @@ class TerraswapLPReserveSimulationMixin:
                 simulations[pair] = pair
         pairs = self.pairs
         try:
-            self.pairs = simulations.values()
+            self.pairs = self.pairs_cls(simulations.values())
             yield self.pairs
         finally:
             self.pairs = pairs

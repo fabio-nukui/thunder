@@ -265,7 +265,6 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
         self = super().__new__(cls)
 
         self.multi_routes = multi_routes
-        self.routes = multi_routes.routes
         self.start_token = multi_routes.tokens[0]
         self.use_router = multi_routes.router_address is not None
 
@@ -284,6 +283,7 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
         self.__init__(
             client,
             pairs=multi_routes.pairs,
+            routes=multi_routes.routes,
             filter_keys=multi_routes.pairs,
             fee_denom=self.start_token.denom,
         )
