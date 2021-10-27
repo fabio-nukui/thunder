@@ -1,7 +1,8 @@
 import logging
-from contextlib import AsyncExitStack, asynccontextmanager
-from typing import Sequence
+from contextlib import asynccontextmanager
+from typing import Iterable
 
+import utils
 from chains.terra import terraswap
 from chains.terra.token import TerraTokenAmount
 from exceptions import MaxSpreadAssertion
@@ -12,7 +13,9 @@ AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
 
 
 class TerraswapLPReserveSimulationMixin:
-    def __init__(self, *args, pairs: Sequence[terraswap.HybridLiquidityPair], **kwargs):
+    log: utils.logger.ReformatedLogger
+
+    def __init__(self, *args, pairs: Iterable[terraswap.HybridLiquidityPair], **kwargs):
         self.pairs = pairs
         self._mempool_reserve_changes = self._get_initial_mempool_params()
 
@@ -28,7 +31,7 @@ class TerraswapLPReserveSimulationMixin:
 
     @property
     def _simulating_reserve_changes(self) -> bool:
-        return any(pair.n_simulations > 0 for pair in self.pairs)
+        return any(pair._stop_updates for pair in self.pairs)
 
     @asynccontextmanager
     async def _simulate_reserve_changes(
@@ -51,15 +54,15 @@ class TerraswapLPReserveSimulationMixin:
                     self._mempool_reserve_changes[pair][0] + changes[0],
                     self._mempool_reserve_changes[pair][1] + changes[1],
                 )
-        async with AsyncExitStack() as stack:
-            for pair in self.pairs:
-                pair_changes = self._mempool_reserve_changes[pair]
-                if any(amount for amount in pair_changes):
-                    new_simulation = await stack.enter_async_context(
-                        pair.simulate_reserve_change(pair_changes)
-                    )
-                    if new_simulation:
-                        log.debug(f"{self}: Simulation of reserve changes: {pair}: {pair_changes}")
-                    else:
-                        log.debug(f"{self}: Already simulating changes: {pair}: {pair_changes}")
+        simulations: dict[terraswap.HybridLiquidityPair, terraswap.HybridLiquidityPair] = {}
+        for pair in self.pairs:
+            pair_changes = self._mempool_reserve_changes[pair]
+            if any(amount for amount in pair_changes):
+                self.log.debug(f"Simulation of reserve changes: {pair}: {pair_changes}")
+            simulations[pair] = await pair.simulate_reserve_change(pair_changes)
+        pairs = self.pairs
+        try:
+            self.pairs = simulations.values()
             yield
+        finally:
+            self.pairs = pairs

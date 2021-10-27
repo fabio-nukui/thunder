@@ -5,11 +5,9 @@ import base64
 import json
 import logging
 import math
-from contextlib import asynccontextmanager
-from copy import deepcopy
+from copy import copy
 from decimal import Decimal
 from enum import Enum
-from typing import AsyncIterator
 
 from terra_sdk.core import AccAddress
 from terra_sdk.core.coins import Coins
@@ -92,7 +90,6 @@ class LiquidityPair(BaseTerraLiquidityPair):
     factory_name: str | None
     lp_token: LPToken
     _reserves: AmountTuple
-    _res_bak: AmountTuple
 
     @classmethod
     async def new(
@@ -114,7 +111,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
         )
         self.tokens = self.lp_token.pair_tokens
 
-        self.n_simulations = 0
+        self._stop_updates = False
         self._reserves = self.tokens[0].to_amount(), self.tokens[1].to_amount()
 
         return self
@@ -125,7 +122,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
         return f"{self.__class__.__name__}({self.repr_symbol}, factory={self.factory_name!r})"
 
     async def get_reserves(self) -> AmountTuple:
-        if self.n_simulations == 0:
+        if not self._stop_updates:
             self._reserves = await self._get_reserves()
         return self._reserves
 
@@ -137,31 +134,16 @@ class LiquidityPair(BaseTerraLiquidityPair):
             self.tokens[1].to_amount(int_amount=data["assets"][1]["amount"]),
         )
 
-    @asynccontextmanager
-    async def simulate_reserve_change(
-        self,
-        amounts: AmountTuple,
-        check_repeats: bool = True,
-    ) -> AsyncIterator[bool]:
+    async def simulate_reserve_change(self, amounts: AmountTuple) -> LiquidityPair:
+        simulation = copy(self)
+        simulation._stop_updates = True
+        if amounts[0].amount == amounts[1].amount == 0:
+            return simulation
+
         amounts = self._fix_amounts_order(amounts)
-        if check_repeats and self.n_simulations > 0:
-            expected = self._reserves[0] - self._res_bak[0], self._reserves[1] - self._res_bak[1]
-            if not expected == amounts:
-                raise Exception(f"Error on liquidity pair simulation: {expected=}, {amounts=}")
-            try:
-                self.n_simulations += 1
-                yield False
-            finally:
-                self.n_simulations -= 1
-        else:
-            self._res_bak = deepcopy(await self.get_reserves())
-            try:
-                self.n_simulations += 1
-                self._reserves = self._res_bak[0] + amounts[0], self._res_bak[1] + amounts[1]
-                yield True
-            finally:
-                self._reserves = self._res_bak
-                self.n_simulations -= 1
+        reserves = await self.get_reserves()
+        simulation._reserves = reserves[0] + amounts[0], reserves[1] + amounts[1]
+        return simulation
 
     def _fix_amounts_order(self, amounts: AmountTuple) -> AmountTuple:
         if (amounts[1].token, amounts[0].token) == self.tokens:
@@ -352,10 +334,10 @@ class LiquidityPair(BaseTerraLiquidityPair):
             amount_keep, amount_swap = amounts["amounts_out"]
         else:
             amount_swap, amount_keep = amounts["amounts_out"]
-        async with self.simulate_reserve_change(amounts["pool_change"], check_repeats=False):
-            amount_out, msgs_swap = await self.op_swap(
-                sender, amount_swap, max_slippage, safety_margin
-            )
+        simulation = await self.simulate_reserve_change(amounts["pool_change"])
+        amount_out, msgs_swap = await simulation.op_swap(
+            sender, amount_swap, max_slippage, safety_margin
+        )
         return amount_keep + amount_out, [msg_remove_liquidity] + msgs_swap
 
     async def get_remove_liquidity_amounts_out(
@@ -453,10 +435,10 @@ class LiquidityPair(BaseTerraLiquidityPair):
             amounts_swap["amounts_out"][1].safe_margin(safety_margin),
         )
 
-        async with self.simulate_reserve_change(amounts_swap["pool_change"], check_repeats=False):
-            amount_out, msgs_add_liquidity = await self.op_add_liquidity(
-                sender, amounts_add, slippage_tolerance, safety_margin
-            )
+        simulation = await self.simulate_reserve_change(amounts_swap["pool_change"])
+        amount_out, msgs_add_liquidity = await simulation.op_add_liquidity(
+            sender, amounts_add, slippage_tolerance, safety_margin
+        )
         return amount_out, [msg_swap] + msgs_add_liquidity
 
     async def op_add_liquidity(

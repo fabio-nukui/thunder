@@ -1,19 +1,19 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from contextlib import asynccontextmanager
-from typing import AsyncIterator
+from typing import TypeVar
 
 from .client import TerraClient
 from .token import TerraNativeToken, TerraToken, TerraTokenAmount
 
 AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
+_BaseTerraLiquidityPairT = TypeVar("_BaseTerraLiquidityPairT", bound="BaseTerraLiquidityPair")
 
 
 class BaseTerraLiquidityPair(ABC):
     client: TerraClient
     tokens: tuple[TerraToken, TerraToken]
-    n_simulations: int
+    _stop_updates: bool
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.repr_symbol})"
@@ -36,10 +36,12 @@ class BaseTerraLiquidityPair(ABC):
     ) -> TerraTokenAmount:
         ...
 
-    @asynccontextmanager
     @abstractmethod
-    async def simulate_reserve_change(self, amounts: AmountTuple) -> AsyncIterator[bool]:
-        yield False
+    async def simulate_reserve_change(
+        self: _BaseTerraLiquidityPairT,
+        amounts: AmountTuple,
+    ) -> _BaseTerraLiquidityPairT:
+        ...
 
     @abstractmethod
     async def get_reserve_changes_from_msg(self, msg: dict) -> AmountTuple:
@@ -62,10 +64,10 @@ class NativeLiquidityPair(BaseTerraLiquidityPair):
         token_out = self.tokens[0] if amount_in.token == self.tokens[1] else self.tokens[1]
         return await self.client.market.get_amount_out(amount_in, token_out, safety_margin)
 
-    @asynccontextmanager
-    async def simulate_reserve_change(self, amounts: AmountTuple) -> AsyncIterator[bool]:
+    async def simulate_reserve_change(self, amounts: AmountTuple) -> NativeLiquidityPair:
+        if amounts[0].amount == amounts[1].amount == 0:
+            return self
         raise NotImplementedError
-        yield
 
     async def get_reserve_changes_from_msg(self, msg: dict) -> AmountTuple:
         raise NotImplementedError
