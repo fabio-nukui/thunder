@@ -1,4 +1,4 @@
-from . import ahttp, aoptimization, aws, cache, debug, http, optimization
+from . import ahttp, aoptimization, aws, cache, debug, http, logger, optimization
 
 __all__ = [
     "ahttp",
@@ -7,5 +7,6 @@ __all__ = [
     "cache",
     "debug",
     "http",
+    "logger",
     "optimization",
 ]

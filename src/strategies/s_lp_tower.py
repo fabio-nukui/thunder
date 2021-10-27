@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import time
 from dataclasses import dataclass
 from decimal import Decimal
@@ -34,7 +33,6 @@ from exceptions import TxError, UnprofitableArbitrage
 
 from .common.default_params import MIN_PROFIT_UST, MIN_START_AMOUNT, OPTIMIZATION_TOLERANCE
 
-log = logging.getLogger(__name__)
 ESTIMATED_GAS_USE = 1_555_000
 
 
@@ -153,7 +151,7 @@ class LPTowerArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbitra
                     native_amount=UST.to_amount(initial_amount.amount * lp_ust_price),
                 )
             except LCDResponseError as e:
-                log.debug(
+                self.log.debug(
                     "Error when estimating fee",
                     extra={
                         "data": {
@@ -238,7 +236,7 @@ class LPTowerArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbitra
         )
         amount = self.pool_0.lp_token.to_amount(lp_amount)
         if amount > pool_0_lp_balance:
-            log.warning(
+            self.log.warning(
                 "Not enough balance for full arbitrage: "
                 f"wanted {amount.amount:.6f}, have {pool_0_lp_balance.amount:.6f}"
             )

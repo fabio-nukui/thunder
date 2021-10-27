@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from abc import ABC, abstractmethod
 from collections import Counter
 from dataclasses import dataclass
@@ -8,6 +7,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any, Generic, Optional, TypeVar
 
+import utils
 from common import BlockchainClient, TokenAmount
 from exceptions import (
     BlockchainNewState,
@@ -17,9 +17,6 @@ from exceptions import (
     TxError,
     UnprofitableArbitrage,
 )
-
-log = logging.getLogger(__name__)
-
 
 _BlockchainClientT = TypeVar("_BlockchainClientT", bound=BlockchainClient)
 
@@ -115,10 +112,14 @@ class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
     def __init__(self, client: _BlockchainClientT, broadcast_kwargs: dict = None):
         self.client = client
         self.broadcast_kwargs = broadcast_kwargs or {}
+        self.last_run_height = 0
 
         self.data = ArbitrageData()
-        log.info(f"Initialized {self} at height={self.client.height}")
-        self.last_run_height = 0
+        self.log = utils.logger.ReformatedLogger(__name__, formater=self._log_formatter)
+        self.log.info("Initialized")
+
+    def _log_formatter(self, msg: Any) -> str:
+        return f"{self} height={self.client.height}: {msg}"
 
     @abstractmethod
     def _reset_mempool_params(self):
@@ -141,13 +142,13 @@ class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
             if self.state == State.waiting_confirmation:
                 if self.last_run_height >= height:
                     return
-                log.debug(f"{self} ({height=}) Looking for tx confirmation(s)")
+                self.log.debug("Looking for tx confirmation(s)")
                 try:
                     params: BaseArbParams = self.data.params  # type: ignore
                     txs: list[ArbTx] = self.data.txs  # type: ignore
                     self.data.results = await self._confirm_txs(height, params, txs)
                     profit = sum(res.net_profit_usd or 0 for res in self.data.results)
-                    log.info(
+                    self.log.info(
                         f"Arbitrage {_format_status_logs(self.data.results)}, "
                         f"net_profit_usd={profit:.2f}",
                         extra={"data": self.data.to_data()},
@@ -156,12 +157,12 @@ class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
                         res.tx_err_log and "out of gas" in res.tx_err_log
                         for res in self.data.results
                     ):
-                        log.warning(f"{self} out of gas")
+                        self.log.warning("Out of gas")
                     self.data.reset()
                 except IsBusy:
                     return
             if self.state == State.ready_to_generate_parameters:
-                log.debug(f"{self} ({height=}) Generating arbitrage parameters")
+                self.log.debug("Generating arbitrage parameters")
                 try:
                     self.data.params = await self._get_arbitrage_params(height, filtered_mempool)
                 except (
@@ -171,22 +172,22 @@ class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
                     TxAlreadyBroadcasted,
                     BlockchainNewState,
                 ) as e:
-                    log.debug(e)
+                    self.log.debug(e)
                     return
             if self.state == State.ready_to_broadcast:
                 n_txs = self.data.params.n_repeat  # type: ignore
-                log.info(f"{self} ({height=}) Broadcasting {n_txs} transaction(s)")
+                self.log.info(f"Broadcasting {n_txs} transaction(s)")
                 try:
                     arb_params: BaseArbParams = self.data.params  # type: ignore
                     self.data.txs = await self._broadcast_txs(
                         arb_params, height, **self.broadcast_kwargs
                     )
-                    log.debug("Arbitrage broadcasted", extra={"data": self.data.to_data()})
+                    self.log.debug("Arbitrage broadcasted", extra={"data": self.data.to_data()})
                 except TxAlreadyBroadcasted as e:
-                    log.debug(e)
+                    self.log.debug(e)
                     self.data.reset()
                 except BlockchainNewState as e:
-                    log.warning(e)
+                    self.log.warning(e)
                     self.data.reset()
                 return
         finally:

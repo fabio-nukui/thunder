@@ -34,7 +34,7 @@ def _extract_tokens_from_routes(
 
 
 def _repr_route_symbols(tokens: Iterable[Token]):
-    return f"({'->'.join(token.symbol for token in tokens)})"
+    return f"{'->'.join(token.symbol for token in tokens)}"
 
 
 class MultiRoutes:

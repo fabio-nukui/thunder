@@ -369,7 +369,7 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
                 fee_denom=self.fee_denom,
             )
         except LCDResponseError as e:
-            log.debug(
+            self.log.debug(
                 "Error when estimating fee",
                 extra={"data": {"msgs": [msg.to_data() for msg in msgs]}},
                 exc_info=True,
@@ -435,7 +435,7 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
         if not self.use_router:
             if initial_amount > available_amount:
                 symbol = self.start_token.symbol
-                log.warning(
+                self.log.warning(
                     "Not enough balance for full arbitrage: "
                     f"wanted {symbol} {initial_amount.amount:,.2f}, "
                     f"have {symbol} {available_amount.amount:,.2f}"
@@ -445,7 +445,7 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
         max_amount = min(available_amount.amount, self.max_single_arbitrage.amount)
         n_repeat = math.ceil(initial_amount.amount / max_amount)
         if n_repeat > MAX_N_REPEATS:
-            log.warning(f"{n_repeat=} is too hight, reducing to {MAX_N_REPEATS}")
+            self.log.warning(f"{n_repeat=} is too hight, reducing to {MAX_N_REPEATS}")
             n_repeat = MAX_N_REPEATS
         return initial_amount / n_repeat, n_repeat
 
