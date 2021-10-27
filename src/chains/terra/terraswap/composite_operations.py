@@ -153,6 +153,9 @@ class SingleRoute:
     ) -> TerraTokenAmount:
         pairs = self.pairs if not reverse else reversed(self.pairs)
         step_amount = amount_in
+        if self.router is not None:
+            route = self._get_route_steps(reverse)
+            return await self.router.get_swap_amount_out(amount_in, route, safety_margin)
         for pair in pairs:
             step_amount = await pair.get_swap_amount_out(step_amount, safety_margin)
         return step_amount

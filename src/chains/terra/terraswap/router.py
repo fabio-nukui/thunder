@@ -149,7 +149,7 @@ class Router:
         next_amount_in = await self.client.treasury.deduct_tax(amount_in)
         for step in route:
             pair = self._get_pair(step)
-            if isinstance(pair, RouteStepNative) and step == route[-1]:
+            if step == route[-1]:
                 next_amount_in = await self.client.treasury.deduct_tax(next_amount_in)
             next_amount_in = await pair.get_swap_amount_out(next_amount_in, safety_margin)
         return next_amount_in * ROUTER_EFFICIENCY
