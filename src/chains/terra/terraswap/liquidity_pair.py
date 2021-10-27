@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from copy import deepcopy
 from decimal import Decimal
 from enum import Enum
+from typing import AsyncIterator
 
 from terra_sdk.core import AccAddress
 from terra_sdk.core.coins import Coins
@@ -90,8 +91,8 @@ class LiquidityPair(BaseTerraLiquidityPair):
     fee_rate: Decimal
     factory_name: str | None
     lp_token: LPToken
-    stop_updates: bool
     _reserves: AmountTuple
+    _res_bak: AmountTuple
 
     @classmethod
     async def new(
@@ -113,7 +114,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
         )
         self.tokens = self.lp_token.pair_tokens
 
-        self.stop_updates = False
+        self.n_simulations = 0
         self._reserves = self.tokens[0].to_amount(), self.tokens[1].to_amount()
 
         return self
@@ -124,7 +125,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
         return f"{self.__class__.__name__}({self.repr_symbol}, factory={self.factory_name!r})"
 
     async def get_reserves(self) -> AmountTuple:
-        if not self.stop_updates:
+        if self.n_simulations == 0:
             self._reserves = await self._get_reserves()
         return self._reserves
 
@@ -137,17 +138,26 @@ class LiquidityPair(BaseTerraLiquidityPair):
         )
 
     @asynccontextmanager
-    async def simulate_reserve_change(self, amounts: AmountTuple):
+    async def simulate_reserve_change(self, amounts: AmountTuple) -> AsyncIterator[bool]:
         amounts = self._fix_amounts_order(amounts)
-        reserves = deepcopy(await self.get_reserves())
-        stop_updates = self.stop_updates
-        try:
-            self.stop_updates = True
-            self._reserves = reserves[0] + amounts[0], reserves[1] + amounts[1]
-            yield
-        finally:
-            self._reserves = reserves
-            self.stop_updates = stop_updates
+        if self.n_simulations > 0:
+            expected = self._reserves[0] - self._res_bak[0], self._reserves[1] - self._res_bak[1]
+            if not expected == amounts:
+                raise Exception(f"Error on liquidity pair simulation: {expected=}, {amounts=}")
+            try:
+                self.n_simulations += 1
+                yield False
+            finally:
+                self.n_simulations -= 1
+        else:
+            self._res_bak = deepcopy(await self.get_reserves())
+            try:
+                self.n_simulations += 1
+                self._reserves = self._res_bak[0] + amounts[0], self._res_bak[1] + amounts[1]
+                yield True
+            finally:
+                self._reserves = self._res_bak
+                self.n_simulations -= 1
 
     def _fix_amounts_order(self, amounts: AmountTuple) -> AmountTuple:
         if (amounts[1].token, amounts[0].token) == self.tokens:

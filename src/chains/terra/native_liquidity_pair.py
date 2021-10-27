@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
+from typing import AsyncIterator
 
 from .client import TerraClient
 from .token import TerraNativeToken, TerraToken, TerraTokenAmount
@@ -12,6 +13,7 @@ AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
 class BaseTerraLiquidityPair(ABC):
     client: TerraClient
     tokens: tuple[TerraToken, TerraToken]
+    n_simulations: int
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.repr_symbol})"
@@ -36,8 +38,8 @@ class BaseTerraLiquidityPair(ABC):
 
     @asynccontextmanager
     @abstractmethod
-    async def simulate_reserve_change(self, amounts: AmountTuple):
-        yield
+    async def simulate_reserve_change(self, amounts: AmountTuple) -> AsyncIterator[bool]:
+        yield False
 
     @abstractmethod
     async def get_reserve_changes_from_msg(self, msg: dict) -> AmountTuple:
@@ -61,7 +63,7 @@ class NativeLiquidityPair(BaseTerraLiquidityPair):
         return await self.client.market.get_amount_out(amount_in, token_out, safety_margin)
 
     @asynccontextmanager
-    async def simulate_reserve_change(self, amounts: AmountTuple):
+    async def simulate_reserve_change(self, amounts: AmountTuple) -> AsyncIterator[bool]:
         raise NotImplementedError
         yield
 

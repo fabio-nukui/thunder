@@ -14,7 +14,6 @@ AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
 class TerraswapLPReserveSimulationMixin:
     def __init__(self, *args, pairs: Sequence[terraswap.HybridLiquidityPair], **kwargs):
         self.pairs = pairs
-        self._simulating_reserve_changes = False
         self._mempool_reserve_changes = self._get_initial_mempool_params()
 
         super().__init__(*args, **kwargs)  # type: ignore
@@ -26,6 +25,10 @@ class TerraswapLPReserveSimulationMixin:
 
     def _reset_mempool_params(self):
         self._mempool_reserve_changes = self._get_initial_mempool_params()
+
+    @property
+    def _simulating_reserve_changes(self) -> bool:
+        return any(pair.n_simulations > 0 for pair in self.pairs)
 
     @asynccontextmanager
     async def _simulate_reserve_changes(
@@ -52,12 +55,11 @@ class TerraswapLPReserveSimulationMixin:
             for pair in self.pairs:
                 pair_changes = self._mempool_reserve_changes[pair]
                 if any(amount for amount in pair_changes):
-                    log.debug(f"{self}: Simulation of reserve changes: {pair}: {pair_changes}")
-                    await stack.enter_async_context(pair.simulate_reserve_change(pair_changes))
-
-            simulating_reserve_changes = self._simulating_reserve_changes
-            self._simulating_reserve_changes = True
-            try:
-                yield
-            finally:
-                self._simulating_reserve_changes = simulating_reserve_changes
+                    new_simulation = await stack.enter_async_context(
+                        pair.simulate_reserve_change(pair_changes)
+                    )
+                    if new_simulation:
+                        log.debug(f"{self}: Simulation of reserve changes: {pair}: {pair_changes}")
+                    else:
+                        log.debug(f"{self}: Already simulating changes: {pair}: {pair_changes}")
+            yield
