@@ -11,10 +11,10 @@ import utils
 from common import BlockchainClient, TokenAmount
 from exceptions import (
     BlockchainNewState,
+    FeeEstimationError,
     IsBusy,
     OptimizationError,
     TxAlreadyBroadcasted,
-    TxError,
     UnprofitableArbitrage,
 )
 
@@ -167,7 +167,7 @@ class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
                     self.data.params = await self._get_arbitrage_params(height, filtered_mempool)
                 except (
                     UnprofitableArbitrage,
-                    TxError,
+                    FeeEstimationError,
                     OptimizationError,
                     TxAlreadyBroadcasted,
                     BlockchainNewState,

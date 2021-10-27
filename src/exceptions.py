@@ -2,7 +2,7 @@ class BlockchainNewState(Exception):
     pass
 
 
-class EstimateFeeError(Exception):
+class FeeEstimationError(Exception):
     pass
 
 
@@ -33,10 +33,6 @@ class OptimizationError(Exception):
 
 
 class TxAlreadyBroadcasted(Exception):
-    pass
-
-
-class TxError(Exception):
     pass
 
 

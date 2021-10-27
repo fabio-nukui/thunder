@@ -15,7 +15,7 @@ from terra_sdk.exceptions import LCDResponseError
 
 import configs
 from chains.terra.token import TerraNativeToken, TerraTokenAmount
-from exceptions import EstimateFeeError, TxAlreadyBroadcasted
+from exceptions import FeeEstimationError, TxAlreadyBroadcasted
 from utils.cache import CacheGroup, ttl_cache
 
 from .base_api import Api
@@ -80,7 +80,7 @@ class TxApi(Api):
                 if not use_fallback_estimate:
                     raise e
                 if estimated_gas_use is None:
-                    raise EstimateFeeError(
+                    raise FeeEstimationError(
                         "Could not use fallback fee estimation without estimated_gas_use", e
                     )
                 if native_amount is None:
@@ -90,7 +90,7 @@ class TxApi(Api):
                             raise NotImplementedError
                         native_amount = TerraTokenAmount.from_coin(coins_send.to_list()[0])
                     else:
-                        raise EstimateFeeError("Could not get native_amount from msg", e)
+                        raise FeeEstimationError("Could not get native_amount from msg", e)
                 return await self._fallback_fee_estimation(
                     estimated_gas_use, native_amount, fee_denom, gas_adjustment
                 )

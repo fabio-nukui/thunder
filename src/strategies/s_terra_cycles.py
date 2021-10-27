@@ -24,7 +24,7 @@ from arbitrage.terra import (
 from chains.terra import LUNA, UST, NativeLiquidityPair, TerraClient, TerraTokenAmount, terraswap
 from chains.terra.token import TerraNativeToken
 from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
-from exceptions import EstimateFeeError, TxError, UnprofitableArbitrage
+from exceptions import FeeEstimationError, UnprofitableArbitrage
 
 from .common.default_params import (
     MAX_N_REPEATS,
@@ -89,7 +89,7 @@ async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
         for multi_routes in route_group:
             try:
                 arbs.append(await TerraCyclesArbitrage.new(client, multi_routes))
-            except EstimateFeeError as e:
+            except FeeEstimationError as e:
                 log.info(f"Error when initializing arbitrage with {multi_routes}: {e}")
     assert len(arbs) >= MIN_N_ARBITRAGES
     return arbs
@@ -308,7 +308,7 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
             try:
                 fee = await self.client.tx.estimate_fee(msgs)
             except Exception as e:
-                raise EstimateFeeError(e)
+                raise FeeEstimationError(e)
             list_gas.append(fee.gas)
         return max(list_gas)
 
@@ -325,7 +325,7 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
             for route in self.routes:
                 try:
                     params.append(await self._get_params_single_route(route, initial_balance))
-                except (TxError, UnprofitableArbitrage) as e:
+                except (FeeEstimationError, UnprofitableArbitrage) as e:
                     errors.append(e)
         if not params:
             raise UnprofitableArbitrage(errors)
@@ -374,7 +374,7 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
                 extra={"data": {"msgs": [msg.to_data() for msg in msgs]}},
                 exc_info=True,
             )
-            raise TxError(e)
+            raise FeeEstimationError(e)
         gas_cost = TerraTokenAmount.from_coin(*fee.amount) * n_repeat
         gas_cost_raw = gas_cost / self.client.gas_adjustment
         net_profit = final_amount - initial_amount - gas_cost_raw

@@ -29,7 +29,7 @@ from chains.terra import (
     terraswap,
 )
 from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
-from exceptions import TxError, UnprofitableArbitrage
+from exceptions import FeeEstimationError, UnprofitableArbitrage
 
 from .common.default_params import MIN_PROFIT_UST, MIN_START_AMOUNT, OPTIMIZATION_TOLERANCE
 
@@ -162,7 +162,7 @@ class LPTowerArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbitra
                     },
                     exc_info=True,
                 )
-                raise TxError(e)
+                raise FeeEstimationError(e)
         gas_cost = TerraTokenAmount.from_coin(*fee.amount)
         gas_cost_raw = gas_cost.amount / self.client.gas_adjustment
         net_profit_ust = (final_amount - initial_amount).amount * lp_ust_price - gas_cost_raw
