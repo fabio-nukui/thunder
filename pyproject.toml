@@ -2,7 +2,7 @@
 filterwarnings = ["ignore::FutureWarning"]
 
 [tool.pyright]
-include = ["src", "scripts", "tests", "app.py"]
+include = ["src", "scripts", "tests", "app"]
 pythonVersion = "3.9"
 pythonPlatform = "Linux"
 exclude = ["**/node_modules", "**/__pycache__", ".git"]
