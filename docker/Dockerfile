@@ -71,7 +71,7 @@ FROM prod as terra_broadcaster
 
 COPY --chown=$USER:$GID app/terra_broadcaster.py ${HOME}/work/
 
-COPY --chown=$USER:$GID docker/terra_broadcaster/hypercorn.toml ${HOME}/work/
+COPY --chown=$USER:$GID config/terra_broadcaster/hypercorn.toml ${HOME}/work/
 
 CMD ["hypercorn", "--config", "hypercorn.toml", "terra_broadcaster:app"]
 
@@ -135,7 +135,7 @@ RUN jupyter labextension install -y \
     rm -rf $HOME/.local && \
     fix-permissions $HOME $CONDA_DIR
 
-COPY docker/lab $HOME/.jupyter/
+COPY config/lab $HOME/.jupyter/
 
 RUN mv $HOME/.jupyter/tracker.jupyterlab-settings \
         $HOME/.jupyter/lab/user-settings/@jupyterlab/notebook-extension/ && \
