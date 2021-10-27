@@ -1,0 +1,17 @@
+[Unit]
+Description=Terra Daemon
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+ExecStart=/usr/local/bin/terrad start --x-crisis-skip-assert-invariants
+Restart=always
+MemoryHigh=85%
+MemoryMax=95%
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+LimitNOFILE=65535
