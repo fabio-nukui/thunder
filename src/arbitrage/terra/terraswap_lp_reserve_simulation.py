@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
-from typing import AsyncIterator, Callable, Iterable, Sequence
+from typing import Callable, Iterable, Sequence
 
 import utils
 from chains.terra import terraswap
@@ -30,7 +30,7 @@ class TerraswapLPReserveSimulationMixin:
     ):
         self.pairs = pairs
         self.pairs_cls = pairs_cls
-        self.routes = routes
+        self.routes = routes or []
         self._mempool_reserve_changes = self._get_initial_mempool_params()
 
         super().__init__(*args, **kwargs)  # type: ignore
@@ -51,7 +51,7 @@ class TerraswapLPReserveSimulationMixin:
     async def _simulate_reserve_changes(
         self,
         filtered_mempool: dict[terraswap.HybridLiquidityPair, list[list[dict]]] = None,
-    ) -> AsyncIterator[Iterable[terraswap.HybridLiquidityPair]]:
+    ):
         if filtered_mempool is None:
             yield self.pairs
             return
@@ -77,8 +77,13 @@ class TerraswapLPReserveSimulationMixin:
             else:
                 simulations[pair] = pair
         pairs = self.pairs
+        route_pairs = {route: route.pairs for route in self.routes}
         try:
+            for route in self.routes:
+                route.pairs = [simulations[pair] for pair in route.pairs]
             self.pairs = self.pairs_cls(simulations.values())
-            yield self.pairs
+            yield
         finally:
             self.pairs = pairs
+            for route in self.routes:
+                route.pairs = route_pairs[route]
