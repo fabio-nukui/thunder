@@ -1,6 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
-from typing import Iterable
+from typing import AsyncIterator, Iterable
 
 import utils
 from chains.terra import terraswap
@@ -37,12 +37,12 @@ class TerraswapLPReserveSimulationMixin:
     async def _simulate_reserve_changes(
         self,
         filtered_mempool: dict[terraswap.HybridLiquidityPair, list[list[dict]]] = None,
-    ):
+    ) -> AsyncIterator[Iterable[terraswap.HybridLiquidityPair]]:
         if filtered_mempool is None:
-            yield
+            yield self.pairs
             return
         if not any(list_msgs for list_msgs in filtered_mempool.values()):
-            yield
+            yield self.pairs
             return
         for pair, list_msgs in filtered_mempool.items():
             for (msg,) in list_msgs:  # Only txs with one message were filtered
@@ -65,6 +65,6 @@ class TerraswapLPReserveSimulationMixin:
         pairs = self.pairs
         try:
             self.pairs = simulations.values()
-            yield
+            yield self.pairs
         finally:
             self.pairs = pairs
