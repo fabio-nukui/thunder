@@ -3,7 +3,7 @@ import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Awaitable, Iterable, Mapping, Sequence
 
 from terra_sdk.core.auth import StdFee, TxInfo
 from terra_sdk.core.wasm import MsgExecuteContract
@@ -119,13 +119,15 @@ async def run_strategy(
     async for height, mempool in client.mempool.iter_height_mempool(mempool_filters):
         if any(height > arb_route.last_run_height for arb_route in arb_routes):
             utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)
+        tasks: list[Awaitable] = []
         for arb_route in arb_routes:
             mempool_route = {
                 key: filter_ for key, filter_ in mempool.items() if key in arb_route.filter_keys
             }
             any_new_mempool_msg = any(list_msgs for list_msgs in mempool_route.values())
             if height > arb_route.last_run_height or any_new_mempool_msg:
-                await arb_route.run(height, mempool_route)
+                tasks.append(arb_route.run(height, mempool_route))
+        await asyncio.gather(*tasks)
         if max_n_blocks is not None and (n_blocks := height - start_height) >= max_n_blocks:
             break
     log.info(f"Stopped execution after {n_blocks=}")
