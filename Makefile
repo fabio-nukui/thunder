@@ -125,6 +125,7 @@ restart: build  ## Restart running strategy "$STRAT" with updated code
 	$(MAKE) start
 	sleep $(RESTART_SLEEP_TIME)
 	docker stop $(ARBITRAGE_CONTAINER_NAME)_stopping
+	docker rm $(ARBITRAGE_CONTAINER_NAME)_stopping
 
 check-restart: check-all restart  ## Restart running strategy "$STRAT" with updated code
 
