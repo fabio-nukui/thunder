@@ -47,23 +47,21 @@ class ReconnectingLCDClient(AsyncLCDClient):
         try:
             return await super()._get(*args, **kwargs)
         except ServerDisconnectedError:
-            log.debug("Reconnecting LCD session")
-            asyncio.create_task(self.session.close())
-            self.session = aiohttp.ClientSession(
-                headers={"Accept": "application/json"}, loop=self.loop
-            )
+            await self._reconnect_session()
             return await super()._get(*args, **kwargs)
 
     async def _post(self, *args, **kwargs):
         try:
             return await super()._post(*args, **kwargs)
         except ServerDisconnectedError:
-            log.debug("Reconnecting LCD session")
-            asyncio.create_task(self.session.close())
-            self.session = aiohttp.ClientSession(
-                headers={"Accept": "application/json"}, loop=self.loop
-            )
+            await self._reconnect_session()
             return await super()._post(*args, **kwargs)
+
+    async def _reconnect_session(self):
+        log.debug("Reconnecting LCD session")
+        old_session = self.session
+        self.session = aiohttp.ClientSession(headers={"Accept": "application/json"}, loop=self.loop)
+        await old_session.close()
 
 
 class TerraClient(AsyncBlockchainClient):
