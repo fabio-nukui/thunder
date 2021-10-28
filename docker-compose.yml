@@ -12,4 +12,4 @@ services:
     volumes:
       - ./logs:/home/thunder/work/logs
     network_mode: "host"
-    restart: on-failure
+    restart: always

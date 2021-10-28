@@ -104,11 +104,12 @@ build: check-all ## Build docker main image
 	docker build --target main -t $(MAIN_IMAGE_NAME) -f docker/Dockerfile .
 
 start: ## Start docker container running arbitrage strategy "$STRAT" (e.g.: make start STRAT=1)
-	docker run --rm -d \
+	docker run -d \
 		--net=host \
 		-v $(PWD)/logs:/home/$(CONTAINER_USER)/work/logs \
 		--name $(ARBITRAGE_CONTAINER_NAME) \
 		--env-file $(ENV_FILE) \
+		--restart always \
 		$(MAIN_IMAGE_NAME)
 
 stop:  ## Stop docker conteiner running strategy "$STRAT" (e.g.: make stop STRAT=1)
