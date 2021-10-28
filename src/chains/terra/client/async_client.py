@@ -28,6 +28,7 @@ from utils.cache import CacheGroup, ttl_cache
 from ..denoms import UST
 from ..token import TerraTokenAmount
 from . import utils_rpc
+from .api_broadcaster import BroadcasterApi
 from .api_market import MarketApi
 from .api_mempool import MempoolApi
 from .api_oracle import OracleApi
@@ -67,23 +68,27 @@ class ReconnectingLCDClient(AsyncLCDClient):
 class TerraClient(AsyncBlockchainClient):
     def __init__(
         self,
-        hd_wallet: dict = None,
         lcd_uri: str = configs.TERRA_LCD_URI,
         fcd_uri: str = configs.TERRA_FCD_URI,
         rpc_http_uri: str = configs.TERRA_RPC_HTTP_URI,
         rpc_websocket_uri: str = configs.TERRA_RPC_WEBSOCKET_URI,
+        use_broadcaster: bool = configs.TERRA_USE_BROADCASTER,
+        broadcaster_uri: str = configs.TERRA_BROADCASTER_URI,
         broadcast_lcd_uris: list[str] = configs.TERRA_BROADCAST_LCD_URIS,
         chain_id: str = configs.TERRA_CHAIN_ID,
         fee_denom: str = UST.denom,
         gas_prices: Coins.Input = None,
         gas_adjustment: Decimal = configs.TERRA_GAS_ADJUSTMENT,
-        hd_wallet_index: int = 0,
         raise_on_syncing: bool = configs.RAISE_ON_SYNCING,
+        hd_wallet: dict = None,
+        hd_wallet_index: int = 0,
     ):
         self.lcd_uri = lcd_uri
         self.fcd_uri = fcd_uri
         self.rpc_http_uri = rpc_http_uri
         self.rpc_websocket_uri = rpc_websocket_uri
+        self.use_broadcaster = use_broadcaster
+        self.broadcaster_uri = broadcaster_uri
         self.broadcast_lcd_uris = broadcast_lcd_uris
         self.chain_id = chain_id
         self.fee_denom = fee_denom
@@ -96,6 +101,7 @@ class TerraClient(AsyncBlockchainClient):
         self.height = 0
         self.account_sequence = 0
 
+        self.broadcaster = BroadcasterApi(self)
         self.market = MarketApi(self)
         self.mempool = MempoolApi(self)
         self.oracle = OracleApi(self)
@@ -119,6 +125,8 @@ class TerraClient(AsyncBlockchainClient):
         self.account_sequence = (await self.get_account_data()).sequence
         if self.gas_prices is None:
             self.lcd.gas_prices = await self.tx.get_gas_prices()
+        await self.broadcaster.start()
+        await self.mempool.start()
         await super().start()
 
     def __repr__(self) -> str:
@@ -131,12 +139,14 @@ class TerraClient(AsyncBlockchainClient):
         return await self.lcd.tendermint.syncing()
 
     async def close(self):
+        logging.debug(f"Closing {self=}")
         await asyncio.gather(
-            self.lcd.session.close(),
             self.lcd_http_client.aclose(),
             self.fcd_client.aclose(),
-            *(client.aclose() for client in self.broadcast_lcd_clients),
             self.rpc_http_client.aclose(),
+            *(client.aclose() for client in self.broadcast_lcd_clients),
+            self.lcd.session.close(),
+            self.broadcaster.close(),
             self.mempool.close(),
         )
 

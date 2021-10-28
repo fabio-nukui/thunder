@@ -116,7 +116,7 @@ stop:  ## Stop docker conteiner running strategy "$STRAT" (e.g.: make stop STRAT
 	docker stop $(ARBITRAGE_CONTAINER_NAME)
 
 start-terra_broadcaster:  ## Build and start terra-broadcast/ngnix containers/volumes
-	docker-compose up --build terra_broadcaster
+	docker-compose up -d --build terra_broadcaster
 
 restart: build  ## Restart running strategy "$STRAT" with updated code
 	docker rename $(ARBITRAGE_CONTAINER_NAME) $(ARBITRAGE_CONTAINER_NAME)_stopping

@@ -31,9 +31,9 @@ _pat_sequence_error = re.compile(r"account sequence mismatch, expected (\d+)")
 
 
 class NoLogError(Exception):
-    def __init__(self, *args):
-        self.message = ""
-        super().__init__(*args)
+    def __init__(self, data):
+        self.message = data.get("raw_log", "")
+        super().__init__(data)
 
 
 class TxApi(Api):
@@ -139,20 +139,22 @@ class TxApi(Api):
         expect_logs_: bool = True,
         account_number: int = None,
         sequence: int = None,
+        fee: StdFee = None,
         fee_denom: str = None,
         **kwargs,
     ) -> list[tuple[float, SyncTxBroadcastResult]]:
+        if self.client.use_broadcaster:
+            log.info("Posting to broadcaster")
+            return await self.client.broadcaster.post(msgs, n_repeat, expect_logs_, fee, fee_denom)
         account_number, sequence = await self.client._valid_account_params(account_number, sequence)
-        if "fee" not in kwargs:
-            kwargs["fee"] = self.estimate_fee(
-                msgs, account_number=account_number, sequence=sequence
-            )
+        if fee is None:
+            fee = await self.estimate_fee(msgs, account_number=account_number, sequence=sequence)
         log.debug(f"Executing messages {n_repeat} time(s): {msgs}")
         results: list[tuple[float, SyncTxBroadcastResult]] = []
         for i in range(1, n_repeat + 1):
             log.debug(f"Executing message {i} if {n_repeat}")
             res = await self.execute_msgs(
-                msgs, expect_logs_, account_number, sequence, fee_denom, log_=False, **kwargs
+                msgs, expect_logs_, account_number, sequence, fee, fee_denom, log_=False, **kwargs
             )
             results.append((time.time(), res))
             sequence = max(self.client.account_sequence, sequence + 1)
@@ -164,23 +166,30 @@ class TxApi(Api):
         expect_logs_: bool = True,
         account_number: int = None,
         sequence: int = None,
+        fee: StdFee = None,
         fee_denom: str = None,
         log_: bool = True,
         **kwargs,
     ) -> SyncTxBroadcastResult:
+        if self.client.use_broadcaster:
+            log.info("Posting to broadcaster")
+            ((timestamp, result),) = await self.client.broadcaster.post(
+                msgs, n_repeat=1, expect_logs=expect_logs_, fee=fee, fee_denom=fee_denom
+            )
+            log.info(f"Broadcaster sent payload to blockchain at {timestamp=}")
+            return result
         if log_:
             log.debug(f"Sending tx: {msgs}")
         fee_denom = self.client.fee_denom if fee_denom is None else fee_denom
 
         account_number, sequence = await self.client._valid_account_params(account_number, sequence)
         # Fixes bug in terraswap_sdk==1.0.0b2
-        if "fee" not in kwargs:
-            kwargs["fee"] = self.estimate_fee(
-                msgs, account_number=account_number, sequence=sequence
-            )
+        if fee is None:
+            fee = await self.estimate_fee(msgs, account_number=account_number, sequence=sequence)
         for i in range(1, MAX_BROADCAST_TRIES + 1):
             signed_tx = await self.client.wallet.create_and_sign_tx(
                 msgs,
+                fee=fee,
                 fee_denoms=[fee_denom],
                 account_number=account_number,
                 sequence=sequence,
@@ -207,7 +216,7 @@ class TxApi(Api):
                     raise e
             else:
                 self.client.account_sequence = sequence + 1
-                asyncio.create_task(self._broadcast_async(payload))
+                await self._broadcast_async(payload)
                 break
 
         log.debug(f"Tx executed: {data['txhash']}")

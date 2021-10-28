@@ -36,14 +36,18 @@ class MempoolCacheManager:
     ):
         self._height = height
         self._rpc_websocket_uri = rpc_websocket_uri
-        self._rpc_client = utils.ahttp.AsyncClient(base_url=rpc_http_uri)
-        self._lcd_client = utils.ahttp.AsyncClient(base_url=lcd_uri, n_tries=1)
+        self._rpc_http_uri = rpc_http_uri
+        self._lcd_uri = lcd_uri
 
         self._txs_cache: dict[str, dict] = {}
         self._read_txs: set[str] = set()
         self._running_thread_update_height = False
         self.new_blockchain_state = False
         self._decoder_error_counter = 0
+
+    async def start(self):
+        self._rpc_client = utils.ahttp.AsyncClient(base_url=self._rpc_http_uri)
+        self._lcd_client = utils.ahttp.AsyncClient(base_url=self._lcd_uri, n_tries=1)
 
     async def close(self):
         await asyncio.gather(
@@ -166,6 +170,9 @@ class MempoolApi(Api):
             self._rpc_websocket_uri,
             str(client.lcd_uri),
         )
+
+    async def start(self):
+        await self._cache_manager.start()
 
     async def close(self):
         await self._cache_manager.close()
