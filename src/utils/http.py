@@ -1,6 +1,8 @@
 """Drop-in replacement for part of httpx module with some extra retry features."""
 import logging
+import re
 import time
+from collections import Counter
 from typing import Iterable
 
 import httpx
@@ -119,3 +121,21 @@ def _send_request(
             log.debug(f"Error on http {method} ({e})", exc_info=True)
         time.sleep((1 + backoff_factor) ** i - 1)
     raise httpx.HTTPError(f"httpx {method} failed after {n_tries=}")
+
+
+def get_host_ip() -> str:
+    ip_getter_service_urls = [
+        "http://icanhazip.com",
+        "http://ifconfig.me",
+        "http://api.ipify.org",
+        "http://bot.whatismyipaddress.com",
+        "http://ipinfo.io/ip",
+        "http://ipecho.net/plain",
+    ]
+    ips: list[str] = []
+    for url in ip_getter_service_urls:
+        res = get(url, follow_redirects=True)
+        ip = res.text.strip()
+        if re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", ip):
+            ips.append(ip)
+    return Counter(ips).most_common(1)[0][0]

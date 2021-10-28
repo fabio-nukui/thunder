@@ -45,6 +45,8 @@ class BroadcasterApi(Api):
         self._broadcaster_cache: dict[int, list[BroadcastCacheKey]] = {}
 
     async def start(self):
+        if f"http://{await utils.ahttp.get_host_ip()}:1318" == self.client.broadcaster_uri:
+            self.client.broadcaster_uri = "http://localhost:1318"
         self._http_client = utils.ahttp.AsyncClient(base_url=self.client.broadcaster_uri)
 
     async def close(self):

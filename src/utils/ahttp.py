@@ -1,6 +1,8 @@
 """Drop-in replacement for part of httpx module with some extra retry features. (async version)"""
 import asyncio
 import logging
+import re
+from collections import Counter
 from typing import Iterable
 
 import httpx
@@ -119,3 +121,24 @@ async def _send_request(
             log.debug(f"Error on http {method} ({e})", exc_info=True)
         await asyncio.sleep((1 + backoff_factor) ** i - 1)
     raise httpx.HTTPError(f"httpx {method} failed after {n_tries=}")
+
+
+async def get_host_ip() -> str:
+    ip_getter_service_urls = [
+        "http://icanhazip.com",
+        "http://ifconfig.me",
+        "http://api.ipify.org",
+        "http://bot.whatismyipaddress.com",
+        "http://ipinfo.io/ip",
+        "http://ipecho.net/plain",
+    ]
+    ips = await asyncio.gather(*(_get_text(url) for url in ip_getter_service_urls))
+    counter = Counter(ip for ip in ips if re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", ip))
+    return counter.most_common(1)[0][0]
+
+
+async def _get_text(url) -> str:
+    try:
+        return (await get(url)).text
+    except Exception:
+        return ""
