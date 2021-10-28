@@ -99,9 +99,11 @@ endif
 rm-dev: ## Remove stopped dev container
 	docker rm $(DEV_CONTAINER_NAME)
 
-build: check-all ## Build docker main image
+build: ## Build docker main image
 	echo $(GIT_BRANCH) > docker/git_commit
 	docker build --target main -t $(MAIN_IMAGE_NAME) -f docker/Dockerfile .
+
+check-build: check-all build ## Build docker main image after checks
 
 start: ## Start docker container running arbitrage strategy "$STRAT" (e.g.: make start STRAT=1)
 	docker run -d \
@@ -123,6 +125,8 @@ restart: build  ## Restart running strategy "$STRAT" with updated code
 	$(MAKE) start
 	sleep $(RESTART_SLEEP_TIME)
 	docker stop $(ARBITRAGE_CONTAINER_NAME)_stopping
+
+check-restart: check-all restart  ## Restart running strategy "$STRAT" with updated code
 
 upload-notebooks: ## Upload jupyter notebooks
 	aws s3 sync \
