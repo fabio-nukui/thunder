@@ -135,6 +135,7 @@ download-notebooks: ## Download jupyter notebooks
 
 get-env: ## Download .env files
 	aws s3 sync $(DATA_SOURCE)/env env
+	python3 scripts/fix_aws_region_env_files.py
 
 check-all: qa test check-clean-tree ## Run all checks and tests
 
