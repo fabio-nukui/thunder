@@ -229,5 +229,8 @@ class TxApi(Api):
 
     async def _broadcast_async(self, payload: dict):
         payload["mode"] = "async"
-        tasks = (client.post("txs", json=payload) for client in self.client.broadcast_lcd_clients)
+        tasks = (
+            client.post("txs", json=payload, n_tries=2)
+            for client in self.client.broadcast_lcd_clients
+        )
         await asyncio.gather(*tasks)
