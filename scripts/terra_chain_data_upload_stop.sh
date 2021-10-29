@@ -19,7 +19,7 @@ FILE_NAME=terra-data-$(date -u +%Y-%m-%dT%H-%M).tar.gz
 read cmd << EOF
 set -eu; cd $CUR_DIR
 echo Compressing data to $FILE_NAME
-tar --use-compress-program='pigz --recursive | pv' -cf $FILE_NAME $TERRA_DATA_DIR
+tar --use-compress-program='pigz --recursive | pv' -cf $FILE_NAME data
 echo uploading to S3
 aws s3 cp $FILE_NAME $S3_PATH
 rm $FILE_NAME
