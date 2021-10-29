@@ -216,7 +216,7 @@ class TxApi(Api):
                     raise e
             else:
                 self.client.account_sequence = sequence + 1
-                await self._broadcast_async(payload)
+                asyncio.create_task(self._broadcast_async(payload))
                 break
 
         log.debug(f"Tx executed: {data['txhash']}")
