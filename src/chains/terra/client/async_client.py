@@ -118,6 +118,7 @@ class TerraClient(AsyncBlockchainClient):
 
     async def close(self):
         logging.debug(f"Closing {self=}")
+        self.mempool.stop()
         await asyncio.gather(
             self.lcd_http_client.aclose(),
             self.fcd_client.aclose(),

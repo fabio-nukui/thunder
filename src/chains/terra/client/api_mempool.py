@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from asyncio.futures import Future
+import threading
+from enum import Enum, auto
 from typing import TYPE_CHECKING, AsyncIterable, Mapping, TypeVar
 
 import httpx
 
 import configs
-from exceptions import BlockchainNewState
+from utils.cache import CacheGroup, ttl_cache
 
 from ..tx_filter import Filter
 from . import utils_rpc
@@ -20,20 +21,51 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 MAX_DECODER_ERRORS_PER_BLOCK = 20
+DECODER_CACHE_SIZE = 2000
+DECODER_CACHE_TTL = 60
 DECODE_TX_TIMEOUT = 0.1
 _T = TypeVar("_T")
 
 
+class UpdateEvent(Enum):
+    new_block = auto()
+    mempool = auto()
+    null = auto()
+
+
+class LatestHeightThread(threading.Thread):
+    def __init__(self, mcm: MempoolCacheManager, *args, daemon: bool = True, **kargs):
+        super().__init__(*args, daemon=daemon, **kargs)
+
+        self.mcm = mcm
+        self.loop = asyncio.new_event_loop()
+        self._stopped = threading.Event()
+
+    def run(self):
+        self.loop.run_until_complete(self._update_height())
+
+    def stop(self):
+        self._stopped.set()
+
+    async def _update_height(self):
+        async for height in utils_rpc.loop_latest_height(self.mcm.client.rpc_websocket_uri):
+            self.mcm.height = height
+            if self._stopped.is_set():
+                return
+
+
 class MempoolCacheManager:
     def __init__(self, client: TerraClient):
-        self._height = client.height
         self.client = client
 
         self._txs_cache: dict[str, dict] = {}
         self._read_txs: set[str] = set()
-        self._running_thread_update_height = False
-        self.new_blockchain_state = False
         self._decoder_error_counter = 0
+
+        self._height = 0
+        self._height_thread = LatestHeightThread(self)
+        self._height_thread.start()
+        self._stop_tasks = asyncio.Event()
 
     @property
     def height(self) -> int:
@@ -42,8 +74,12 @@ class MempoolCacheManager:
     @height.setter
     def height(self, value: int):
         self._height = value
-        self.new_blockchain_state = False
+        self._txs_cache = {}
+        self._read_txs = set()
         self._decoder_error_counter = 0
+
+    def stop(self):
+        self._height_thread.stop()
 
     async def filter_new_height_mempool(
         self,
@@ -66,46 +102,43 @@ class MempoolCacheManager:
         height: int,
         new_block_only: bool,
     ) -> tuple[int, list[list[dict]]]:
-        cor_next_height = utils_rpc.wait_next_block_height(self.client.rpc_websocket_uri)
-        cor_mempool_txs = self.fetch_mempool_txs()
-        if height != self.height or new_block_only:
-            self.height = await cor_next_height
-            self._txs_cache = await cor_mempool_txs
-        elif self._running_thread_update_height:
-            self._txs_cache = await cor_mempool_txs
-            del cor_mempool_txs
-        else:
-            as_completed_events = asyncio.as_completed((cor_next_height, cor_mempool_txs))
-            data = await next(as_completed_events)
-            if isinstance(data, int):
-                self.height = data
-                del as_completed_events
-            else:
-                self._txs_cache = data  # type: ignore
-                self._running_thread_update_height = True
-                fut_next_height: Future[int] = next(as_completed_events)  # type: ignore
-                asyncio.create_task(self._update_height(fut_next_height))
-        if self.new_blockchain_state:
-            raise BlockchainNewState
+        cor_wait_next_block = self._wait_next_block(height)
+        cor_mempool_txs = self._update_mempool_txs(wait_for_changes=True)
+        self._stop_tasks.clear()
+        tasks = asyncio.as_completed((cor_wait_next_block, cor_mempool_txs))
+        event = await next(tasks)
+        if new_block_only and event != UpdateEvent.new_block:
+            await next(tasks)
+        self._stop_tasks.set()
+        del cor_wait_next_block
+        del cor_mempool_txs
         unread_txs_msgs = [
             tx["msg"] for key, tx in self._txs_cache.items() if key not in self._read_txs
         ]
         self._read_txs = set(self._txs_cache)
         return self.height, unread_txs_msgs
 
-    async def fetch_mempool_txs(self) -> dict[str, dict]:
-        n_txs = len(self._txs_cache)
+    async def _wait_next_block(self, min_height: int) -> UpdateEvent:
         while True:
+            if self._stop_tasks.is_set():
+                return UpdateEvent.null
+            if self.height > min_height:
+                return UpdateEvent.new_block
+            await asyncio.sleep(configs.TERRA_POLL_INTERVAL)
+
+    async def _update_mempool_txs(self, wait_for_changes: bool) -> UpdateEvent:
+        while True:
+            if self._stop_tasks.is_set():
+                return UpdateEvent.null
             res = await self.client.rpc_http_client.get("unconfirmed_txs")
             raw_txs: list[str] = res.json()["result"]["txs"]
-            if n_txs != len(raw_txs):
+            if not wait_for_changes or set(raw_txs) != set(self._txs_cache):
                 break
             await asyncio.sleep(configs.TERRA_POLL_INTERVAL)
 
-        if not self._read_txs.issubset(raw_txs):
+        if not set(self._txs_cache).issubset(raw_txs):
             # Some txs were removed from mempool, a new block has arrived
-            self.new_blockchain_state = True
-            self._txs_cache = {key: tx for key, tx in self._txs_cache.items() if key in raw_txs}
+            self._txs_cache = {}
             self._read_txs = set()
 
         tasks = {
@@ -116,10 +149,18 @@ class MempoolCacheManager:
         except Exception as e:
             e.args = (*e.args, f"{len(tasks)=}")
             raise e
-        new_txs = {raw_tx: tx for raw_tx, tx in zip(tasks, txs) if tx}
-        return self._txs_cache | new_txs
+        self._txs_cache.update({raw_tx: tx for raw_tx, tx in zip(tasks, txs) if tx})
+        return UpdateEvent.mempool
 
+    async def fetch_mempool_txs(self) -> dict[str, dict]:
+        self._stop_tasks.clear()
+        await self._update_mempool_txs(wait_for_changes=False)
+        return self._txs_cache
+
+    @ttl_cache(CacheGroup.TERRA, maxsize=DECODER_CACHE_SIZE, ttl=DECODER_CACHE_TTL)
     async def _decode_tx(self, raw_tx: str) -> dict:
+        if self._stop_tasks.is_set():
+            return {}
         try:
             response = await self.client.lcd_http_client.post(
                 "txs/decode", json={"tx": raw_tx}, timeout=DECODE_TX_TIMEOUT
@@ -132,22 +173,18 @@ class MempoolCacheManager:
         else:
             return response.json()["result"]
 
-    async def _update_height(self, fut_next_height: Future[int]):
-        self.height = await fut_next_height
-        self._running_thread_update_height = False
-
 
 class MempoolApi(Api):
     def __init__(self, client: "TerraClient"):
         super().__init__(client)
-        self.new_block_only = False
         self._cache_manager = MempoolCacheManager(client)
 
     async def fetch_mempool_msgs(self) -> list[list[dict]]:
         txs = await self._cache_manager.fetch_mempool_txs()
-        if self._cache_manager.new_blockchain_state:
-            raise BlockchainNewState
         return [tx["msg"] for tx in txs.values()]
+
+    def stop(self):
+        self._cache_manager.stop()
 
     async def get_height_mempool(self, height: int) -> tuple[int, list[list[dict]]]:
         return await self._cache_manager.get_new_height_mempool(height, new_block_only=False)
@@ -157,12 +194,9 @@ class MempoolApi(Api):
         filters: Mapping[_T, Filter],
     ) -> AsyncIterable[tuple[int, dict[_T, list[list[dict]]]]]:
         while True:
-            try:
-                last_height, mempool = await self._cache_manager.filter_new_height_mempool(
-                    self.client.height, filters, self.new_block_only
-                )
-            except BlockchainNewState:
-                continue
+            last_height, mempool = await self._cache_manager.filter_new_height_mempool(
+                self.client.height, filters, new_block_only=False
+            )
             if last_height > self.client.height:
                 self.client.height = last_height
             yield last_height, mempool

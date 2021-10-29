@@ -170,7 +170,6 @@ class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
                     FeeEstimationError,
                     OptimizationError,
                     TxAlreadyBroadcasted,
-                    BlockchainNewState,
                 ) as e:
                     self.log.debug(e)
                     return
