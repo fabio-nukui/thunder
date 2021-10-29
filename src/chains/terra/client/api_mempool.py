@@ -27,6 +27,10 @@ DECODE_TX_TIMEOUT = 0.1
 _T = TypeVar("_T")
 
 
+class DecodeError(Exception):
+    pass
+
+
 class UpdateEvent(Enum):
     new_block = auto()
     mempool = auto()
@@ -158,10 +162,16 @@ class MempoolCacheManager:
         await self._update_mempool_txs(wait_for_changes=False)
         return self._txs_cache
 
+    async def _get_decoded_tx(self, raw_tx: str) -> dict:
+        try:
+            return await self._decode_tx(raw_tx)
+        except DecodeError:
+            return {}
+
     @ttl_cache(CacheGroup.TERRA, maxsize=DECODER_CACHE_SIZE, ttl=DECODER_CACHE_TTL)
     async def _decode_tx(self, raw_tx: str) -> dict:
         if self._stop_tasks:
-            return {}
+            raise DecodeError
         try:
             response = await self.client.lcd_http_client.post(
                 "txs/decode", json={"tx": raw_tx}, timeout=DECODE_TX_TIMEOUT
@@ -170,7 +180,7 @@ class MempoolCacheManager:
             self._decoder_error_counter += 1
             if self._decoder_error_counter > MAX_DECODER_ERRORS_PER_BLOCK:
                 raise Exception(f"{self._decoder_error_counter} decoder errors last block")
-            return {}
+            raise DecodeError
         else:
             return response.json()["result"]
 
