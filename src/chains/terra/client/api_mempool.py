@@ -65,7 +65,7 @@ class MempoolCacheManager:
         self._height = 0
         self._height_thread = LatestHeightThread(self)
         self._height_thread.start()
-        self._stop_tasks = asyncio.Event()
+        self._stop_tasks = False
 
     @property
     def height(self) -> int:
@@ -104,12 +104,13 @@ class MempoolCacheManager:
     ) -> tuple[int, list[list[dict]]]:
         cor_wait_next_block = self._wait_next_block(height)
         cor_mempool_txs = self._update_mempool_txs(wait_for_changes=True)
-        self._stop_tasks.clear()
+        self._stop_tasks = False
         tasks = asyncio.as_completed((cor_wait_next_block, cor_mempool_txs))
         event = await next(tasks)
         if new_block_only and event != UpdateEvent.new_block:
             await next(tasks)
-        self._stop_tasks.set()
+        self._stop_tasks = True
+        del tasks
         del cor_wait_next_block
         del cor_mempool_txs
         unread_txs_msgs = [
@@ -120,7 +121,7 @@ class MempoolCacheManager:
 
     async def _wait_next_block(self, min_height: int) -> UpdateEvent:
         while True:
-            if self._stop_tasks.is_set():
+            if self._stop_tasks:
                 return UpdateEvent.null
             if self.height > min_height:
                 return UpdateEvent.new_block
@@ -128,7 +129,7 @@ class MempoolCacheManager:
 
     async def _update_mempool_txs(self, wait_for_changes: bool) -> UpdateEvent:
         while True:
-            if self._stop_tasks.is_set():
+            if self._stop_tasks:
                 return UpdateEvent.null
             res = await self.client.rpc_http_client.get("unconfirmed_txs")
             raw_txs: list[str] = res.json()["result"]["txs"]
@@ -153,13 +154,13 @@ class MempoolCacheManager:
         return UpdateEvent.mempool
 
     async def fetch_mempool_txs(self) -> dict[str, dict]:
-        self._stop_tasks.clear()
+        self._stop_tasks = False
         await self._update_mempool_txs(wait_for_changes=False)
         return self._txs_cache
 
     @ttl_cache(CacheGroup.TERRA, maxsize=DECODER_CACHE_SIZE, ttl=DECODER_CACHE_TTL)
     async def _decode_tx(self, raw_tx: str) -> dict:
-        if self._stop_tasks.is_set():
+        if self._stop_tasks:
             return {}
         try:
             response = await self.client.lcd_http_client.post(
