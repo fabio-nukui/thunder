@@ -19,6 +19,7 @@ EOF
 
 echo Stopping terrad to sync latest files
 systemctl stop terrad
+sleep 10
 
 sudo -i -u "$RUNNER_USER" bash << EOF
 set -eu; cd $CUR_DIR

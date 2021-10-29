@@ -13,6 +13,7 @@ CUR_DIR=$PWD
 
 echo Stopping terrad
 systemctl stop terrad
+sleep 10
 
 FILE_NAME=terra-data-$(date -u +%Y-%m-%dT%H-%M).tar.gz
 
