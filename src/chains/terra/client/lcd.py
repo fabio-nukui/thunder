@@ -7,13 +7,18 @@ from terra_sdk.client.lcd import AsyncLCDClient
 
 log = logging.getLogger(__name__)
 
-MAX_CONCURRENT_REQUESTS = 20
+DEFAULT_MAX_CONCURRENT_REQUESTS = 20
 
 
 class AsyncLCDClient2(AsyncLCDClient):
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self,
+        *args,
+        max_concurrent_requests: int = DEFAULT_MAX_CONCURRENT_REQUESTS,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
-        self._requests_semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+        self._requests_semaphore = asyncio.Semaphore(max_concurrent_requests)
         self._reconnect_lock = asyncio.Lock()
 
     async def _get(self, *args, **kwargs):

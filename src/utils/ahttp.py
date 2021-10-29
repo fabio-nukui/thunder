@@ -15,6 +15,7 @@ DEFAULT_TIMEOUT = 5.0
 DEFAULT_N_TRIES = 3
 DEFAULT_BACKOFF_FACTOR = 0.5
 DEFAULT_STATUS_FORCELIST = (500, 502, 503, 504)
+DEFAULT_MAX_CONCURRENT_REQUESTS = 50
 
 
 class AsyncClient(httpx.AsyncClient):
@@ -23,12 +24,14 @@ class AsyncClient(httpx.AsyncClient):
         n_tries: int = DEFAULT_N_TRIES,
         backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
         status_forcelist: Iterable[int] = DEFAULT_STATUS_FORCELIST,
+        max_concurrent_requests: int = DEFAULT_MAX_CONCURRENT_REQUESTS,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self.n_tries = n_tries
         self.backoff_factor = backoff_factor
         self.status_forcelist = status_forcelist
+        self._semaphore_requests = asyncio.Semaphore(max_concurrent_requests)
 
     async def get(
         self,
@@ -37,7 +40,8 @@ class AsyncClient(httpx.AsyncClient):
         **kwargs,
     ) -> httpx.Response:
         """httpx GET with default retries"""
-        return await request("GET", url, n_tries=n_tries, httpx_client=self, **kwargs)
+        async with self._semaphore_requests:
+            return await request("GET", url, n_tries=n_tries, httpx_client=self, **kwargs)
 
     async def post(
         self,
@@ -46,7 +50,8 @@ class AsyncClient(httpx.AsyncClient):
         **kwargs,
     ) -> httpx.Response:
         """httpx POST with default retries"""
-        return await request("POST", url, n_tries=n_tries, httpx_client=self, **kwargs)
+        async with self._semaphore_requests:
+            return await request("POST", url, n_tries=n_tries, httpx_client=self, **kwargs)
 
 
 _DEFAULT_CLIENT = AsyncClient()
