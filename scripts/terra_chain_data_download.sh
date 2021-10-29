@@ -7,14 +7,15 @@ if [[ $(id -u) -ne 0 ]]; then
 fi
 
 TERRA_DATA_DIR=/mnt/nvme0/terra/data
+S3_PATH=s3://crypto-thunder/chain_data/terra/
 CUR_DIR=$PWD
 
-snapshot_name=$(aws s3 ls s3://crypto-thunder/chain_data/terra/ | awk -F ' ' '{print $4}' | tail -n 1)
+snapshot_name=$(aws s3 ls $S3_PATH | awk -F ' ' '{print $4}' | tail -n 1)
 
 sudo -i -u ubuntu bash << EOF
 cd $CUR_DIR
 echo Downloading latest snapshot "$snapshot_name"
-aws s3 cp "$snapshot_name" .
+aws s3 cp $S3_PATH"$snapshot_name" .
 EOF
 
 echo Stopping terrad

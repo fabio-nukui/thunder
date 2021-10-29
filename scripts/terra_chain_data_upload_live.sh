@@ -7,6 +7,7 @@ if [[ $(id -u) -ne 0 ]]; then
 fi
 
 TERRA_DATA_DIR=/mnt/nvme0/terra/data
+S3_PATH=s3://crypto-thunder/chain_data/terra/
 CUR_DIR=$PWD
 
 sudo -i -u ubuntu bash << EOF
@@ -34,6 +35,6 @@ cd $CUR_DIR
 echo Compressing data to $FILE_NAME
 tar --use-compress-program='pigz --recursive | pv' -cf $FILE_NAME $TERRA_DATA_DIR
 echo uploading to S3
-aws s3 cp $FILE_NAME s3://crypto-thunder/chain_data/terra/
+aws s3 cp $FILE_NAME $S3_PATH
 rm $FILE_NAME
 EOF
