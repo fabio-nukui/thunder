@@ -9,9 +9,6 @@ from collections import defaultdict
 from decimal import Decimal
 from typing import AsyncIterable
 
-import aiohttp
-from aiohttp.client_exceptions import ServerDisconnectedError
-from terra_sdk.client.lcd import AsyncLCDClient
 from terra_sdk.core import AccAddress, Coins
 from terra_sdk.core.auth import TxLog
 from terra_sdk.core.auth.data.account import Account
@@ -34,6 +31,7 @@ from .api_mempool import MempoolApi
 from .api_oracle import OracleApi
 from .api_treasury import TreasuryApi
 from .api_tx import TxApi
+from .lcd import AsyncLCDClient2
 
 log = logging.getLogger(__name__)
 
@@ -41,28 +39,6 @@ log = logging.getLogger(__name__)
 TERRA_CONTRACT_QUERY_CACHE_SIZE = 10_000
 CONTRACT_INFO_CACHE_TTL = 86400  # Contract info should not change; 24h ttl
 _pat_contract_not_found = re.compile(r"contract terra1(\w+): not found")
-
-
-class ReconnectingLCDClient(AsyncLCDClient):
-    async def _get(self, *args, **kwargs):
-        try:
-            return await super()._get(*args, **kwargs)
-        except ServerDisconnectedError:
-            await self._reconnect_session()
-            return await super()._get(*args, **kwargs)
-
-    async def _post(self, *args, **kwargs):
-        try:
-            return await super()._post(*args, **kwargs)
-        except ServerDisconnectedError:
-            await self._reconnect_session()
-            return await super()._post(*args, **kwargs)
-
-    async def _reconnect_session(self):
-        log.debug("Reconnecting LCD session")
-        old_session = self.session
-        self.session = aiohttp.ClientSession(headers={"Accept": "application/json"}, loop=self.loop)
-        await old_session.close()
 
 
 class TerraClient(AsyncBlockchainClient):
@@ -115,7 +91,7 @@ class TerraClient(AsyncBlockchainClient):
         self.broadcast_lcd_clients = [
             utils.ahttp.AsyncClient(base_url=url) for url in self.broadcast_lcd_uris if url
         ]
-        self.lcd = ReconnectingLCDClient(
+        self.lcd = AsyncLCDClient2(
             self.lcd_uri, self.chain_id, self.gas_prices, self.gas_adjustment
         )
         self.wallet = self.lcd.wallet(self.key)
