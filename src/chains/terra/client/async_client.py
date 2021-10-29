@@ -85,9 +85,13 @@ class TerraClient(AsyncBlockchainClient):
         self.tx = TxApi(self)
 
     async def start(self):
+        if f"http://{await utils.ahttp.get_host_ip()}:1318" == self.broadcaster_uri:
+            self.broadcaster_uri = "http://localhost:1318"
+
         self.lcd_http_client = utils.ahttp.AsyncClient(base_url=self.lcd_uri)
         self.fcd_client = utils.ahttp.AsyncClient(base_url=self.fcd_uri)
         self.rpc_http_client = utils.ahttp.AsyncClient(base_url=self.rpc_http_uri)
+        self.broadcaster_client = utils.ahttp.AsyncClient(base_url=self.broadcaster_uri)
         self.broadcast_lcd_clients = [
             utils.ahttp.AsyncClient(base_url=url) for url in self.broadcast_lcd_uris if url
         ]
@@ -101,8 +105,6 @@ class TerraClient(AsyncBlockchainClient):
         self.account_sequence = (await self.get_account_data()).sequence
         if self.gas_prices is None:
             self.lcd.gas_prices = await self.tx.get_gas_prices()
-        await self.broadcaster.start()
-        await self.mempool.start()
         await super().start()
 
     def __repr__(self) -> str:
@@ -122,8 +124,6 @@ class TerraClient(AsyncBlockchainClient):
             self.rpc_http_client.aclose(),
             *(client.aclose() for client in self.broadcast_lcd_clients),
             self.lcd.session.close(),
-            self.broadcaster.close(),
-            self.mempool.close(),
         )
 
     @ttl_cache(CacheGroup.TERRA, TERRA_CONTRACT_QUERY_CACHE_SIZE)

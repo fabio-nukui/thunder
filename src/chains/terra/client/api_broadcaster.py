@@ -7,7 +7,6 @@ from terra_sdk.core.auth import StdFee
 from terra_sdk.core.broadcast import SyncTxBroadcastResult
 from terra_sdk.core.msg import Msg
 
-import utils
 from exceptions import TxAlreadyBroadcasted
 
 from .base_api import Api
@@ -44,14 +43,6 @@ class BroadcasterApi(Api):
         super().__init__(client)
         self._broadcaster_cache: dict[int, list[BroadcastCacheKey]] = {}
 
-    async def start(self):
-        if f"http://{await utils.ahttp.get_host_ip()}:1318" == self.client.broadcaster_uri:
-            self.client.broadcaster_uri = "http://localhost:1318"
-        self._http_client = utils.ahttp.AsyncClient(base_url=self.client.broadcaster_uri)
-
-    async def close(self):
-        await self._http_client.aclose()
-
     async def post(
         self,
         msgs: Sequence[Msg],
@@ -68,7 +59,7 @@ class BroadcasterApi(Api):
             "fee": fee.to_data() if fee is not None else None,
             "fee_denom": fee_denom,
         }
-        res = await self._http_client.post("txs", json=payload)
+        res = await self.client.broadcaster_client.post("txs", json=payload)
         data: BroadcasterResponse = res.json()
         if data["result"] == "repeated_tx":
             raise TxAlreadyBroadcasted

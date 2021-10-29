@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, AsyncIterable, Mapping, TypeVar
 import httpx
 
 import configs
-import utils
 from exceptions import BlockchainNewState
 
 from ..tx_filter import Filter
@@ -20,41 +19,21 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-MAX_CONCURRENT_DECODE_REQUESTS = 10
 MAX_DECODER_ERRORS_PER_BLOCK = 20
 DECODE_TX_TIMEOUT = 0.1
 _T = TypeVar("_T")
 
 
 class MempoolCacheManager:
-    def __init__(
-        self,
-        height: int,
-        rpc_websocket_uri: str,
-        rpc_http_uri: str,
-        lcd_uri: str,
-    ):
-        self._height = height
-        self._rpc_websocket_uri = rpc_websocket_uri
-        self._rpc_http_uri = rpc_http_uri
-        self._lcd_uri = lcd_uri
+    def __init__(self, client: TerraClient):
+        self._height = client.height
+        self.client = client
 
         self._txs_cache: dict[str, dict] = {}
         self._read_txs: set[str] = set()
         self._running_thread_update_height = False
         self.new_blockchain_state = False
         self._decoder_error_counter = 0
-        self._decoder_semaphore = asyncio.Semaphore(MAX_CONCURRENT_DECODE_REQUESTS)
-
-    async def start(self):
-        self._rpc_client = utils.ahttp.AsyncClient(base_url=self._rpc_http_uri)
-        self._lcd_client = utils.ahttp.AsyncClient(base_url=self._lcd_uri, n_tries=1)
-
-    async def close(self):
-        await asyncio.gather(
-            self._lcd_client.aclose(),
-            self._rpc_client.aclose(),
-        )
 
     @property
     def height(self) -> int:
@@ -87,7 +66,7 @@ class MempoolCacheManager:
         height: int,
         new_block_only: bool,
     ) -> tuple[int, list[list[dict]]]:
-        cor_next_height = utils_rpc.wait_next_block_height(self._rpc_websocket_uri)
+        cor_next_height = utils_rpc.wait_next_block_height(self.client.rpc_websocket_uri)
         cor_mempool_txs = self.fetch_mempool_txs()
         if height != self.height or new_block_only:
             self.height = await cor_next_height
@@ -117,7 +96,7 @@ class MempoolCacheManager:
     async def fetch_mempool_txs(self) -> dict[str, dict]:
         n_txs = len(self._txs_cache)
         while True:
-            res = await self._rpc_client.get("unconfirmed_txs")
+            res = await self.client.rpc_http_client.get("unconfirmed_txs")
             raw_txs: list[str] = res.json()["result"]["txs"]
             if n_txs != len(raw_txs):
                 break
@@ -142,10 +121,9 @@ class MempoolCacheManager:
 
     async def _decode_tx(self, raw_tx: str) -> dict:
         try:
-            async with self._decoder_semaphore:
-                response = await self._lcd_client.post(
-                    "txs/decode", json={"tx": raw_tx}, timeout=DECODE_TX_TIMEOUT
-                )
+            response = await self.client.lcd_http_client.post(
+                "txs/decode", json={"tx": raw_tx}, timeout=DECODE_TX_TIMEOUT
+            )
         except httpx.HTTPError:
             self._decoder_error_counter += 1
             if self._decoder_error_counter > MAX_DECODER_ERRORS_PER_BLOCK:
@@ -163,20 +141,7 @@ class MempoolApi(Api):
     def __init__(self, client: "TerraClient"):
         super().__init__(client)
         self.new_block_only = False
-        self._rpc_websocket_uri = str(client.rpc_http_uri)
-
-        self._cache_manager = MempoolCacheManager(
-            client.height,
-            client.rpc_websocket_uri,
-            self._rpc_websocket_uri,
-            str(client.lcd_uri),
-        )
-
-    async def start(self):
-        await self._cache_manager.start()
-
-    async def close(self):
-        await self._cache_manager.close()
+        self._cache_manager = MempoolCacheManager(client)
 
     async def fetch_mempool_msgs(self) -> list[list[dict]]:
         txs = await self._cache_manager.fetch_mempool_txs()
