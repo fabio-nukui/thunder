@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-MAX_CONCURRENT_DECODE_REQUESTS = 5
+MAX_CONCURRENT_DECODE_REQUESTS = 10
 MAX_DECODER_ERRORS_PER_BLOCK = 20
 DECODE_TX_TIMEOUT = 0.1
 _T = TypeVar("_T")
@@ -44,6 +44,7 @@ class MempoolCacheManager:
         self._running_thread_update_height = False
         self.new_blockchain_state = False
         self._decoder_error_counter = 0
+        self._decoder_semaphore = asyncio.Semaphore(MAX_CONCURRENT_DECODE_REQUESTS)
 
     async def start(self):
         self._rpc_client = utils.ahttp.AsyncClient(base_url=self._rpc_http_uri)
@@ -131,20 +132,20 @@ class MempoolCacheManager:
         tasks = {
             raw_tx: self._decode_tx(raw_tx) for raw_tx in raw_txs if raw_tx not in self._txs_cache
         }
-        async with asyncio.Semaphore(MAX_CONCURRENT_DECODE_REQUESTS):
-            try:
-                txs = await asyncio.gather(*tasks.values())
-            except Exception as e:
-                e.args = (*e.args, f"{len(tasks)=}")
-                raise e
+        try:
+            txs = await asyncio.gather(*tasks.values())
+        except Exception as e:
+            e.args = (*e.args, f"{len(tasks)=}")
+            raise e
         new_txs = {raw_tx: tx for raw_tx, tx in zip(tasks, txs) if tx}
         return self._txs_cache | new_txs
 
     async def _decode_tx(self, raw_tx: str) -> dict:
         try:
-            response = await self._lcd_client.post(
-                "txs/decode", json={"tx": raw_tx}, timeout=DECODE_TX_TIMEOUT
-            )
+            async with self._decoder_semaphore:
+                response = await self._lcd_client.post(
+                    "txs/decode", json={"tx": raw_tx}, timeout=DECODE_TX_TIMEOUT
+                )
         except httpx.HTTPError:
             self._decoder_error_counter += 1
             if self._decoder_error_counter > MAX_DECODER_ERRORS_PER_BLOCK:
