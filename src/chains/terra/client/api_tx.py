@@ -105,7 +105,7 @@ class TxApi(Api):
         mempool = await self.client.mempool.fetch_mempool_msgs()
         data = [msg.to_data() for msg in msgs]
         if data in mempool:
-            raise TxAlreadyBroadcasted
+            raise TxAlreadyBroadcasted("Tx in mempool")
 
     async def _fallback_fee_estimation(
         self,

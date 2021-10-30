@@ -171,13 +171,11 @@ class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
                     self.data.params = await self._get_arbitrage_params(
                         height, filtered_mempool
                     )
-                except (
-                    UnprofitableArbitrage,
-                    FeeEstimationError,
-                    OptimizationError,
-                    TxAlreadyBroadcasted,
-                ) as e:
+                except (UnprofitableArbitrage, FeeEstimationError, OptimizationError) as e:
                     self.log.debug(e)
+                    return
+                except TxAlreadyBroadcasted as e:
+                    self.log.info(e)
                     return
             if self.state == State.ready_to_broadcast:
                 n_txs = self.data.params.n_repeat  # type: ignore

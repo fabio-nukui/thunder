@@ -62,7 +62,7 @@ class BroadcasterApi(Api):
         res = await self.client.broadcaster_client.post("txs", json=payload, n_tries=1)
         data: BroadcasterResponse = res.json()
         if data["result"] == "repeated_tx":
-            raise TxAlreadyBroadcasted
+            raise TxAlreadyBroadcasted("Tx broadcasted by other host")
         return [
             (timestamp, SyncTxBroadcastResult(**result)) for timestamp, result in data["data"]
         ]
