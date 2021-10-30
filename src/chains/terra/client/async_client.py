@@ -103,6 +103,7 @@ class TerraClient(AsyncBlockchainClient):
         self.account_sequence = (await self.get_account_data()).sequence
         if self.gas_prices is None:
             self.lcd.gas_prices = await self.tx.get_gas_prices()
+        self.mempool.start()
         await super().start()
 
     async def _fix_broadcaster_urls(self):

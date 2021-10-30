@@ -67,7 +67,6 @@ class MempoolCacheManager:
 
         self._height = 0
         self._height_thread = LatestHeightThread(self)
-        self._height_thread.start()
         self._stop_tasks = False
 
     @property
@@ -79,6 +78,10 @@ class MempoolCacheManager:
         self._height = value
         self._txs_cache = {}
         self._read_txs = set()
+
+    def start(self):
+        self._height = self.client.height
+        self._height_thread.start()
 
     def stop(self):
         self._height_thread.stop()
@@ -192,6 +195,9 @@ class MempoolApi(Api):
     async def fetch_mempool_msgs(self) -> list[list[dict]]:
         txs = await self._cache_manager.fetch_mempool_txs()
         return [tx["msg"] for tx in txs.values()]
+
+    def start(self):
+        self._cache_manager.start()
 
     def stop(self):
         self._cache_manager.stop()
