@@ -43,7 +43,8 @@ async def post_tx():
         log.debug(f"({remote_addr=}) Received BroadcasterPayload", extra={"data": data})
         if not data:
             log.warning(
-                f"({remote_addr=}) Unable to parse data", extra={"data": await request.get_data()}
+                f"({remote_addr=}) Unable to parse data",
+                extra={"data": await request.get_data()},
             )
             return Response(
                 json.dumps({"message": "Unable to parse data"}),

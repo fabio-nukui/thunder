@@ -78,7 +78,9 @@ class CurvePool:
     @ttl_cache(CacheGroup.ETHEREUM, N_POOLS_CACHE)
     def _get_balances(self) -> list[int]:
         return [
-            self.contract.functions.balances(i).call(block_identifier=self.client.block_identifier)
+            self.contract.functions.balances(i).call(
+                block_identifier=self.client.block_identifier
+            )
             for i in range(self.n_coins)
         ]
 

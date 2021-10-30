@@ -78,7 +78,9 @@ class SingleRoute:
         self.client = client
         self.tokens = list(tokens)
         self.pairs = list(pairs)
-        self.router = Router(router_address, pairs, client) if router_address is not None else None
+        self.router = (
+            Router(router_address, pairs, client) if router_address is not None else None
+        )
         self.is_cycle = self.tokens[0] == self.tokens[-1]
 
     def __repr__(self) -> str:
@@ -111,7 +113,9 @@ class SingleRoute:
         msgs: list[MsgExecuteContract] = []
         for pair in pairs:
             if not isinstance(pair, LiquidityPair):
-                raise NotImplementedError("SingleRoute.op_swap() only implemented for Router swaps")
+                raise NotImplementedError(
+                    "SingleRoute.op_swap() only implemented for Router swaps"
+                )
             step_amount, step_msgs = await pair.op_swap(
                 self.client.address, step_amount, max_slippage, safety_margin
             )
@@ -133,7 +137,9 @@ class SingleRoute:
     @cache
     def _get_route_steps(self, reverse: bool) -> Sequence[RouteStep]:
         pairs, token_in = (
-            (self.pairs, self.tokens[0]) if not reverse else (reversed(self.pairs), self.tokens[-1])
+            (self.pairs, self.tokens[0])
+            if not reverse
+            else (reversed(self.pairs), self.tokens[-1])
         )
         steps: list[RouteStepNative | RouteStepTerraswap] = []
         for pair in pairs:

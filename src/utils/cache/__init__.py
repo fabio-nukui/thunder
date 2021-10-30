@@ -36,7 +36,11 @@ CACHE_GROUPS_TTL = {
 CACHE_GROUPS_TTL[CacheGroup.ALL] = min(CACHE_GROUPS_TTL.values())
 
 
-def _get_ttl_cache(group: CacheGroup, maxsize: int, ttl: float = None) -> TTLCache | TTLCacheStats:
+def _get_ttl_cache(
+    group: CacheGroup,
+    maxsize: int,
+    ttl: float = None,
+) -> TTLCache | TTLCacheStats:
     ttl = CACHE_GROUPS_TTL[group] if ttl is None else ttl
     cache = TTLCacheStats(maxsize, ttl) if configs.CACHE_STATS else TTLCache(maxsize, ttl)
 

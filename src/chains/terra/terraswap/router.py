@@ -30,7 +30,9 @@ class RouteStep(ABC):
         self.token_out = token_out
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(token_in={self.token_in}, token_out={self.token_out})"
+        return (
+            f"{self.__class__.__name__}(token_in={self.token_in}, token_out={self.token_out})"
+        )
 
     @property
     def sorted_tokens(self) -> tuple[TerraToken, TerraToken]:

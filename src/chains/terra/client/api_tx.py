@@ -58,7 +58,9 @@ class TxApi(Api):
         sequence: int = None,
     ) -> StdFee:
         fee_denom = self.client.fee_denom if fee_denom is None else fee_denom
-        account_number, sequence = await self.client._valid_account_params(account_number, sequence)
+        account_number, sequence = await self.client._valid_account_params(
+            account_number, sequence
+        )
         for i in range(1, MAX_FEE_ESTIMATION_TRIES + 1):
             try:
                 fee = await self.client.lcd.tx.estimate_fee(
@@ -114,7 +116,9 @@ class TxApi(Api):
     ) -> StdFee:
         assert isinstance(native_amount.token, TerraNativeToken)
 
-        gas_adjustment = self.client.gas_adjustment if gas_adjustment is None else gas_adjustment
+        gas_adjustment = (
+            self.client.gas_adjustment if gas_adjustment is None else gas_adjustment
+        )
         gas_adjustment += FALLBACK_EXTRA_GAS_ADJUSTMENT
         adjusted_gas_use = round(estimated_gas_use * gas_adjustment)
 
@@ -145,16 +149,29 @@ class TxApi(Api):
     ) -> list[tuple[float, SyncTxBroadcastResult]]:
         if self.client.use_broadcaster:
             log.info("Posting to broadcaster")
-            return await self.client.broadcaster.post(msgs, n_repeat, expect_logs_, fee, fee_denom)
-        account_number, sequence = await self.client._valid_account_params(account_number, sequence)
+            return await self.client.broadcaster.post(
+                msgs, n_repeat, expect_logs_, fee, fee_denom
+            )
+        account_number, sequence = await self.client._valid_account_params(
+            account_number, sequence
+        )
         if fee is None:
-            fee = await self.estimate_fee(msgs, account_number=account_number, sequence=sequence)
+            fee = await self.estimate_fee(
+                msgs, account_number=account_number, sequence=sequence
+            )
         log.debug(f"Executing messages {n_repeat} time(s): {msgs}")
         results: list[tuple[float, SyncTxBroadcastResult]] = []
         for i in range(1, n_repeat + 1):
             log.debug(f"Executing message {i} if {n_repeat}")
             res = await self.execute_msgs(
-                msgs, expect_logs_, account_number, sequence, fee, fee_denom, log_=False, **kwargs
+                msgs,
+                expect_logs_,
+                account_number,
+                sequence,
+                fee,
+                fee_denom,
+                log_=False,
+                **kwargs,
             )
             results.append((time.time(), res))
             sequence = max(self.client.account_sequence, sequence + 1)
@@ -182,10 +199,14 @@ class TxApi(Api):
             log.debug(f"Sending tx: {msgs}")
         fee_denom = self.client.fee_denom if fee_denom is None else fee_denom
 
-        account_number, sequence = await self.client._valid_account_params(account_number, sequence)
+        account_number, sequence = await self.client._valid_account_params(
+            account_number, sequence
+        )
         # Fixes bug in terraswap_sdk==1.0.0b2
         if fee is None:
-            fee = await self.estimate_fee(msgs, account_number=account_number, sequence=sequence)
+            fee = await self.estimate_fee(
+                msgs, account_number=account_number, sequence=sequence
+            )
         for i in range(1, MAX_BROADCAST_TRIES + 1):
             signed_tx = await self.client.wallet.create_and_sign_tx(
                 msgs,

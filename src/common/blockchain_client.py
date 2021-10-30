@@ -48,7 +48,9 @@ class AsyncBlockchainClient(BlockchainClient, ABC):
         ...
 
     @classmethod
-    async def new(cls: type[_AsyncBlockchainClientT], *args, **kwargs) -> _AsyncBlockchainClientT:
+    async def new(
+        cls: type[_AsyncBlockchainClientT], *args, **kwargs
+    ) -> _AsyncBlockchainClientT:
         self = cls(*args, **kwargs)
         await self.start()
         return self
@@ -67,7 +69,8 @@ class AsyncBlockchainClient(BlockchainClient, ABC):
 
     async def start(self):
         if self.raise_on_syncing and await self.is_syncing():
-            assert isinstance(self.height, int), f"Unexpected height={self.height}, expected int"
+            if not isinstance(self.height, int):
+                raise Exception(f"Unexpected height={self.height}, expected int")
             raise NodeSyncing(self.height)
 
         self.started = True

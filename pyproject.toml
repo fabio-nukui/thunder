@@ -14,12 +14,12 @@ reportUndefinedVariable = false
 reportTypedDictNotRequiredAccess = false
 
 [tool.black]
-line-length = 100
+line-length = 96
 target-version = ["py39"]
 fast = true
 
 [tool.isort]
-line_length = 100
+line_length = 96
 profile = "black"
 
 [tool.mypy]

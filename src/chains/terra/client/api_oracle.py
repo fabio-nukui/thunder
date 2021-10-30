@@ -15,7 +15,9 @@ class OracleApi(Api):
     @ttl_cache(CacheGroup.TERRA, maxsize=1)
     async def get_exchange_rates(self) -> dict[TerraNativeToken, Decimal]:
         oracle_rates = await self.client.lcd.oracle.exchange_rates()
-        rates = {TerraNativeToken(c.denom): Decimal(str(c.amount)) for c in oracle_rates.to_list()}
+        rates = {
+            TerraNativeToken(c.denom): Decimal(str(c.amount)) for c in oracle_rates.to_list()
+        }
         rates[LUNA] = Decimal(1)
         return rates
 

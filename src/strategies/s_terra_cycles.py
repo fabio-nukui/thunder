@@ -21,7 +21,14 @@ from arbitrage.terra import (
     TerraswapLPReserveSimulationMixin,
     run_strategy,
 )
-from chains.terra import LUNA, UST, NativeLiquidityPair, TerraClient, TerraTokenAmount, terraswap
+from chains.terra import (
+    LUNA,
+    UST,
+    NativeLiquidityPair,
+    TerraClient,
+    TerraTokenAmount,
+    terraswap,
+)
 from chains.terra.token import TerraNativeToken
 from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
 from exceptions import FeeEstimationError, UnprofitableArbitrage

@@ -86,7 +86,9 @@ class ArbResult:
             "timestamp_received": self.timestamp_received,
             "block_received": self.block_received,
             "final_amount": None if self.final_amount is None else self.final_amount.to_data(),
-            "net_profit_usd": None if self.net_profit_usd is None else float(self.net_profit_usd),
+            "net_profit_usd": (
+                None if self.net_profit_usd is None else float(self.net_profit_usd)
+            ),
         }
 
 
@@ -99,7 +101,9 @@ class ArbitrageData:
         return {
             "params": None if self.params is None else self.params.to_data(),
             "txs": None if self.txs is None else [tx.to_data() for tx in self.txs],
-            "results": None if self.results is None else [res.to_data() for res in self.results],
+            "results": (
+                None if self.results is None else [res.to_data() for res in self.results]
+            ),
         }
 
     def reset(self):
@@ -164,7 +168,9 @@ class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
             if self.state == State.ready_to_generate_parameters:
                 self.log.debug("Generating arbitrage parameters")
                 try:
-                    self.data.params = await self._get_arbitrage_params(height, filtered_mempool)
+                    self.data.params = await self._get_arbitrage_params(
+                        height, filtered_mempool
+                    )
                 except (
                     UnprofitableArbitrage,
                     FeeEstimationError,
@@ -201,7 +207,12 @@ class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
         ...
 
     @abstractmethod
-    async def _broadcast_txs(self, arb_params: BaseArbParams, height: int, **kwargs) -> list[ArbTx]:
+    async def _broadcast_txs(
+        self,
+        arb_params: BaseArbParams,
+        height: int,
+        **kwargs,
+    ) -> list[ArbTx]:
         ...
 
     @abstractmethod

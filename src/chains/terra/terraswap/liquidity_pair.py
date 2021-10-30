@@ -160,7 +160,9 @@ class LiquidityPair(BaseTerraLiquidityPair):
                     break
             else:
                 raise NotImplementedError("not implemented for pools without a native token")
-            exchange_rate = await self.client.oracle.get_exchange_rate(reference_token, token_quote)
+            exchange_rate = await self.client.oracle.get_exchange_rate(
+                reference_token, token_quote
+            )
         supply = await self.lp_token.get_supply(self.client)
         for reserve in await self.get_reserves():
             if reserve.token == reference_token:
@@ -189,7 +191,9 @@ class LiquidityPair(BaseTerraLiquidityPair):
         max_spread: Decimal = None,
         belief_price: Decimal = None,
     ) -> TerraTokenAmount:
-        amounts = await self.get_swap_amounts(amount_in, safety_margin, max_spread, belief_price)
+        amounts = await self.get_swap_amounts(
+            amount_in, safety_margin, max_spread, belief_price
+        )
         return amounts["amounts_out"][1]
 
     async def get_swap_amounts(
@@ -342,7 +346,8 @@ class LiquidityPair(BaseTerraLiquidityPair):
         amount_burn: TerraTokenAmount,
         safety_margin: bool | int = False,
     ) -> AmountTuple:
-        return (await self.get_remove_liquidity_amounts(amount_burn, safety_margin))["amounts_out"]
+        amounts = await self.get_remove_liquidity_amounts(amount_burn, safety_margin)
+        return amounts["amounts_out"]
 
     async def get_remove_liquidity_amounts(
         self,
@@ -411,7 +416,9 @@ class LiquidityPair(BaseTerraLiquidityPair):
 
         # Calculate optimum ratio to swap before adding liquidity, excluding tax influence
         aux = self.fee_rate * (reserve_in.amount + amount_in.amount) - 2 * reserve_in.amount
-        numerator = Decimal(math.sqrt(aux ** 2 + 4 * reserve_in.amount * amount_in.amount)) + aux
+        numerator = (
+            Decimal(math.sqrt(aux ** 2 + 4 * reserve_in.amount * amount_in.amount)) + aux
+        )
         denominator = 2 * amount_in.amount
         ratio_swap = numerator / denominator
 
@@ -502,7 +509,9 @@ class LiquidityPair(BaseTerraLiquidityPair):
             }
         }
         coins = [
-            amount.to_coin() for amount in amounts_in if isinstance(amount.token, TerraNativeToken)
+            amount.to_coin()
+            for amount in amounts_in
+            if isinstance(amount.token, TerraNativeToken)
         ]
         msgs.append(
             MsgExecuteContract(

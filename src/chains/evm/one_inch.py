@@ -42,8 +42,12 @@ class OneInchExchange:
         gas_multiplier: float = None,
     ) -> EVMTokenAmount:
         token_in = amount_in.token
-        address_from = NATIVE_ADDRESS if isinstance(token_in, EVMNativeToken) else token_in.address
-        address_to = NATIVE_ADDRESS if isinstance(token_out, EVMNativeToken) else token_out.address
+        address_from = (
+            NATIVE_ADDRESS if isinstance(token_in, EVMNativeToken) else token_in.address
+        )
+        address_to = (
+            NATIVE_ADDRESS if isinstance(token_out, EVMNativeToken) else token_out.address
+        )
 
         query_params = {
             "fromTokenAddress": address_from,
@@ -51,7 +55,9 @@ class OneInchExchange:
             "amount": amount_in.int_amount,
             **self.client.get_gas_price(gas_multiplier, force_legacy_tx=True),
         }
-        res = utils.http.get(f"{self.api_url}/quote", params=query_params, timeout=TIMEOUT_REQUESTS)
+        res = utils.http.get(
+            f"{self.api_url}/quote", params=query_params, timeout=TIMEOUT_REQUESTS
+        )
         int_amount = res.json()["toTokenAmount"]
         return EVMTokenAmount(token_out, int_amount=int_amount)
 
@@ -65,8 +71,12 @@ class OneInchExchange:
         infinite_approval: bool = True,
     ) -> str:
         token_in = amount_in.token
-        address_from = NATIVE_ADDRESS if isinstance(token_in, EVMNativeToken) else token_in.address
-        address_to = NATIVE_ADDRESS if isinstance(token_out, EVMNativeToken) else token_out.address
+        address_from = (
+            NATIVE_ADDRESS if isinstance(token_in, EVMNativeToken) else token_in.address
+        )
+        address_to = (
+            NATIVE_ADDRESS if isinstance(token_out, EVMNativeToken) else token_out.address
+        )
 
         amount_in.ensure_allowance(self.client, self.router_address, infinite_approval)
 

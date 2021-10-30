@@ -63,7 +63,9 @@ class BroadcasterApi(Api):
         data: BroadcasterResponse = res.json()
         if data["result"] == "repeated_tx":
             raise TxAlreadyBroadcasted
-        return [(timestamp, SyncTxBroadcastResult(**result)) for timestamp, result in data["data"]]
+        return [
+            (timestamp, SyncTxBroadcastResult(**result)) for timestamp, result in data["data"]
+        ]
 
     async def broadcast(self, payload: BroadcasterPayload) -> BroadcasterResponse:
         assert not self.client.use_broadcaster

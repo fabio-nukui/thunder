@@ -37,7 +37,8 @@ class TerraswapLPReserveSimulationMixin:
 
     def _get_initial_mempool_params(self) -> dict[terraswap.HybridLiquidityPair, AmountTuple]:
         return {
-            pair: (pair.tokens[0].to_amount(0), pair.tokens[1].to_amount(0)) for pair in self.pairs
+            pair: (pair.tokens[0].to_amount(0), pair.tokens[1].to_amount(0))
+            for pair in self.pairs
         }
 
     def _reset_mempool_params(self):

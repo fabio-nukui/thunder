@@ -14,7 +14,13 @@ from chains.terra import TerraClient, TerraTokenAmount
 from chains.terra.tx_filter import Filter
 from exceptions import BlockchainNewState, IsBusy
 
-from ..repeated_tx_arbitrage import ArbResult, ArbTx, BaseArbParams, RepeatedTxArbitrage, TxStatus
+from ..repeated_tx_arbitrage import (
+    ArbResult,
+    ArbTx,
+    BaseArbParams,
+    RepeatedTxArbitrage,
+    TxStatus,
+)
 
 log = logging.getLogger(__name__)
 
@@ -35,7 +41,8 @@ class TerraRepeatedTxArbitrage(RepeatedTxArbitrage[TerraClient], ABC):
     def __init__(self, *args, filter_keys: Iterable, fee_denom: str = None, **kwargs):
         self.filter_keys = filter_keys
         self.fee_denom = fee_denom
-        kwargs["broadcast_kwargs"] = kwargs.get("broadcast_kwargs", {}) | {"fee_denom": fee_denom}
+        kwargs = kwargs.get("broadcast_kwargs", {})
+        kwargs["broadcast_kwargs"] = kwargs | {"fee_denom": fee_denom}
         super().__init__(*args, **kwargs)
 
     async def _broadcast_txs(  # type: ignore[override]
@@ -49,7 +56,9 @@ class TerraRepeatedTxArbitrage(RepeatedTxArbitrage[TerraClient], ABC):
         results = await self.client.tx.execute_multi_msgs(
             arb_params.msgs, arb_params.n_repeat, fee=arb_params.est_fee, fee_denom=fee_denom
         )
-        return [ArbTx(timestamp_sent=timestamp, tx_hash=res.txhash) for timestamp, res in results]
+        return [
+            ArbTx(timestamp_sent=timestamp, tx_hash=res.txhash) for timestamp, res in results
+        ]
 
     async def _confirm_txs(  # type: ignore[override]
         self,

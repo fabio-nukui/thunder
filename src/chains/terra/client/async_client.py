@@ -38,7 +38,7 @@ log = logging.getLogger(__name__)
 
 TERRA_CONTRACT_QUERY_CACHE_SIZE = 10_000
 CONTRACT_INFO_CACHE_TTL = 86400  # Contract info should not change; 24h ttl
-_pat_contract_not_found = re.compile(r"contract terra1(\w+): not found")
+_pat_missing_contract = re.compile(r"contract terra1(\w+): not found")
 
 
 class TerraClient(AsyncBlockchainClient):
@@ -132,7 +132,7 @@ class TerraClient(AsyncBlockchainClient):
         try:
             return await self.lcd.wasm.contract_query(contract_addr, query_msg)
         except LCDResponseError as e:
-            if e.response.status == 500 and (match := _pat_contract_not_found.search(e.message)):
+            if e.response.status == 500 and (match := _pat_missing_contract.search(e.message)):
                 raise NotContract(match.group(1))
             else:
                 raise e
@@ -227,7 +227,9 @@ class TerraClient(AsyncBlockchainClient):
                 for addr, str_amount in zip(coins_spent["spender"], coins_spent["amount"]):
                     changes[addr].append(-TerraTokenAmount.from_str(str_amount))
             if coins_received := tx_log.events_by_type.get("coin_received"):
-                for addr, str_amount in zip(coins_received["receiver"], coins_received["amount"]):
+                for addr, str_amount in zip(
+                    coins_received["receiver"], coins_received["amount"]
+                ):
                     changes[addr].append(TerraTokenAmount.from_str(str_amount))
         return dict(changes)
 

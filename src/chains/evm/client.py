@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from copy import copy
-from typing import Literal, cast
+from typing import Literal
 
 import web3.middleware
 from eth_account.datastructures import SignedTransaction
@@ -68,7 +68,8 @@ class EVMClient(BaseEVMClient):
 
     def __repr__(self) -> str:
         return (
-            f"{self.__class__.__name__}(endpoint_uri={self.endpoint_uri}, address={self.address})"
+            f"{self.__class__.__name__}"
+            f"(endpoint_uri={self.endpoint_uri}, address={self.address})"
         )
 
     @property
@@ -78,7 +79,10 @@ class EVMClient(BaseEVMClient):
         return syncing["currentBlock"] >= syncing["highestBlock"]
 
     def close(self):
-        if isinstance(self.w3.provider, WebsocketProvider) and self.w3.provider.conn.ws is not None:
+        if (
+            isinstance(self.w3.provider, WebsocketProvider)
+            and self.w3.provider.conn.ws is not None
+        ):
             asyncio.get_event_loop().run_until_complete(self.w3.provider.conn.ws.close())
         if isinstance(self.w3.provider, HTTPProvider):
             for session in web3_http_sessions_cache.values():
@@ -95,12 +99,12 @@ class EVMClient(BaseEVMClient):
         base_fee_multiplier = base_fee_multiplier or self.base_fee_multiplier
 
         if force_legacy_tx or not self.eip_1559:
-            return {"gasPrice": round(cast(int, self.w3.eth.gas_price) * gas_multiplier)}
+            return {"gasPrice": round(int(self.w3.eth.gas_price) * gas_multiplier)}
 
         base_fee = self.w3.eth.get_block("pending")["baseFeePerGas"]
         return {
-            "maxFeePerGas": round(cast(int, base_fee) * base_fee_multiplier),
-            "maxPriorityFeePerGas": round(cast(int, self.w3.eth.max_priority_fee) * gas_multiplier),
+            "maxFeePerGas": round(int(base_fee) * base_fee_multiplier),
+            "maxPriorityFeePerGas": round(int(self.w3.eth.max_priority_fee) * gas_multiplier),
             "type": 2,
         }
 

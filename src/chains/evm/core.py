@@ -28,7 +28,12 @@ INF_APPROVAL_AMOUNT = 0xFF000000000000000000000000000000000000000000000000000000
 class EVMTokenAmount(TokenAmount):
     token: EVMToken
 
-    def ensure_allowance(self, client: BaseEVMClient, spender: str, infinite_approval: bool = True):
+    def ensure_allowance(
+        self,
+        client: BaseEVMClient,
+        spender: str,
+        infinite_approval: bool = True,
+    ):
         if isinstance(self.token, EVMNativeToken):
             return
         allowance = self.token.get_allowance(client.address, spender)
@@ -61,7 +66,9 @@ class EVMNativeToken(Token[EVMTokenAmount]):
     ):
         self.chain_id = chain_id
         self.symbol = _NATIVE_TOKENS[chain_id]["symbol"] if symbol is None else symbol
-        self.decimals = int(_NATIVE_TOKENS[chain_id]["decimals"]) if decimals is None else decimals
+        self.decimals = (
+            int(_NATIVE_TOKENS[chain_id]["decimals"]) if decimals is None else decimals
+        )
 
     @property
     def _id(self) -> tuple:

@@ -147,7 +147,9 @@ class MempoolCacheManager:
             self._read_txs = set()
 
         tasks = {
-            raw_tx: self._decode_tx(raw_tx) for raw_tx in raw_txs if raw_tx not in self._txs_cache
+            raw_tx: self._decode_tx(raw_tx)
+            for raw_tx in raw_txs
+            if raw_tx not in self._txs_cache
         }
         try:
             txs = await asyncio.gather(*tasks.values())

@@ -49,10 +49,11 @@ class TradingPair:
         self.base_asset = BinanceToken(info["baseAsset"], info["baseAssetPrecision"])
         self.quote_asset = BinanceToken(info["quoteAsset"], info["quoteAssetPrecision"])
 
-        self.price_tick_size = self._get_filter_value(info["filters"], "PRICE_FILTER", "tickSize")
-        self.lot_step_size = self._get_filter_value(info["filters"], "LOT_SIZE", "stepSize")
-        self.lot_min_size = self._get_filter_value(info["filters"], "LOT_SIZE", "minQty")
-        self.min_notional = self._get_filter_value(info["filters"], "MIN_NOTIONAL", "minNotional")
+        filters = info["filters"]
+        self.price_tick_size = self._get_filter_value(filters, "PRICE_FILTER", "tickSize")
+        self.lot_step_size = self._get_filter_value(filters, "LOT_SIZE", "stepSize")
+        self.lot_min_size = self._get_filter_value(filters, "LOT_SIZE", "minQty")
+        self.min_notional = self._get_filter_value(filters, "MIN_NOTIONAL", "minNotional")
 
         self._ready = False
         self._ready_lock = Lock()
