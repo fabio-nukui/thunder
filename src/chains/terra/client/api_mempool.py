@@ -20,10 +20,10 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-MAX_DECODER_ERRORS_PER_BLOCK = 20
 DECODER_CACHE_SIZE = 2000
 DECODER_CACHE_TTL = 60
 DECODE_TX_TIMEOUT = 0.1
+MAX_RAW_TX_LENGTH = 3000
 _T = TypeVar("_T")
 
 
@@ -64,7 +64,6 @@ class MempoolCacheManager:
 
         self._txs_cache: dict[str, dict] = {}
         self._read_txs: set[str] = set()
-        self._decoder_error_counter = 0
 
         self._height = 0
         self._height_thread = LatestHeightThread(self)
@@ -80,7 +79,6 @@ class MempoolCacheManager:
         self._height = value
         self._txs_cache = {}
         self._read_txs = set()
-        self._decoder_error_counter = 0
 
     def stop(self):
         self._height_thread.stop()
@@ -136,7 +134,9 @@ class MempoolCacheManager:
             if self._stop_tasks:
                 return UpdateEvent.null
             res = await self.client.rpc_http_client.get("unconfirmed_txs")
-            raw_txs: list[str] = res.json()["result"]["txs"]
+            raw_txs: list[str] = [
+                tx for tx in res.json()["result"]["txs"] if len(tx) < MAX_RAW_TX_LENGTH
+            ]
             if not wait_for_changes or set(raw_txs) != set(self._txs_cache):
                 break
             await asyncio.sleep(configs.TERRA_POLL_INTERVAL)
@@ -147,7 +147,7 @@ class MempoolCacheManager:
             self._read_txs = set()
 
         tasks = {
-            raw_tx: self._decode_tx(raw_tx)
+            raw_tx: self._get_decoded_tx(raw_tx)
             for raw_tx in raw_txs
             if raw_tx not in self._txs_cache
         }
@@ -172,16 +172,19 @@ class MempoolCacheManager:
 
     @ttl_cache(CacheGroup.TERRA, maxsize=DECODER_CACHE_SIZE, ttl=DECODER_CACHE_TTL)
     async def _decode_tx(self, raw_tx: str) -> dict:
-        if self._stop_tasks:
-            raise DecodeError
         try:
             response = await self.client.lcd_http_client.post(
-                "txs/decode", json={"tx": raw_tx}, timeout=DECODE_TX_TIMEOUT
+                "txs/decode",
+                json={"tx": raw_tx},
+                timeout=DECODE_TX_TIMEOUT,
+                follow_redirects=True,
+                n_tries=1,
             )
-        except httpx.HTTPError:
-            self._decoder_error_counter += 1
-            if self._decoder_error_counter > MAX_DECODER_ERRORS_PER_BLOCK:
-                raise Exception(f"{self._decoder_error_counter} decoder errors last block")
+        except httpx.HTTPError as e:
+            if isinstance(e, httpx.HTTPStatusError) and "not support" in e.response.text:
+                # Non legacy-compatible txs
+                return {}
+            log.debug(f"Decode error {len(raw_tx)=}: {raw_tx=}")
             raise DecodeError
         else:
             return response.json()["result"]
