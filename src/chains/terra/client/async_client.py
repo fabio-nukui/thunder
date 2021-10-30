@@ -85,7 +85,7 @@ class TerraClient(AsyncBlockchainClient):
         self.tx = TxApi(self)
 
     async def start(self):
-        await self._fix_host_ip_from_broadcaster_urls()
+        await self._fix_broadcaster_urls()
         self.lcd_http_client = utils.ahttp.AsyncClient(base_url=self.lcd_uri)
         self.fcd_client = utils.ahttp.AsyncClient(base_url=self.fcd_uri)
         self.rpc_http_client = utils.ahttp.AsyncClient(base_url=self.rpc_http_uri)
@@ -105,7 +105,7 @@ class TerraClient(AsyncBlockchainClient):
             self.lcd.gas_prices = await self.tx.get_gas_prices()
         await super().start()
 
-    async def _fix_host_ip_from_broadcaster_urls(self):
+    async def _fix_broadcaster_urls(self):
         host_ip = await utils.ahttp.get_host_ip()
         if f"http://{host_ip}:1318" == self.broadcaster_uri:
             self.broadcaster_uri = "http://localhost:1318"
