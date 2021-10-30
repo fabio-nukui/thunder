@@ -1,3 +1,7 @@
-# Add to root crontab (sudo crontab -e) Needed while terrad has memory issues. More graceful than systemd's shutdown on MemoryMax
+# Add to root crontab (sudo crontab -e)
 
-* * * * * /usr/bin/test 95 -le $(/usr/bin/awk '$1=="MemTotal:"{t=$2} $1=="MemAvailable:"{a=$2} END{printf "%d", (t-a)/t*100}' /proc/meminfo) && systemctl restart terrad
+# Needed while terrad has memory issues. More graceful than systemd's shutdown on MemoryMax
+* * * * * /usr/bin/test 96 -le $(/usr/bin/awk '$1=="MemTotal:"{t=$2} $1=="MemAvailable:"{a=$2} END{printf "%d", (t-a)/t*100}' /proc/meminfo) && systemctl restart terrad
+
+# Backups terra chain data to S3. Assumes script accessible in /usr/local/bin
+0 0 * * 1 /usr/local/bin/terra_chain_data_upload_stop.sh >> /var/log/terra_chain_data_upload
