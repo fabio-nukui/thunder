@@ -85,18 +85,13 @@ class TerraClient(AsyncBlockchainClient):
         self.tx = TxApi(self)
 
     async def start(self):
-        host_ip = await utils.ahttp.get_host_ip()
-        if f"http://{host_ip}:1318" == self.broadcaster_uri:
-            self.broadcaster_uri = "http://localhost:1318"
-
+        await self._fix_host_ip_from_broadcaster_urls()
         self.lcd_http_client = utils.ahttp.AsyncClient(base_url=self.lcd_uri)
         self.fcd_client = utils.ahttp.AsyncClient(base_url=self.fcd_uri)
         self.rpc_http_client = utils.ahttp.AsyncClient(base_url=self.rpc_http_uri)
         self.broadcaster_client = utils.ahttp.AsyncClient(base_url=self.broadcaster_uri)
         self.broadcast_lcd_clients = [
-            utils.ahttp.AsyncClient(base_url=url)
-            for url in self.broadcast_lcd_uris
-            if url and host_ip not in url
+            utils.ahttp.AsyncClient(base_url=url) for url in self.broadcast_lcd_uris
         ]
         self.lcd = AsyncLCDClient2(
             self.lcd_uri, self.chain_id, self.gas_prices, self.gas_adjustment
@@ -109,6 +104,14 @@ class TerraClient(AsyncBlockchainClient):
         if self.gas_prices is None:
             self.lcd.gas_prices = await self.tx.get_gas_prices()
         await super().start()
+
+    async def _fix_host_ip_from_broadcaster_urls(self):
+        host_ip = await utils.ahttp.get_host_ip()
+        if f"http://{host_ip}:1318" == self.broadcaster_uri:
+            self.broadcaster_uri = "http://localhost:1318"
+        self.broadcast_lcd_uris = [
+            url for url in self.broadcast_lcd_uris if url and host_ip not in url
+        ]
 
     def __repr__(self) -> str:
         return (
