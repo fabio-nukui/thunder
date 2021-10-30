@@ -118,12 +118,18 @@ async def _send_request(
             return res
         except httpx.HTTPStatusError as e:
             status_code = e.response.status_code
-            url = e.request.url
             if status_code not in status_forcelist:
                 raise
-            log.debug(f"Error on http {method}, {url=}, {status_code=}", exc_info=True)
+            log.debug(
+                f"Error on http {method}, url={str(e.request.url)}, "
+                f"{status_code=}, response={e.response.text!r}",
+                exc_info=True,
+            )
+        except httpx.RequestError as e:
+            url = e.request.url
+            log.debug(f"Error on http {method} url={str(e.request.url)}", exc_info=True)
         except Exception as e:
-            log.debug(f"Error on http {method} ({e})", exc_info=True)
+            log.debug(f"Error on http {method}, {client.base_url=} ({e})", exc_info=True)
         await asyncio.sleep((1 + backoff_factor) ** i - 1)
     raise httpx.HTTPError(f"httpx {method} failed after {n_tries=}")
 

@@ -120,7 +120,7 @@ class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
 
         self.data = ArbitrageData()
         self.log = utils.logger.ReformatedLogger(__name__, formater=self._log_formatter)
-        self.log.info("Initialized")
+        self.log.debug("Initialized")
 
     def _log_formatter(self, msg: Any) -> str:
         return f"{self} height={self.client.height}: {msg}"
