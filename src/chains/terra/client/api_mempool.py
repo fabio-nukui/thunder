@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 
 DECODER_CACHE_SIZE = 2000
 DECODER_CACHE_TTL = 60
-DECODE_TX_TIMEOUT = 0.1
+DECODE_TX_TIMEOUT = 0.5
 MAX_RAW_TX_LENGTH = 3000
 _T = TypeVar("_T")
 
@@ -147,7 +147,7 @@ class MempoolCacheManager:
             self._read_txs = set()
 
         tasks = {
-            raw_tx: self._get_decoded_tx(raw_tx)
+            raw_tx: self._decode_tx(raw_tx)
             for raw_tx in raw_txs
             if raw_tx not in self._txs_cache
         }
@@ -164,12 +164,6 @@ class MempoolCacheManager:
         await self._update_mempool_txs(wait_for_changes=False)
         return self._txs_cache
 
-    async def _get_decoded_tx(self, raw_tx: str) -> dict:
-        try:
-            return await self._decode_tx(raw_tx)
-        except DecodeError:
-            return {}
-
     @ttl_cache(CacheGroup.TERRA, maxsize=DECODER_CACHE_SIZE, ttl=DECODER_CACHE_TTL)
     async def _decode_tx(self, raw_tx: str) -> dict:
         try:
@@ -185,7 +179,7 @@ class MempoolCacheManager:
                 # Non legacy-compatible txs
                 return {}
             log.debug(f"Decode error {len(raw_tx)=}: {raw_tx=}")
-            raise DecodeError
+            return {}
         else:
             return response.json()["result"]
 
