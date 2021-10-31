@@ -1,26 +1,32 @@
 #!/usr/bin/env bash
-set -eu
+set -eux
 
 if [[ $(id -u) -ne 0 ]]; then
    echo "This script must be run as root" 
    exit 1
 fi
 
-TERRA_DIR=/mnt/nvme0/terra
-S3_PATH=s3://crypto-thunder/chain_data/terra
-RUNNER_USER=ubuntu
+USER=ubuntu
+TERRA_HOME=/home/$USER/.terra
+S3_PATH=s3://crypto-thunder/chain_data/terra_genesis
 
-echo Stopping terrad
+CONFIG_FILE=$TERRA_HOME/config/config.toml
+DATA_DIR=$TERRA_HOME/$(grep -m1 '^db_dir' $CONFIG_FILE | sed -r 's/^db_dir = "(.+)"/\1/')
+DATA_DIR=$(cd -P $DATA_DIR && pwd)  # Follow symlinks
+
+STATE_FILENAME_COMPRESSED=$(aws s3 ls $S3_PATH/ | awk -F ' ' '{print $4}' | tail -n 1)
+STATE_FILENAME=$(echo $STATE_FILENAME_COMPRESSED | sed 's/\.gz//')
+
 systemctl stop terrad
-sleep 10
+sleep 3
 
-SNAPSHOT_NAME=$(aws s3 ls $S3_PATH | awk -F ' ' '{print $4}' | tail -n 1)
-
-sudo -i -u "$RUNNER_USER" bash << EOF
-set -eu
-rm -rf "$TERRA_DIR"/data
-aws s3 cp "$S3_PATH"/"$SNAPSHOT_NAME" - | pv | tar --use-compress-program=pigz -xC "$TERRA_DIR"
+# Run as non-root to avoid file ownership issues
+sudo -i -u "$USER" bash << EOF
+set -eux -o pipefail
+rm -rf $DATA_DIR
+mkdir $DATA_DIR
+aws s3 cp $S3_PATH/$STATE_FILENAME_COMPRESSED - | pigz -dc > $DATA_DIR/$STATE_FILENAME
+sed -ri 's/^(genesis_file = "data\/).+"$/\1'$STATE_FILENAME'"/' $CONFIG_FILE
 EOF
 
-echo Restating terrad
 systemctl start terrad
