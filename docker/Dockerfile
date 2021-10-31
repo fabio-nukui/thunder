@@ -1,4 +1,4 @@
-########################################### BASE ###################################################
+# =========================================== BASE =============================================
 FROM condaforge/miniforge3:4.10.3-7 as base
 
 ARG USER=thunder
@@ -48,7 +48,7 @@ RUN mkdir ${HOME}/work
 
 WORKDIR ${HOME}/work
 
-# ########################################### PROD #################################################
+# =========================================== PROD =============================================
 FROM base as prod
 
 COPY --chown=$USER:$GID logging_config.yaml ${HOME}/work/
@@ -59,14 +59,14 @@ COPY --chown=$USER:$GID src ${HOME}/work/src
 
 COPY --chown=$USER:$GID docker/git_commit ${HOME}/work/git_commit
 
-# ########################################### MAIN #################################################
+# =========================================== MAIN =============================================
 FROM prod as main
 
 COPY --chown=$USER:$GID app/main.py ${HOME}/work/app.py
 
 CMD ["python", "app.py"]
 
-# #################################### TERRA_BROADCASTER ###########################################
+# ==================================== TERRA_BROADCASTER =======================================
 FROM prod as terra_broadcaster
 
 COPY --chown=$USER:$GID app/terra_broadcaster.py ${HOME}/work/
@@ -75,7 +75,7 @@ COPY --chown=$USER:$GID config/terra_broadcaster/hypercorn.toml ${HOME}/work/
 
 CMD ["hypercorn", "--config", "hypercorn.toml", "terra_broadcaster:app"]
 
-############################################ DEV ###################################################
+# =========================================== DEV ==============================================
 FROM base as dev
 
 USER root
@@ -101,7 +101,7 @@ RUN conda install --quiet --yes \
     conda clean --all -f -y  && \
     fix-permissions $HOME $CONDA_DIR
 
-############################################ LAB ###################################################
+# =========================================== LAB ==============================================
 FROM dev as lab
 
 RUN conda install --quiet --yes \
