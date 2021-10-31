@@ -1,5 +1,5 @@
 ########################################### BASE ###################################################
-FROM condaforge/miniforge3:4.10.3-5 as base
+FROM condaforge/miniforge3:4.10.3-7 as base
 
 ARG USER=thunder
 ARG UID=1000
