@@ -32,7 +32,7 @@ systemctl start terrad
 
 FILE_NAME=terra-data-$(date -u +%Y-%m-%dT%H-%M).tar.gz
 
-read cmd_upload << EOF
+sudo -i -u "$RUNNER_USER" bash << EOF
 set -eu; cd $CUR_DIR
 echo Compressing data to $FILE_NAME
 tar --use-compress-program='pigz --recursive | pv' -cf $FILE_NAME data
