@@ -108,17 +108,19 @@ class TerraClient(AsyncBlockchainClient):
         await super().start()
 
     async def _check_connections(self):
-        if configs.TERRA_USE_BROADCASTER:
-            tasks = [self.broadcaster_client.check_connection("lcd/node_info")]
-        else:
-            tasks = [conn.check_connection("node_info") for conn in self.broadcast_lcd_clients]
-        results = await asyncio.gather(
+        tasks = [
             self.lcd_http_client.check_connection("node_info"),
             self.fcd_client.check_connection("node_info"),
             self.rpc_http_client.check_connection("health"),
-            *tasks,
-        )
+        ]
+        if configs.TERRA_USE_BROADCASTER:
+            tasks.append(self.broadcaster_client.check_connection("lcd/node_info"))
+        results = await asyncio.gather(*tasks)
         assert all(results), "Connection error(s)"
+        if not configs.TERRA_USE_BROADCASTER:
+            await asyncio.gather(
+                *(conn.check_connection("node_info") for conn in self.broadcast_lcd_clients)
+            )
 
     async def _fix_broadcaster_urls(self):
         host_ip = await utils.ahttp.get_host_ip()
