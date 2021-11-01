@@ -53,6 +53,16 @@ class AsyncClient(httpx.AsyncClient):
         async with self._semaphore_requests:
             return await request("POST", url, n_tries=n_tries, httpx_client=self, **kwargs)
 
+    async def check_connection(self, check_url: URLTypes) -> bool:
+        try:
+            await self.get(check_url, n_tries=1)
+        except Exception:
+            log.exception(f"Connection failed: base_url={str(self.base_url)}")
+            return False
+        else:
+            log.debug(f"Connection OK: base_url={str(self.base_url)}")
+            return True
+
 
 _DEFAULT_CLIENT = AsyncClient()
 
