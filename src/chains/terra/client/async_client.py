@@ -113,11 +113,11 @@ class TerraClient(AsyncBlockchainClient):
             self.fcd_client.check_connection("node_info"),
             self.rpc_http_client.check_connection("health"),
         ]
-        if configs.TERRA_USE_BROADCASTER:
+        if self.use_broadcaster:
             tasks.append(self.broadcaster_client.check_connection("lcd/node_info"))
         results = await asyncio.gather(*tasks)
         assert all(results), "Connection error(s)"
-        if not configs.TERRA_USE_BROADCASTER:
+        if not self.use_broadcaster:
             await asyncio.gather(
                 *(conn.check_connection("node_info") for conn in self.broadcast_lcd_clients)
             )
