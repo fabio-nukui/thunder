@@ -56,8 +56,8 @@ class AsyncClient(httpx.AsyncClient):
     async def check_connection(self, check_url: URLTypes) -> bool:
         try:
             await self.get(check_url, n_tries=1)
-        except Exception:
-            log.exception(f"Connection failed: base_url={str(self.base_url)}")
+        except Exception as e:
+            log.warning(f"Connection failed ({e!r}): base_url={str(self.base_url)}")
             return False
         else:
             log.debug(f"Connection OK: base_url={str(self.base_url)}")
