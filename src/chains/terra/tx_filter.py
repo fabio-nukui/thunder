@@ -9,7 +9,7 @@ from . import terraswap
 from .token import TerraNativeToken
 
 
-def _decode_msg(raw_msg: str | dict, always_base64: bool = True) -> dict:
+def _decode_msg(raw_msg: str | dict, always_base64: bool) -> dict:
     if isinstance(raw_msg, dict):
         return {} if always_base64 else raw_msg
     return json.loads(base64.b64decode(raw_msg))
@@ -76,7 +76,7 @@ class FilterFirstActionTerraswap(Filter):
         self,
         action: terraswap.Action,
         pairs: Iterable[terraswap.LiquidityPair],
-        aways_base64: bool = True,
+        aways_base64: bool = False,
     ):
         self.action = action
         self.pairs = list(pairs)
