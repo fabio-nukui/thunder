@@ -114,8 +114,9 @@ class LiquidityPair(BaseTerraLiquidityPair):
 
         self._stop_updates = False
         self._reserves = self.tokens[0].to_amount(), self.tokens[1].to_amount()
-        if check_liquidity and (self._reserves[0] == 0 or self._reserves[1] == 0):
-            raise InsufficientLiquidity
+        if check_liquidity and any(r == 0 for r in await self.get_reserves()):
+            log.debug(f"{self}: Zero liquidity on initialization")
+            raise InsufficientLiquidity(self)
 
         return self
 
@@ -278,7 +279,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
 
         reserves = await self.get_reserves()
         if reserves[0] == 0 or reserves[1] == 0:
-            raise InsufficientLiquidity
+            raise InsufficientLiquidity(self)
         if amount_in is not None:
             token_in = amount_in.token
         elif amount_out is not None:
@@ -291,7 +292,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
         else:
             reserve_out, reserve_in = reserves
         if amount_out is not None and amount_out >= reserve_out:
-            raise InsufficientLiquidity
+            raise InsufficientLiquidity(self)
         return reserve_in, reserve_out
 
     def build_swap_msg(

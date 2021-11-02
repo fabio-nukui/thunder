@@ -139,7 +139,7 @@ async def _send_request(
             url = e.request.url
             log.debug(f"Error on http {method} url={str(e.request.url)}", exc_info=True)
         except Exception as e:
-            log.debug(f"Error on http {method}, {client.base_url=} ({e})", exc_info=True)
+            log.debug(f"Error on http {method}, {client.base_url=} ({e!r})", exc_info=True)
         await asyncio.sleep((1 + backoff_factor) ** i - 1)
     raise httpx.HTTPError(f"httpx {method} failed after {n_tries=}")
 

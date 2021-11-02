@@ -97,7 +97,7 @@ async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
             try:
                 arbs.append(await TerraCyclesArbitrage.new(client, multi_routes))
             except FeeEstimationError as e:
-                log.info(f"Error when initializing arbitrage with {multi_routes}: {e}")
+                log.info(f"Error when initializing arbitrage with {multi_routes}: {e!r}")
     assert len(arbs) >= MIN_N_ARBITRAGES
     return arbs
 
@@ -141,7 +141,7 @@ async def _get_luna_native_routes(
     for pair_symbol in factory.addresses["pairs"]:
         if not (match := pat_token_symbol.match(pair_symbol)) or pair_symbol == "UST-LUNA":
             continue
-        terraswap_pair = await factory.get_pair(match.group())
+        terraswap_pair = await factory.get_pair(match.group(), check_liquidity=False)
         if not isinstance(terraswap_pair.tokens[0], TerraNativeToken):
             continue
         native_pair = NativeLiquidityPair(client, terraswap_pair.tokens)  # type: ignore
