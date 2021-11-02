@@ -542,11 +542,12 @@ class LiquidityPair(BaseTerraLiquidityPair):
             ]
             if msg["contract"] in cw20_token_addresses:
                 assert "send" in msg["execute_msg"], f"Expected CW20 send, received {msg}"
-                terraswap_msg = msg["execute_msg"]["send"]["msg"]
-                if Action.swap in terraswap_msg:
-                    swap_msg = json.loads(base64.b64decode(terraswap_msg[Action.swap]))
+                raw_send_msg: dict | str = msg["execute_msg"]["send"]["msg"]
+                if isinstance(raw_send_msg, str):
+                    send_msg: dict = json.loads(base64.b64decode(raw_send_msg))
                 else:
-                    swap_msg = {}
+                    send_msg = raw_send_msg
+                swap_msg = send_msg.get(Action.swap, {})
                 token = await CW20Token.from_contract(msg["contract"], self.client)
                 amount_in = token.to_amount(int_amount=msg["execute_msg"]["send"]["amount"])
             else:

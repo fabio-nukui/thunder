@@ -9,7 +9,9 @@ from . import terraswap
 from .token import TerraNativeToken
 
 
-def _decode_msg(raw_msg: str) -> dict:
+def _decode_msg(raw_msg: str | dict) -> dict:
+    if isinstance(raw_msg, dict):
+        return raw_msg
     return json.loads(base64.b64decode(raw_msg))
 
 
