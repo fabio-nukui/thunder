@@ -99,6 +99,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
         fee_rate: Decimal = None,
         factory_name: str = None,
         recursive_lp_token_code_id: int = None,
+        check_liquidity: bool = True,
     ) -> LiquidityPair:
         self = super().__new__(cls)
         self.contract_addr = contract_addr
@@ -113,6 +114,8 @@ class LiquidityPair(BaseTerraLiquidityPair):
 
         self._stop_updates = False
         self._reserves = self.tokens[0].to_amount(), self.tokens[1].to_amount()
+        if check_liquidity and (self._reserves[0] == 0 or self._reserves[1] == 0):
+            raise InsufficientLiquidity
 
         return self
 

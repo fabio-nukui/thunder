@@ -123,7 +123,7 @@ class Factory:
     async def get_pairs(self, pairs_names: Iterable[str]) -> Tuple[LiquidityPair, ...]:
         return await asyncio.gather(*(self.get_pair(pair) for pair in pairs_names))  # type: ignore
 
-    async def get_pair(self, pair_name: str) -> LiquidityPair:
+    async def get_pair(self, pair_name: str, check_liquidity: bool = True) -> LiquidityPair:
         try:
             contract_addr = self.addresses["pairs"][pair_name]
         except KeyError:
@@ -134,6 +134,7 @@ class Factory:
             self.client,
             fee_rate=_get_fee_rate(contract_addr),
             factory_name=self.name,
+            check_liquidity=check_liquidity,
         )
 
     def get_router(self, liquidity_pairs: Iterable[HybridLiquidityPair]) -> Router:

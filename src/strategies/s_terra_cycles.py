@@ -31,7 +31,7 @@ from chains.terra import (
 )
 from chains.terra.token import TerraNativeToken
 from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
-from exceptions import FeeEstimationError, UnprofitableArbitrage
+from exceptions import FeeEstimationError, InsufficientLiquidity, UnprofitableArbitrage
 
 from .common.default_params import (
     MAX_N_REPEATS,
@@ -190,10 +190,16 @@ async def _get_ust_loop_3cycle_routes(
         for factory in (terraswap_factory, loop_factory):
             for ust_pair_symbol in (f"{token_symbol}-UST", f"UST-{token_symbol}"):
                 if ust_pair_symbol in factory.addresses["pairs"]:
-                    ust_pairs.append(await factory.get_pair(ust_pair_symbol))
+                    try:
+                        ust_pairs.append(await factory.get_pair(ust_pair_symbol))
+                    except InsufficientLiquidity:
+                        continue
         assert ust_pairs, f"No UST pairs found for {token_symbol}"
 
-        loop_token_pair = await loop_factory.get_pair(pair_symbol)
+        try:
+            loop_token_pair = await loop_factory.get_pair(pair_symbol)
+        except InsufficientLiquidity:
+            continue
         list_steps = [ust_pairs, [loop_token_pair], [loop_ust_pair]]
 
         routes.append(terraswap.MultiRoutes(client, UST, list_steps))
@@ -214,12 +220,18 @@ async def _get_ust_loopdex_terraswap_2cycle_routes(
             continue
         reversed_symbol = f"{match.group(2)}-UST" if match.group(2) else f"UST-{match.group(1)}"
         if pair_symbol in terraswap_factory.addresses["pairs"]:
-            terraswap_pair = await terraswap_factory.get_pair(pair_symbol)
+            terraswap_pair_symbol = pair_symbol
         elif reversed_symbol in terraswap_factory.addresses["pairs"]:
-            terraswap_pair = await terraswap_factory.get_pair(reversed_symbol)
+            terraswap_pair_symbol = reversed_symbol
         else:
             continue
-        loop_pair = await loop_factory.get_pair(pair_symbol)
+        try:
+            terraswap_pair, loop_pair = await asyncio.gather(
+                terraswap_factory.get_pair(terraswap_pair_symbol),
+                loop_factory.get_pair(pair_symbol),
+            )
+        except InsufficientLiquidity:
+            continue
         routes.append(terraswap.MultiRoutes(client, UST, [[terraswap_pair], [loop_pair]]))
     return routes
 
@@ -240,10 +252,15 @@ async def _get_ust_alte_3cycle_routes(
         ust_pairs: list[terraswap.LiquidityPair] = []
         for ust_pair_symbol in (f"{token_symbol}-UST", f"UST-{token_symbol}"):
             if ust_pair_symbol in factory.addresses["pairs"]:
-                ust_pairs.append(await factory.get_pair(ust_pair_symbol))
+                try:
+                    ust_pairs.append(await factory.get_pair(ust_pair_symbol))
+                except InsufficientLiquidity:
+                    continue
         assert ust_pairs, f"No UST pairs found for {token_symbol}"
-
-        alte_token_pair = await factory.get_pair(pair_symbol)
+        try:
+            alte_token_pair = await factory.get_pair(pair_symbol)
+        except InsufficientLiquidity:
+            continue
         list_steps = [ust_pairs, [alte_token_pair], [alte_ust_pair]]
         routes.append(terraswap.MultiRoutes(client, UST, list_steps))
     return routes
