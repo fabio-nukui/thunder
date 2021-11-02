@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from terra_sdk.core import AccAddress
 from terra_sdk.core.wasm.msgs import MsgExecuteContract
 
-from .client import TerraClient
 from .native_liquidity_pair import BaseTerraLiquidityPair
 from .token import CW20Token, TerraTokenAmount
+
+if TYPE_CHECKING:
+    from .client import TerraClient
 
 
 class AnchorVault(BaseTerraLiquidityPair):

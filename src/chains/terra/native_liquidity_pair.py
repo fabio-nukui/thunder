@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 from terra_sdk.core import AccAddress
 
-from .client import TerraClient
-from .swap_utils import Operation
 from .token import TerraNativeToken, TerraToken, TerraTokenAmount
+
+if TYPE_CHECKING:
+    from .client import TerraClient
+    from .swap_utils import Operation
 
 AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
 _BaseTerraLiquidityPairT = TypeVar("_BaseTerraLiquidityPairT", bound="BaseTerraLiquidityPair")

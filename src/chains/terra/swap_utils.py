@@ -8,8 +8,6 @@ from typing import Iterable, Sequence, Union, cast
 from terra_sdk.core.strings import AccAddress
 from terra_sdk.core.wasm import MsgExecuteContract
 
-from common.token import Token
-
 from .client import TerraClient
 from .native_liquidity_pair import BaseTerraLiquidityPair, NativeLiquidityPair
 from .terraswap.liquidity_pair import LiquidityPair
@@ -34,7 +32,7 @@ def _extract_tokens_from_routes(
     return tuple(tokens)
 
 
-def _repr_route_symbols(tokens: Iterable[Token]):
+def _repr_route_symbols(tokens: Iterable[TerraToken]):
     return f"{'->'.join(token.symbol for token in tokens)}"
 
 

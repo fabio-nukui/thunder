@@ -1,4 +1,8 @@
-from ..token import TerraNativeToken, TerraToken
+from terra_sdk.core.wasm import MsgExecuteContract
+
+from ..token import TerraNativeToken, TerraToken, TerraTokenAmount
+
+Operation = tuple[TerraTokenAmount, list[MsgExecuteContract]]
 
 
 def token_to_data(token: TerraToken) -> dict[str, dict[str, str]]:
