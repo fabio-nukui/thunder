@@ -54,6 +54,7 @@ class AnchorVault(BaseTerraLiquidityPair):
         self.b_token = await CW20Token.from_contract(data["basset_token_addr"], client)
         self.n_token = await CW20Token.from_contract(n_token_contract_addr, client)
         self.tokens = self.b_token, self.n_token
+        self._stop_updates = False
 
         if (n_token_minter := await self.n_token.get_minter(client)) != contract_addr:
             raise Exception(f"{n_token_minter=} and {contract_addr=} do not match")
