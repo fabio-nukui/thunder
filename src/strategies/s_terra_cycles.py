@@ -84,7 +84,7 @@ async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
         terraswap.TerraswapFactory.new(client), terraswap.LoopFactory.new(client)
     )
     list_route_groups = await asyncio.gather(
-        _get_ust_native_routes(client, terraswap_factory),
+        _get_ust_native_routes(client, loop_factory, terraswap_factory),
         _get_luna_native_routes(client, terraswap_factory),
         _get_ust_terraswap_3cycle_routes(client, terraswap_factory),
         _get_ust_loop_3cycle_routes(client, loop_factory, terraswap_factory),
@@ -116,17 +116,19 @@ def get_filters(
 
 async def _get_ust_native_routes(
     client: TerraClient,
-    factory: terraswap.TerraswapFactory,
+    loop_factory: terraswap.LoopFactory,
+    terraswap_factory: terraswap.TerraswapFactory,
 ) -> list[terraswap.MultiRoutes]:
-    terraswap_pair = await factory.get_pair("UST-LUNA")
+    loop_pair = await loop_factory.get_pair("LUNA-UST")
+    terraswap_pair = await terraswap_factory.get_pair("UST-LUNA")
     native_pair = NativeLiquidityPair(client, (UST, LUNA))
 
     return [
         terraswap.MultiRoutes(
             client=client,
             start_token=UST,
-            list_steps=[[terraswap_pair], [native_pair]],
-            router_address=factory.addresses["router"],
+            list_steps=[[loop_pair, terraswap_pair], [native_pair]],
+            router_address=terraswap_factory.addresses["router"],
         )
     ]
 
