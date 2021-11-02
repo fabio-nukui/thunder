@@ -9,9 +9,9 @@ from . import terraswap
 from .token import TerraNativeToken
 
 
-def _decode_msg(raw_msg: str | dict) -> dict:
+def _decode_msg(raw_msg: str | dict, always_base64: bool = True) -> dict:
     if isinstance(raw_msg, dict):
-        return raw_msg
+        return {} if always_base64 else raw_msg
     return json.loads(base64.b64decode(raw_msg))
 
 
@@ -72,9 +72,15 @@ class FilterMsgsLength(Filter):
 
 
 class FilterFirstActionTerraswap(Filter):
-    def __init__(self, action: terraswap.Action, pairs: Iterable[terraswap.LiquidityPair]):
+    def __init__(
+        self,
+        action: terraswap.Action,
+        pairs: Iterable[terraswap.LiquidityPair],
+        aways_base64: bool = True,
+    ):
         self.action = action
         self.pairs = list(pairs)
+        self.aways_base64 = aways_base64
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(action={self.action}, pairs={self.pairs})"
@@ -98,7 +104,7 @@ class FilterFirstActionTerraswap(Filter):
                     and "send" in (execute_msg := value["execute_msg"])
                     and "msg" in (send := execute_msg["send"])
                     and send["contract"] == pair.contract_addr
-                    and self.action in _decode_msg(send["msg"])
+                    and self.action in _decode_msg(send["msg"], self.aways_base64)
                 ):
                     return True
         return False
