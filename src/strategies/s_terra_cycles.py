@@ -309,10 +309,10 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
     async def _estimate_gas_use(self) -> int:
         list_gas: list[int] = []
         for route in self.routes:
-            _, msgs = await route.op_swap(
-                self.min_start_amount, min_amount_out=self.start_token.to_amount(0)
-            )
             try:
+                _, msgs = await route.op_swap(
+                    self.min_start_amount, min_amount_out=self.start_token.to_amount(0)
+                )
                 fee = await self.client.tx.estimate_fee(msgs)
             except Exception as e:
                 raise FeeEstimationError(e)
