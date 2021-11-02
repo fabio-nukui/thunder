@@ -129,6 +129,12 @@ class CW20Token(BaseTerraToken):
         res = await client.contract_query(contract_addr, {"token_info": {}})
         return cls(contract_addr, res["symbol"], res["decimals"])
 
+    async def get_minter(self, client: "TerraClient") -> AccAddress | None:
+        res = await client.contract_query(self.contract_addr, {"minter": {}})
+        if not res:
+            return None
+        return res["minter"]
+
     async def get_balance(self, client: "TerraClient", address: str = None) -> TerraTokenAmount:
         address = client.address if address is None else address
         res = await client.contract_query(self.contract_addr, {"balance": {"address": address}})
