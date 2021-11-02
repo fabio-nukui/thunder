@@ -1,0 +1,12 @@
+{
+  "anchor_vaults": [
+    {
+      "vault_addresss": "terra1cda4adzngjzcn8quvfu2229s8tedl5t306352x",
+      "n_asset_address": "terra10f2mt82kjnkxqj2gepgwl637u2w4ue2z5nhz5j"
+    },
+    {
+      "vault_addresss": "terra1tfrecwlvzcv9h697q3g0d08vd53ssu5w4war4n",
+      "n_asset_address": "terra178v546c407pdnx5rer3hu8s2c0fc924k74ymnn"
+    }
+  ]
+}

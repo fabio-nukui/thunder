@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import asyncio
+import json
+from typing import TYPE_CHECKING, Sequence
 
 from terra_sdk.core import AccAddress
 from terra_sdk.core.wasm.msgs import MsgExecuteContract
@@ -10,6 +12,25 @@ from .token import CW20Token, TerraTokenAmount
 
 if TYPE_CHECKING:
     from .client import TerraClient
+
+ADDRESSES_FILE = "resources/addresses/terra/{chain_id}/nexus.json"
+
+
+def _get_addresses(chain_id: str) -> dict[str, list[dict]]:
+    return json.load(open(ADDRESSES_FILE.format(chain_id=chain_id)))
+
+
+class Factory:
+    def __init__(self, client: TerraClient):
+        self.client = client
+        self.addresses = _get_addresses(client.chain_id)
+
+    async def get_anchor_vaults(self) -> Sequence[AnchorVault]:
+        tasks = [
+            AnchorVault.new(a["vault_addresss"], a["n_asset_address"], self.client)
+            for a in self.addresses["anchor_vaults"]
+        ]
+        return await asyncio.gather(*tasks)
 
 
 class AnchorVault(BaseTerraLiquidityPair):
@@ -32,6 +53,7 @@ class AnchorVault(BaseTerraLiquidityPair):
 
         self.b_token = await CW20Token.from_contract(data["basset_token_addr"], client)
         self.n_token = await CW20Token.from_contract(n_token_contract_addr, client)
+        self.tokens = self.b_token, self.n_token
 
         if (n_token_minter := await self.n_token.get_minter(client)) != contract_addr:
             raise Exception(f"{n_token_minter=} and {contract_addr=} do not match")
@@ -45,16 +67,16 @@ class AnchorVault(BaseTerraLiquidityPair):
         self, sender: AccAddress, amount_in: TerraTokenAmount, *args
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
         amount_out = await self.get_swap_amount_out(amount_in)
-        if amount_in == self.b_token:
+        if amount_in.token == self.b_token:
             msg = self.get_deposit_msg(sender, amount_in.int_amount)
         else:
             msg = self.get_withdraw_msg(sender, amount_in.int_amount)
         return amount_out, [msg]
 
     async def get_swap_amount_out(self, amount_in: TerraTokenAmount, *args) -> TerraTokenAmount:
-        if amount_in == self.b_token:
+        if amount_in.token == self.b_token:
             return self.n_token.to_amount(amount_in.amount)
-        if amount_in == self.n_token:
+        if amount_in.token == self.n_token:
             return self.b_token.to_amount(amount_in.amount)
         raise TypeError(f"{amount_in.token=} not b_asset nor n_asset")
 
@@ -77,3 +99,15 @@ class AnchorVault(BaseTerraLiquidityPair):
             }
         }
         return MsgExecuteContract(sender, self.n_token.contract_addr, execute_msg)
+
+    async def simulate_reserve_change(
+        self,
+        amounts: tuple[TerraTokenAmount, TerraTokenAmount],
+    ) -> AnchorVault:
+        return self
+
+    async def get_reserve_changes_from_msg(
+        self,
+        msg: dict,
+    ) -> tuple[TerraTokenAmount, TerraTokenAmount]:
+        raise NotImplementedError

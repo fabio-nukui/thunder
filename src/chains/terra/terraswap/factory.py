@@ -24,9 +24,10 @@ with open("resources/addresses/terra/columbus-5/cw20_whitelist.json") as f:
     _CW20_WHITELIST: dict = json.load(f)
 
 _FEES = {
-    "terra154jt8ppucvvakvqa5fyfjdflsu6v83j4ckjfq3": Decimal("0.00300001"),  # LOOP_LOOPR
-    "terra1dw5j23l6nwge69z0enemutfmyc93c36aqnzjj5": Decimal("0.00300001"),  # LOOPR_UST
-    "terra1kh2g4fnhvqtnwwpqa84eywn72ve9vdkp5chhlx": Decimal("0.0030005"),  # ALTE_LUNA
+    "terra154jt8ppucvvakvqa5fyfjdflsu6v83j4ckjfq3": Decimal("0.00300001"),  # LOOP-LOOPR
+    "terra1dw5j23l6nwge69z0enemutfmyc93c36aqnzjj5": Decimal("0.00300001"),  # LOOPR-UST
+    "terra1kh2g4fnhvqtnwwpqa84eywn72ve9vdkp5chhlx": Decimal("0.0030005"),  # ALTE-LUNA
+    "terra163pkeeuwxzr0yhndf8xd2jprm9hrtk59xf7nqf": Decimal("0.0030001"),  # Psi-UST
 }
 
 

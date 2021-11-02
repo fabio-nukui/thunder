@@ -113,10 +113,6 @@ class SingleRoute:
         step_amount = amount_in
         msgs: list[MsgExecuteContract] = []
         for pair in pairs:
-            if not isinstance(pair, LiquidityPair):
-                raise NotImplementedError(
-                    "SingleRoute.op_swap() only implemented for Router swaps"
-                )
             step_amount, step_msgs = await pair.op_swap(
                 self.client.address, step_amount, safety_margin
             )

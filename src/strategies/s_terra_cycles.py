@@ -29,13 +29,13 @@ from chains.terra import (
     TerraClient,
     TerraNativeToken,
     TerraTokenAmount,
+    nexus,
     terraswap,
 )
 from chains.terra.swap_utils import MultiRoutes, SingleRoute
 from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
 from exceptions import FeeEstimationError, InsufficientLiquidity, UnprofitableArbitrage
-
-from .common.default_params import (
+from strategies.common.default_params import (
     MAX_N_REPEATS,
     MAX_SINGLE_ARBITRAGE_AMOUNT,
     MIN_PROFIT_UST,
@@ -85,9 +85,11 @@ async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
     terraswap_factory, loop_factory = await asyncio.gather(
         terraswap.TerraswapFactory.new(client), terraswap.LoopFactory.new(client)
     )
+    nexus_factory = nexus.Factory(client)
     list_route_groups = await asyncio.gather(
         _get_ust_native_routes(client, loop_factory, terraswap_factory),
         _get_luna_native_routes(client, terraswap_factory),
+        _get_psi_routes(client, nexus_factory, [terraswap_factory, loop_factory]),
         _get_ust_terraswap_3cycle_routes(client, terraswap_factory),
         _get_ust_loop_3cycle_routes(client, loop_factory, terraswap_factory),
         _get_ust_loopdex_terraswap_2cycle_routes(client, loop_factory, terraswap_factory),
@@ -154,6 +156,47 @@ async def _get_luna_native_routes(
         routes.append(
             MultiRoutes(client, LUNA, list_steps, router_address=factory.addresses["router"])
         )
+    return routes
+
+
+async def _get_psi_routes(
+    client: TerraClient,
+    nexus_factory: nexus.Factory,
+    terraswap_factories: Sequence[terraswap.Factory],
+) -> list[MultiRoutes]:
+    nexus_anchor_vaults = await nexus_factory.get_anchor_vaults()
+
+    steps: Sequence[Sequence[BaseTerraLiquidityPair]]
+    routes: list[MultiRoutes] = []
+    for vault in nexus_anchor_vaults:
+        if vault.b_token.symbol == "BETH":
+            ust_b_asset_pairs, n_asset_psi_pairs, ust_psi_pairs = await asyncio.gather(
+                _pairs_from_factories(terraswap_factories, "UST", vault.b_token.symbol),
+                _pairs_from_factories(terraswap_factories, "Psi", vault.n_token.symbol),
+                _pairs_from_factories(terraswap_factories, "UST", "Psi"),
+            )
+            steps = [ust_b_asset_pairs, [vault], n_asset_psi_pairs, ust_psi_pairs]
+        elif vault.b_token.symbol == "BLUNA":
+            asset_symbol = vault.b_token.symbol[1:]
+            (
+                ust_asset_pairs,
+                asset_b_asset_pairs,
+                n_asset_psi_pairs,
+                ust_psi_pairs,
+            ) = await asyncio.gather(
+                _pairs_from_factories(terraswap_factories, "UST", asset_symbol),
+                _pairs_from_factories(terraswap_factories, asset_symbol, vault.b_token.symbol),
+                _pairs_from_factories(terraswap_factories, "Psi", vault.n_token.symbol),
+                _pairs_from_factories(terraswap_factories, "UST", "Psi"),
+            )
+            steps = [
+                ust_asset_pairs,
+                asset_b_asset_pairs,
+                [vault],
+                n_asset_psi_pairs,
+                ust_psi_pairs,
+            ]
+        routes.append(MultiRoutes(client, UST, steps))
     return routes
 
 
@@ -266,6 +309,23 @@ async def _get_ust_alte_3cycle_routes(
         list_steps = [ust_pairs, [alte_token_pair], [alte_ust_pair]]
         routes.append(MultiRoutes(client, UST, list_steps))
     return routes
+
+
+async def _pairs_from_factories(
+    terraswap_factories: Sequence[terraswap.Factory],
+    symbol_0: str,
+    symbol_1: str,
+) -> list[terraswap.LiquidityPair]:
+    pairs = []
+    for pair_symbol in (f"{symbol_0}-{symbol_1}", f"{symbol_1}-{symbol_0}"):
+        for factory in terraswap_factories:
+            if pair_symbol in factory.addresses["pairs"]:
+                try:
+                    pairs.append(await factory.get_pair(pair_symbol))
+                except InsufficientLiquidity:
+                    continue
+    assert pairs, f"No pair found for {symbol_0}-{symbol_1}"
+    return pairs
 
 
 class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbitrage):
