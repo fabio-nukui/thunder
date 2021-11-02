@@ -12,10 +12,10 @@ from terra_sdk.core.wasm.msgs import MsgExecuteContract
 from common.token import Token
 
 from ..client import TerraClient
+from ..swap_utils import Operation
 from ..token import TerraToken, TerraTokenAmount
 from .liquidity_pair import LiquidityPair
 from .router import HybridLiquidityPair, Router, RouteStep, RouteStepNative, RouteStepTerraswap
-from .utils import Operation
 
 
 def _extract_tokens_from_routes(

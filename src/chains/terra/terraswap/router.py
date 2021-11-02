@@ -10,9 +10,10 @@ from terra_sdk.core.wasm import MsgExecuteContract
 
 from ..client import TerraClient
 from ..native_liquidity_pair import NativeLiquidityPair
+from ..swap_utils import Operation
 from ..token import CW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
 from .liquidity_pair import LiquidityPair
-from .utils import Operation, token_to_data
+from .utils import token_to_data
 
 HybridLiquidityPair = Union[LiquidityPair, NativeLiquidityPair]
 
