@@ -3,17 +3,14 @@ from __future__ import annotations
 import json
 
 from ..client import TerraClient
-from .composite_operations import MultiRoutes, SingleRoute
 from .factory import Factory
 from .liquidity_pair import Action, LiquidityPair
-from .router import HybridLiquidityPair, Router, RouteStep, RouteStepNative, RouteStepTerraswap
+from .router import Router, RouterLiquidityPair, RouteStep, RouteStepNative, RouteStepTerraswap
 
 __all__ = [
-    "MultiRoutes",
-    "SingleRoute",
     "Action",
     "LiquidityPair",
-    "HybridLiquidityPair",
+    "RouterLiquidityPair",
     "RouteStep",
     "RouteStepNative",
     "RouteStepTerraswap",

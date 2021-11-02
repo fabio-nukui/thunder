@@ -179,8 +179,8 @@ class LiquidityPair(BaseTerraLiquidityPair):
         self,
         sender: AccAddress,
         amount_in: TerraTokenAmount,
-        max_slippage: Decimal = None,
         safety_margin: bool | int = True,
+        max_slippage: Decimal = None,
     ) -> Operation:
         max_slippage = MAX_SWAP_SLIPPAGE if max_slippage is None else max_slippage
         amount_out = await self.get_swap_amount_out(amount_in, safety_margin)
@@ -330,8 +330,8 @@ class LiquidityPair(BaseTerraLiquidityPair):
         sender: AccAddress,
         amount_burn: TerraTokenAmount,
         token_out: TerraToken,
-        max_slippage: Decimal = None,
         safety_margin: bool | int = True,
+        max_slippage: Decimal = None,
     ) -> Operation:
         assert token_out in self.tokens
         amounts = await self.get_remove_liquidity_amounts(amount_burn, safety_margin)
@@ -342,7 +342,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
             amount_swap, amount_keep = amounts["amounts_out"]
         simulation = await self.simulate_reserve_change(amounts["pool_change"])
         amount_out, msgs_swap = await simulation.op_swap(
-            sender, amount_swap, max_slippage, safety_margin
+            sender, amount_swap, safety_margin, max_slippage
         )
         return amount_keep + amount_out, [msg_remove_liquidity] + msgs_swap
 
@@ -411,8 +411,8 @@ class LiquidityPair(BaseTerraLiquidityPair):
         self,
         sender: AccAddress,
         amount_in: TerraTokenAmount,
-        slippage_tolerance: Decimal = None,
         safety_margin: bool | int = True,
+        slippage_tolerance: Decimal = None,
     ) -> Operation:
         reserve_in, reserve_out = await self._get_in_out_reserves(amount_in)
         slippage_tolerance = (

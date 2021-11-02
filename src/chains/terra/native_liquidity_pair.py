@@ -3,7 +3,10 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TypeVar
 
+from terra_sdk.core import AccAddress
+
 from .client import TerraClient
+from .swap_utils import Operation
 from .token import TerraNativeToken, TerraToken, TerraTokenAmount
 
 AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
@@ -27,6 +30,15 @@ class BaseTerraLiquidityPair(ABC):
         if self.tokens[0] < self.tokens[1]:
             return self.tokens[0], self.tokens[1]
         return self.tokens[1], self.tokens[0]
+
+    @abstractmethod
+    async def op_swap(
+        self,
+        sender: AccAddress,
+        amount_in: TerraTokenAmount,
+        safety_margin: bool | int = True,
+    ) -> Operation:
+        ...
 
     @abstractmethod
     async def get_swap_amount_out(
@@ -64,6 +76,14 @@ class NativeLiquidityPair(BaseTerraLiquidityPair):
         assert amount_in.token in self.tokens
         token_out = self.tokens[0] if amount_in.token == self.tokens[1] else self.tokens[1]
         return await self.client.market.get_amount_out(amount_in, token_out, safety_margin)
+
+    async def op_swap(
+        self,
+        sender: AccAddress,
+        amount_in: TerraTokenAmount,
+        safety_margin: bool | int = True,
+    ) -> Operation:
+        raise NotImplementedError
 
     async def simulate_reserve_change(self, amounts: AmountTuple) -> NativeLiquidityPair:
         raise NotImplementedError

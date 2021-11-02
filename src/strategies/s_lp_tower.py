@@ -94,8 +94,8 @@ async def get_arbitrages(client: TerraClient) -> list[LPTowerArbitrage]:
 
 def get_filters(
     arb_routes: list[LPTowerArbitrage],
-) -> dict[terraswap.HybridLiquidityPair, FilterSingleSwapTerraswapPair]:
-    filters: dict[terraswap.HybridLiquidityPair, FilterSingleSwapTerraswapPair] = {}
+) -> dict[terraswap.RouterLiquidityPair, FilterSingleSwapTerraswapPair]:
+    filters: dict[terraswap.RouterLiquidityPair, FilterSingleSwapTerraswapPair] = {}
     for arb_route in arb_routes:
         for pair in arb_route.pairs:
             if not isinstance(pair, terraswap.LiquidityPair):
@@ -278,24 +278,24 @@ class LPTowerArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbitra
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
         if direction == Direction.remove_liquidity_first:
             luna_amount, msgs_remove_liquidity = await self.pairs.pool_0.op_remove_single_side(
-                self.client.address, initial_lp_amount, LUNA, safety_margin=safety_margin
+                self.client.address, initial_lp_amount, LUNA, safety_margin
             )
             lp_amount, msgs_add_liquidity = await self.pairs.pool_1.op_add_single_side(
-                self.client.address, luna_amount, safety_margin=safety_margin
+                self.client.address, luna_amount, safety_margin
             )
             final_lp_amount, msgs_tower_swap = await self.pairs.pool_tower.op_swap(
-                self.client.address, lp_amount, safety_margin=safety_margin
+                self.client.address, lp_amount, safety_margin
             )
             msgs = msgs_remove_liquidity + msgs_add_liquidity + msgs_tower_swap
         else:
             lp_amount, msgs_tower_swap = await self.pairs.pool_tower.op_swap(
-                self.client.address, initial_lp_amount, safety_margin=safety_margin
+                self.client.address, initial_lp_amount, safety_margin
             )
             luna_amount, msgs_remove_liquidity = await self.pairs.pool_1.op_remove_single_side(
-                self.client.address, lp_amount, LUNA, safety_margin=safety_margin
+                self.client.address, lp_amount, LUNA, safety_margin
             )
             final_lp_amount, msgs_add_liquidity = await self.pairs.pool_0.op_add_single_side(
-                self.client.address, luna_amount, safety_margin=safety_margin
+                self.client.address, luna_amount, safety_margin
             )
             msgs = msgs_tower_swap + msgs_remove_liquidity + msgs_add_liquidity
         return final_lp_amount, msgs

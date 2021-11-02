@@ -4,10 +4,11 @@ from terra_sdk.core import AccAddress
 from terra_sdk.core.wasm.msgs import MsgExecuteContract
 
 from .client import TerraClient
+from .native_liquidity_pair import BaseTerraLiquidityPair
 from .token import CW20Token, TerraTokenAmount
 
 
-class AnchorVault:
+class AnchorVault(BaseTerraLiquidityPair):
     contract_addr: AccAddress
     client: TerraClient
     b_token: CW20Token
@@ -37,17 +38,21 @@ class AnchorVault:
         return f"{self.__class__.__name__}({self.b_token.symbol})"
 
     async def op_swap(
-        self, sender: AccAddress, amount_in: TerraTokenAmount
+        self, sender: AccAddress, amount_in: TerraTokenAmount, *args
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
+        amount_out = await self.get_swap_amount_out(amount_in)
         if amount_in == self.b_token:
-            token_out = self.n_token
             msg = self.get_deposit_msg(sender, amount_in.int_amount)
-        elif amount_in == self.n_token:
-            token_out = self.n_token
-            msg = self.get_withdraw_msg(sender, amount_in.int_amount)
         else:
-            raise TypeError(f"{amount_in.token=} not b_asset nor n_asset")
-        return token_out.to_amount(amount_in.amount), [msg]
+            msg = self.get_withdraw_msg(sender, amount_in.int_amount)
+        return amount_out, [msg]
+
+    async def get_swap_amount_out(self, amount_in: TerraTokenAmount, *args) -> TerraTokenAmount:
+        if amount_in == self.b_token:
+            return self.n_token.to_amount(amount_in.amount)
+        if amount_in == self.n_token:
+            return self.b_token.to_amount(amount_in.amount)
+        raise TypeError(f"{amount_in.token=} not b_asset nor n_asset")
 
     def get_deposit_msg(self, sender: AccAddress, amount_deposit: int) -> MsgExecuteContract:
         execute_msg = {

@@ -24,12 +24,14 @@ from arbitrage.terra import (
 from chains.terra import (
     LUNA,
     UST,
+    BaseTerraLiquidityPair,
     NativeLiquidityPair,
     TerraClient,
+    TerraNativeToken,
     TerraTokenAmount,
     terraswap,
 )
-from chains.terra.token import TerraNativeToken
+from chains.terra.swap_utils import MultiRoutes, SingleRoute
 from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
 from exceptions import FeeEstimationError, InsufficientLiquidity, UnprofitableArbitrage
 
@@ -53,7 +55,7 @@ class ArbParams(TerraArbParams):
     block_found: int
 
     initial_balance: TerraTokenAmount
-    route: terraswap.SingleRoute
+    route: SingleRoute
     reverse: bool
 
     initial_amount: TerraTokenAmount
@@ -104,8 +106,8 @@ async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
 
 def get_filters(
     arb_routes: list[TerraCyclesArbitrage],
-) -> dict[terraswap.HybridLiquidityPair, FilterSingleSwapTerraswapPair]:
-    filters: dict[terraswap.HybridLiquidityPair, FilterSingleSwapTerraswapPair] = {}
+) -> dict[terraswap.RouterLiquidityPair, FilterSingleSwapTerraswapPair]:
+    filters: dict[terraswap.RouterLiquidityPair, FilterSingleSwapTerraswapPair] = {}
     for arb_route in arb_routes:
         for pair in arb_route.pairs:
             if not isinstance(pair, terraswap.LiquidityPair):
@@ -118,13 +120,13 @@ async def _get_ust_native_routes(
     client: TerraClient,
     loop_factory: terraswap.LoopFactory,
     terraswap_factory: terraswap.TerraswapFactory,
-) -> list[terraswap.MultiRoutes]:
+) -> list[MultiRoutes]:
     loop_pair = await loop_factory.get_pair("LUNA-UST")
     terraswap_pair = await terraswap_factory.get_pair("UST-LUNA")
     native_pair = NativeLiquidityPair(client, (UST, LUNA))
 
     return [
-        terraswap.MultiRoutes(
+        MultiRoutes(
             client=client,
             start_token=UST,
             list_steps=[[loop_pair, terraswap_pair], [native_pair]],
@@ -136,10 +138,10 @@ async def _get_ust_native_routes(
 async def _get_luna_native_routes(
     client: TerraClient,
     factory: terraswap.TerraswapFactory,
-) -> list[terraswap.MultiRoutes]:
+) -> list[MultiRoutes]:
     pat_token_symbol = re.compile(r"^[A-Z]+-LUNA$")
 
-    routes: list[terraswap.MultiRoutes] = []
+    routes: list[MultiRoutes] = []
     for pair_symbol in factory.addresses["pairs"]:
         if not (match := pat_token_symbol.match(pair_symbol)) or pair_symbol == "UST-LUNA":
             continue
@@ -150,9 +152,7 @@ async def _get_luna_native_routes(
         list_steps: Sequence[Sequence] = [[terraswap_pair], [native_pair]]
 
         routes.append(
-            terraswap.MultiRoutes(
-                client, LUNA, list_steps, router_address=factory.addresses["router"]
-            )
+            MultiRoutes(client, LUNA, list_steps, router_address=factory.addresses["router"])
         )
     return routes
 
@@ -160,12 +160,12 @@ async def _get_luna_native_routes(
 async def _get_ust_terraswap_3cycle_routes(
     client: TerraClient,
     terraswap_factory: terraswap.TerraswapFactory,
-) -> list[terraswap.MultiRoutes]:
+) -> list[MultiRoutes]:
     beth_ust_pair, meth_beth_pair, ust_meth_pair = await terraswap_factory.get_pairs(
         ["BETH-UST", "mETH-BETH", "UST-mETH"]
     )
     return [
-        terraswap.MultiRoutes(
+        MultiRoutes(
             client=client,
             start_token=UST,
             list_steps=[[beth_ust_pair], [meth_beth_pair], [ust_meth_pair]],
@@ -178,11 +178,11 @@ async def _get_ust_loop_3cycle_routes(
     client: TerraClient,
     loop_factory: terraswap.LoopFactory,
     terraswap_factory: terraswap.TerraswapFactory,
-) -> list[terraswap.MultiRoutes]:
+) -> list[MultiRoutes]:
     loop_ust_pair = await loop_factory.get_pair("LOOP-UST")
     pat_token_symbol = re.compile(r"^(?:([a-zA-Z]+)-LOOP|LOOP-([a-zA-Z]+))$")
 
-    routes: list[terraswap.MultiRoutes] = []
+    routes: list[MultiRoutes] = []
     for pair_symbol in loop_factory.addresses["pairs"]:
         if not (match := pat_token_symbol.match(pair_symbol)) or pair_symbol == "LOOP-UST":
             continue
@@ -204,7 +204,7 @@ async def _get_ust_loop_3cycle_routes(
             continue
         list_steps = [ust_pairs, [loop_token_pair], [loop_ust_pair]]
 
-        routes.append(terraswap.MultiRoutes(client, UST, list_steps))
+        routes.append(MultiRoutes(client, UST, list_steps))
     return routes
 
 
@@ -212,11 +212,11 @@ async def _get_ust_loopdex_terraswap_2cycle_routes(
     client: TerraClient,
     loop_factory: terraswap.LoopFactory,
     terraswap_factory: terraswap.TerraswapFactory,
-) -> list[terraswap.MultiRoutes]:
+) -> list[MultiRoutes]:
     pat_token_symbol = re.compile(r"([A-Z]+)-UST|UST-([A-Z]+)")
     pair_symbol: str
 
-    routes: list[terraswap.MultiRoutes] = []
+    routes: list[MultiRoutes] = []
     for pair_symbol in loop_factory.addresses["pairs"]:
         if not (match := pat_token_symbol.match(pair_symbol)):
             continue
@@ -234,18 +234,18 @@ async def _get_ust_loopdex_terraswap_2cycle_routes(
             )
         except InsufficientLiquidity:
             continue
-        routes.append(terraswap.MultiRoutes(client, UST, [[terraswap_pair], [loop_pair]]))
+        routes.append(MultiRoutes(client, UST, [[terraswap_pair], [loop_pair]]))
     return routes
 
 
 async def _get_ust_alte_3cycle_routes(
     client: TerraClient,
     factory: terraswap.TerraswapFactory,
-) -> list[terraswap.MultiRoutes]:
+) -> list[MultiRoutes]:
     alte_ust_pair = await factory.get_pair("ALTE-UST")
     pat_token_symbol = re.compile(r"^(?:([a-zA-Z]+)-ALTE|ALTE-([a-zA-Z]+))$")
 
-    routes: list[terraswap.MultiRoutes] = []
+    routes: list[MultiRoutes] = []
     for pair_symbol in factory.addresses["pairs"]:
         if not (match := pat_token_symbol.match(pair_symbol)) or pair_symbol == "ALTE-UST":
             continue
@@ -264,13 +264,13 @@ async def _get_ust_alte_3cycle_routes(
         except InsufficientLiquidity:
             continue
         list_steps = [ust_pairs, [alte_token_pair], [alte_ust_pair]]
-        routes.append(terraswap.MultiRoutes(client, UST, list_steps))
+        routes.append(MultiRoutes(client, UST, list_steps))
     return routes
 
 
 class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbitrage):
-    multi_routes: terraswap.MultiRoutes
-    routes: list[terraswap.SingleRoute]
+    multi_routes: MultiRoutes
+    routes: list[SingleRoute]
     start_token: TerraNativeToken
     use_router: bool
     estimated_gas_use: int
@@ -283,7 +283,7 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
     async def new(
         cls,
         client: TerraClient,
-        multi_routes: terraswap.MultiRoutes,
+        multi_routes: MultiRoutes,
     ) -> TerraCyclesArbitrage:
         """Arbitrage with UST as starting point and a cycle of liquidity pairs"""
         assert isinstance(multi_routes.tokens[0], TerraNativeToken) and multi_routes.is_cycle
@@ -341,7 +341,7 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
     async def _get_arbitrage_params(
         self,
         height: int,
-        filtered_mempool: dict[terraswap.HybridLiquidityPair, list[list[dict]]] = None,
+        filtered_mempool: dict[BaseTerraLiquidityPair, list[list[dict]]] = None,
     ) -> ArbParams:
         initial_balance = await self.start_token.get_balance(self.client)
 
@@ -378,7 +378,7 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
 
     async def _get_params_single_route(
         self,
-        route: terraswap.SingleRoute,
+        route: SingleRoute,
         initial_balance: TerraTokenAmount,
     ) -> dict:
         reverse = await route.should_reverse(self.min_start_amount)
@@ -417,7 +417,7 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
 
     async def _get_optimal_argitrage_amount(
         self,
-        route: terraswap.SingleRoute,
+        route: SingleRoute,
         reverse: bool,
     ) -> TerraTokenAmount:
         profit = await self._get_gross_profit(self.min_start_amount, route, reverse)
@@ -435,7 +435,7 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
     async def _get_gross_profit(
         self,
         amount_in: TerraTokenAmount,
-        route: terraswap.SingleRoute,
+        route: SingleRoute,
         reverse: bool,
         safety_round: bool = False,
     ) -> TerraTokenAmount:
@@ -445,7 +445,7 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
     async def _get_gross_profit_dec(
         self,
         amount_in: Decimal,
-        route: terraswap.SingleRoute,
+        route: SingleRoute,
         reverse: bool,
         safety_round: bool = False,
     ) -> Decimal:

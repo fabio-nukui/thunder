@@ -15,7 +15,7 @@ from ..token import CW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
 from .liquidity_pair import LiquidityPair
 from .utils import token_to_data
 
-HybridLiquidityPair = Union[LiquidityPair, NativeLiquidityPair]
+RouterLiquidityPair = Union[LiquidityPair, NativeLiquidityPair]
 
 
 ROUTER_EFFICIENCY = Decimal("0.9995")
@@ -81,7 +81,7 @@ class Router:
     def __init__(
         self,
         contract_addr: AccAddress,
-        liquidity_pairs: Iterable[HybridLiquidityPair],
+        liquidity_pairs: Iterable[RouterLiquidityPair],
         client: TerraClient,
     ):
         self.terraswap_pairs: dict[tuple[TerraToken, TerraToken], LiquidityPair] = {}
@@ -89,8 +89,13 @@ class Router:
         for pair in liquidity_pairs:
             if isinstance(pair, LiquidityPair):
                 self.terraswap_pairs[pair.sorted_tokens] = pair
-            else:
+            elif isinstance(pair, NativeLiquidityPair):
                 self.native_pairs[pair.sorted_tokens] = pair
+            else:
+                raise TypeError(
+                    "liquidity_pairs must be terraswap.LiquidityPair or NativeLiquidityPair, "
+                    f"received {pair.__class__.__name__}"
+                )
         self.contract_addr = contract_addr
         self.client = client
 
@@ -157,7 +162,7 @@ class Router:
             next_amount_in = await pair.get_swap_amount_out(next_amount_in, safety_margin)
         return next_amount_in * ROUTER_EFFICIENCY
 
-    def _get_pair(self, step: RouteStep) -> HybridLiquidityPair:
+    def _get_pair(self, step: RouteStep) -> RouterLiquidityPair:
         if isinstance(step, RouteStepTerraswap) and step.sorted_tokens in self.terraswap_pairs:
             return self.terraswap_pairs[step.sorted_tokens]
         if isinstance(step, RouteStepNative) and step.sorted_tokens in self.native_pairs:

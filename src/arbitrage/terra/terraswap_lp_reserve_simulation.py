@@ -5,16 +5,14 @@ from contextlib import asynccontextmanager
 from typing import Callable, Iterable, Sequence
 
 import utils
-from chains.terra import terraswap
-from chains.terra.token import TerraTokenAmount
+from chains.terra import BaseTerraLiquidityPair, TerraTokenAmount
+from chains.terra.swap_utils import SingleRoute
 from exceptions import MaxSpreadAssertion
 
 log = logging.getLogger(__name__)
 
 AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
-PairsCls = Callable[
-    [Iterable[terraswap.HybridLiquidityPair]], Sequence[terraswap.HybridLiquidityPair]
-]
+PairsCls = Callable[[Iterable[BaseTerraLiquidityPair]], Sequence[BaseTerraLiquidityPair]]
 
 
 class TerraswapLPReserveSimulationMixin:
@@ -23,9 +21,9 @@ class TerraswapLPReserveSimulationMixin:
     def __init__(
         self,
         *args,
-        pairs: Sequence[terraswap.HybridLiquidityPair],
+        pairs: Sequence[BaseTerraLiquidityPair],
         pairs_cls: PairsCls = list,
-        routes: list[terraswap.SingleRoute] = None,
+        routes: list[SingleRoute] = None,
         **kwargs,
     ):
         self.pairs = pairs
@@ -35,7 +33,7 @@ class TerraswapLPReserveSimulationMixin:
 
         super().__init__(*args, **kwargs)  # type: ignore
 
-    def _get_initial_mempool_params(self) -> dict[terraswap.HybridLiquidityPair, AmountTuple]:
+    def _get_initial_mempool_params(self) -> dict[BaseTerraLiquidityPair, AmountTuple]:
         return {
             pair: (pair.tokens[0].to_amount(0), pair.tokens[1].to_amount(0))
             for pair in self.pairs
@@ -51,7 +49,7 @@ class TerraswapLPReserveSimulationMixin:
     @asynccontextmanager
     async def _simulate_reserve_changes(
         self,
-        filtered_mempool: dict[terraswap.HybridLiquidityPair, list[list[dict]]] = None,
+        filtered_mempool: dict[BaseTerraLiquidityPair, list[list[dict]]] = None,
     ):
         if filtered_mempool is None:
             yield self.pairs
@@ -69,7 +67,7 @@ class TerraswapLPReserveSimulationMixin:
                     self._mempool_reserve_changes[pair][0] + changes[0],
                     self._mempool_reserve_changes[pair][1] + changes[1],
                 )
-        simulations: dict[terraswap.HybridLiquidityPair, terraswap.HybridLiquidityPair] = {}
+        simulations: dict[BaseTerraLiquidityPair, BaseTerraLiquidityPair] = {}
         for pair in self.pairs:
             pair_changes = self._mempool_reserve_changes[pair]
             if any(amount for amount in pair_changes):

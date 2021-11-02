@@ -14,7 +14,7 @@ from exceptions import NotContract
 
 from ..client import TerraClient
 from .liquidity_pair import LiquidityPair, LPToken, pair_tokens_from_data
-from .router import HybridLiquidityPair, Router
+from .router import Router, RouterLiquidityPair
 
 _FactoryT = TypeVar("_FactoryT", bound="Factory")
 
@@ -138,7 +138,7 @@ class Factory:
             check_liquidity=check_liquidity,
         )
 
-    def get_router(self, liquidity_pairs: Iterable[HybridLiquidityPair]) -> Router:
+    def get_router(self, liquidity_pairs: Iterable[RouterLiquidityPair]) -> Router:
         if "router" not in self.addresses:
             raise Exception(f"{self}: no router address")
         return Router(self.addresses["router"], liquidity_pairs, self.client)
