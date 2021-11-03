@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 from abc import ABC, abstractmethod
 from typing import Iterable
 
+from terra_sdk.core import AccAddress
+
 from . import terraswap
-from .token import TerraNativeToken
+from .token import CW20Token, TerraNativeToken, TerraToken
+
+log = logging.getLogger(__name__)
 
 
 def _decode_msg(raw_msg: str | dict, always_base64: bool) -> dict:
@@ -71,7 +76,7 @@ class FilterMsgsLength(Filter):
         return len(msgs) == self.length
 
 
-class FilterFirstActionTerraswap(Filter):
+class FilterFirstActionPairSwap(Filter):
     def __init__(
         self,
         action: terraswap.Action,
@@ -113,7 +118,7 @@ class FilterFirstActionTerraswap(Filter):
 class FilterSingleSwapTerraswapPair(Filter):
     def __init__(self, pair: terraswap.LiquidityPair):
         self.pair = pair
-        terraswap_filter = FilterFirstActionTerraswap(terraswap.Action.swap, [self.pair])
+        terraswap_filter = FilterFirstActionPairSwap(terraswap.Action.swap, [self.pair])
         self._filter = FilterMsgsLength(1) & terraswap_filter
 
     def __repr__(self) -> str:
@@ -121,3 +126,98 @@ class FilterSingleSwapTerraswapPair(Filter):
 
     def match_msgs(self, msgs: list[dict]) -> bool:
         return self._filter.match_msgs(msgs)
+
+
+class FilterFirstActionRouterSwap(Filter):
+    def __init__(
+        self,
+        factory: terraswap.Factory,
+        pairs: Iterable[terraswap.LiquidityPair],
+        aways_base64: bool = False,
+    ):
+        if "router" not in factory.addresses:
+            raise TypeError("Factory missing router address")
+        self.router_address: AccAddress = factory.addresses["router"]
+        self.aways_base64 = aways_base64
+        self.pairs = [
+            p for p in pairs if p.contract_addr in factory.addresses["pairs"].values()
+        ]
+        self._token_contracts = {
+            token.contract_addr
+            for p in pairs
+            for token in p.tokens
+            if isinstance(token, CW20Token)
+        }
+        self._token_ids = [
+            {_get_token_id(p.tokens[0]), _get_token_id(p.tokens[1])} for p in self.pairs
+        ]
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(pairs={self.pairs})"
+
+    def match_msgs(self, msgs: list[dict]) -> bool:
+        msg = msgs[0]
+        if "MsgExecuteContract" not in msg["type"]:
+            return False
+        value = msg["value"]
+
+        action = "execute_swap_operations"
+        operations: list[dict[str, dict]]
+        if (
+            value["contract"] == self.router_address
+            and action in (execute_msg := value["execute_msg"])
+            and "operations" in (swap_operations := execute_msg[action])
+        ):
+            operations = swap_operations["operations"]
+        elif (
+            value["contract"] in self._token_contracts
+            and "send" in (execute_msg := value["execute_msg"])
+            and "msg" in (send := execute_msg["send"])
+            and send["contract"] == self.router_address
+            and action in (inner_msg := _decode_msg(send["msg"], self.aways_base64))
+            and "operations" in (swap_operations := inner_msg[action])
+        ):
+            operations = swap_operations["operations"]
+        else:
+            return False
+        try:
+            for operation in operations:
+                if "native_swap" in operation:
+                    operation_ids = {
+                        operation["native_swap"]["ask_denom"],
+                        operation["native_swap"]["offer_denom"],
+                    }
+                else:
+                    (ask_asset,) = operation["terra_swap"]["ask_asset_info"].values()
+                    (offer_asset,) = operation["terra_swap"]["offer_asset_info"].values()
+                    (ask_asset_id,) = ask_asset.values()
+                    (offer_asset_id,) = offer_asset.values()
+                    operation_ids = {ask_asset_id, offer_asset_id}
+                if any(operation_ids == ids for ids in self._token_ids):
+                    return True
+        except (KeyError, AttributeError, ValueError):
+            log.debug("Unexpected msg format", extra={"data": msg})
+        return False
+
+
+class FilterSingleSwapTerraswapRouter(Filter):
+    def __init__(
+        self,
+        factory: terraswap.Factory,
+        pairs: Iterable[terraswap.LiquidityPair],
+    ):
+        self.pairs = pairs
+        terraswap_filter = FilterFirstActionRouterSwap(factory, self.pairs)
+        self._filter = FilterMsgsLength(1) & terraswap_filter
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(pairs={self.pairs})"
+
+    def match_msgs(self, msgs: list[dict]) -> bool:
+        return self._filter.match_msgs(msgs)
+
+
+def _get_token_id(token: TerraToken) -> str:
+    if isinstance(token, CW20Token):
+        return token.contract_addr
+    return token.denom
