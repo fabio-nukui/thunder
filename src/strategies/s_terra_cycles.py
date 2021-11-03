@@ -541,9 +541,12 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
     ) -> tuple[TerraTokenAmount, Decimal]:
         balance_changes = TerraClient.extract_coin_balance_changes(info.logs)
         arb_changes = balance_changes[self.client.address]
-        assert all(change.token == self.start_token for change in arb_changes)
-        assert len(arb_changes) == 2
-        return max(arb_changes), arb_changes[0].amount + arb_changes[1].amount
+        amount_out = max(change for change in arb_changes if change.token == self.start_token)
+        profit = sum(
+            (change for change in arb_changes if change.token == self.start_token),
+            start=self.start_token.to_amount(0),
+        )
+        return amount_out, profit.amount
 
 
 async def run(max_n_blocks: int = None):
