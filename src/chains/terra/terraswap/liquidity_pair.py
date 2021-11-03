@@ -301,7 +301,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
         amount_in: TerraTokenAmount,
         min_out: TerraTokenAmount,
     ) -> MsgExecuteContract:
-        belief_price = amount_in.amount / min_out.amount
+        belief_price = amount_in.amount / min_out.amount * (1 - self.fee_rate)
         swap_msg = {"belief_price": f"{belief_price:.18f}", "max_spread": "0.0"}
         if isinstance(token_in := amount_in.token, CW20Token):
             contract = token_in.contract_addr
