@@ -67,8 +67,16 @@ class NativeLiquidityPair(BaseTerraLiquidityPair):
 
     def __init__(self, client: TerraClient, tokens: tuple[TerraNativeToken, TerraNativeToken]):
         self.client = client
-        self.tokens = tokens
+        self.tokens = tokens if (tokens[0] < tokens[1]) else (tokens[1], tokens[0])
         self._stop_updates = False
+
+    def __hash__(self) -> int:
+        return hash((self.__class__, self.tokens))
+
+    def __eq__(self, other) -> bool:
+        if isinstance(other, type(self)):
+            return self.tokens == other.tokens
+        return NotImplemented
 
     async def get_swap_amount_out(
         self,
