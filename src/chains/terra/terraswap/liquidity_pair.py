@@ -657,6 +657,13 @@ class LiquidityPair(BaseTerraLiquidityPair):
         return msgs
 
     async def get_reserve_changes_from_msg(self, msg: dict) -> AmountTuple:
+        if self._is_router_msg(msg):
+            assert self.factory_address
+            assert self.router_address
+            changes = await get_router_reserve_changes_from_msg(
+                self.client, self.factory_address, self.router_address, msg
+            )
+            return next(change for pair, change in changes.items() if self == pair)
         if msg["contract"] == self.contract_addr:
             amount_in, swap_msg = await self._parse_direct_pair_msg(msg)
         elif msg["contract"] in (
@@ -664,12 +671,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
         ):
             amount_in, swap_msg = await self._parse_cw20_send_msg(msg)
         else:
-            assert self.factory_address
-            assert self.router_address
-            changes = await get_router_reserve_changes_from_msg(
-                self.client, self.factory_address, self.router_address, msg
-            )
-            return next(change for pair, change in changes.items() if self == pair)
+            raise Exception(f"Could not parse {msg=}")
         max_spread = Decimal(swap_msg["max_spread"]) if "max_spread" in swap_msg else None
         belief_price = Decimal(swap_msg["belief_price"]) if "belief_price" in swap_msg else None
         amounts = await self.get_swap_amounts(
@@ -681,6 +683,13 @@ class LiquidityPair(BaseTerraLiquidityPair):
         if amounts_pool_change[0].token == self.tokens[0]:
             return amounts_pool_change
         return amounts_pool_change[1], amounts_pool_change[0]
+
+    def _is_router_msg(self, msg: dict) -> bool:
+        if msg["contract"] == self.router_address:
+            return True
+        if "send" not in (execute_msg := msg["execute_msg"]):
+            return False
+        return execute_msg["send"]["contract"] == self.router_address
 
     async def _parse_direct_pair_msg(self, msg: dict) -> tuple[TerraTokenAmount, dict]:
         if Action.swap in msg["execute_msg"]:
