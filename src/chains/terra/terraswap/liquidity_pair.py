@@ -529,27 +529,13 @@ class LiquidityPair(BaseTerraLiquidityPair):
 
     async def get_reserve_changes_from_msg(self, msg: dict) -> AmountTuple:
         if msg["contract"] == self.contract_addr:
-            if Action.swap in msg["execute_msg"]:
-                swap_msg: dict = msg["execute_msg"][Action.swap]
-                offer_asset_data = swap_msg["offer_asset"]
-                token = await token_from_data(offer_asset_data["info"], self.client)
-                amount_in = token.to_amount(int_amount=offer_asset_data["amount"])
-            else:
-                raise NotImplementedError(f"Only swap messages implemented, received {msg}")
+            amount_in, swap_msg = await self._parse_direct_pair_msg(msg)
         else:
             cw20_token_addresses = [
                 token.contract_addr for token in self.tokens if isinstance(token, CW20Token)
             ]
             if msg["contract"] in cw20_token_addresses:
-                assert "send" in msg["execute_msg"], f"Expected CW20 send, received {msg}"
-                raw_send_msg: dict | str = msg["execute_msg"]["send"]["msg"]
-                if isinstance(raw_send_msg, str):
-                    send_msg: dict = json.loads(base64.b64decode(raw_send_msg))
-                else:
-                    send_msg = raw_send_msg
-                swap_msg = send_msg.get(Action.swap, {})
-                token = await CW20Token.from_contract(msg["contract"], self.client)
-                amount_in = token.to_amount(int_amount=msg["execute_msg"]["send"]["amount"])
+                amount_in, swap_msg = await self._parse_cw20_send_msg(msg)
             else:
                 raise Exception(f"Unexpected msg contract={msg['contract']}")
         max_spread = Decimal(swap_msg["max_spread"]) if "max_spread" in swap_msg else None
@@ -563,6 +549,29 @@ class LiquidityPair(BaseTerraLiquidityPair):
         if amounts_pool_change[0].token == self.tokens[0]:
             return amounts_pool_change
         return amounts_pool_change[1], amounts_pool_change[0]
+
+    async def _parse_direct_pair_msg(self, msg: dict) -> tuple[TerraTokenAmount, dict]:
+        if Action.swap in msg["execute_msg"]:
+            swap_msg: dict = msg["execute_msg"][Action.swap]
+            offer_asset_data = swap_msg["offer_asset"]
+            token = await token_from_data(offer_asset_data["info"], self.client)
+            amount_in = token.to_amount(int_amount=offer_asset_data["amount"])
+        else:
+            raise NotImplementedError(f"Only swap messages implemented, received {msg}")
+        return amount_in, swap_msg
+
+    async def _parse_cw20_send_msg(self, msg: dict) -> tuple[TerraTokenAmount, dict]:
+        assert "send" in msg["execute_msg"], f"Expected CW20 send, received {msg}"
+        raw_send_msg: dict | str = msg["execute_msg"]["send"]["msg"]
+        if isinstance(raw_send_msg, str):
+            send_msg: dict = json.loads(base64.b64decode(raw_send_msg))
+        else:
+            send_msg = raw_send_msg
+        swap_msg = send_msg.get(Action.swap, {})
+        token = await CW20Token.from_contract(msg["contract"], self.client)
+        amount_in = token.to_amount(int_amount=msg["execute_msg"]["send"]["amount"])
+
+        return amount_in, swap_msg
 
 
 class LPToken(CW20Token):
