@@ -58,15 +58,16 @@ class TerraswapLPReserveSimulationMixin:
             yield self.pairs
             return
         for pair, list_msgs in filtered_mempool.items():
-            for (msg,) in list_msgs:  # Only txs with one message were filtered
-                try:
-                    changes = await pair.get_reserve_changes_from_msg(msg["value"])
-                except MaxSpreadAssertion:
-                    continue
-                self._mempool_reserve_changes[pair] = (
-                    self._mempool_reserve_changes[pair][0] + changes[0],
-                    self._mempool_reserve_changes[pair][1] + changes[1],
-                )
+            for tx_msgs in list_msgs:
+                for msg in tx_msgs:
+                    try:
+                        changes = await pair.get_reserve_changes_from_msg(msg["value"])
+                    except MaxSpreadAssertion:
+                        continue
+                    self._mempool_reserve_changes[pair] = (
+                        self._mempool_reserve_changes[pair][0] + changes[0],
+                        self._mempool_reserve_changes[pair][1] + changes[1],
+                    )
         simulations: dict[BaseTerraLiquidityPair, BaseTerraLiquidityPair] = {}
         for pair in self.pairs:
             pair_changes = self._mempool_reserve_changes[pair]
