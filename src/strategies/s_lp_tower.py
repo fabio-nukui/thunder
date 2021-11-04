@@ -28,7 +28,12 @@ from chains.terra import (
     TerraTokenAmount,
     terraswap,
 )
-from chains.terra.tx_filter import Filter, FilterSingleSwapTerraswapPair
+from chains.terra.tx_filter import (
+    Filter,
+    FilterFirstActionPairSwap,
+    FilterFirstActionRouterSwap,
+    FilterMsgsLength,
+)
 from exceptions import FeeEstimationError, UnprofitableArbitrage
 
 from .common.default_params import MIN_PROFIT_UST, MIN_START_AMOUNT, OPTIMIZATION_TOLERANCE
@@ -94,13 +99,17 @@ async def get_arbitrages(client: TerraClient) -> list[LPTowerArbitrage]:
 
 def get_filters(
     arb_routes: list[LPTowerArbitrage],
+    terraswap_factory: terraswap.TerraswapFactory,
 ) -> dict[terraswap.RouterLiquidityPair, Filter]:
     filters: dict[terraswap.RouterLiquidityPair, Filter] = {}
     for arb_route in arb_routes:
         for pair in arb_route.pairs:
             if not isinstance(pair, terraswap.LiquidityPair):
-                raise NotImplementedError
-            filters[pair] = FilterSingleSwapTerraswapPair(pair)
+                continue
+            filters[pair] = FilterMsgsLength(1) & (
+                FilterFirstActionPairSwap(terraswap.Action.swap, [pair])
+                | FilterFirstActionRouterSwap(terraswap_factory, [pair])
+            )
     return filters
 
 
@@ -330,5 +339,6 @@ class LPTowerArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbitra
 async def run(max_n_blocks: int = None):
     async with TerraClient() as client:
         arb_routes = await get_arbitrages(client)
-        mempool_filters = get_filters(arb_routes)
+        terraswap_factory = await terraswap.TerraswapFactory.new(client)
+        mempool_filters = get_filters(arb_routes, terraswap_factory)
         await run_strategy(client, arb_routes, mempool_filters, max_n_blocks)

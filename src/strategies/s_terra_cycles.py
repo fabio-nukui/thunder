@@ -33,7 +33,6 @@ from chains.terra import (
     terraswap,
 )
 from chains.terra.swap_utils import MultiRoutes, SingleRoute
-from chains.terra.terraswap.liquidity_pair import Action
 from chains.terra.tx_filter import (
     Filter,
     FilterFirstActionPairSwap,
@@ -122,7 +121,7 @@ def get_filters(
             if not isinstance(pair, terraswap.LiquidityPair):
                 continue
             filters[pair] = FilterMsgsLength(1) & (
-                FilterFirstActionPairSwap(Action.swap, [pair])
+                FilterFirstActionPairSwap(terraswap.Action.swap, [pair])
                 | FilterFirstActionRouterSwap(terraswap_factory, [pair])
             )
     return filters

@@ -15,7 +15,7 @@ async def run(max_n_blocks: int = None):
         )
         terraswap_factory = await terraswap.TerraswapFactory.new(client)
         terra_cycles = s_terra_cycles.get_filters(terra_cycle_arbs, terraswap_factory)
-        s_lp_tower_filters = s_lp_tower.get_filters(s_lp_tower_arbs)
+        s_lp_tower_filters = s_lp_tower.get_filters(s_lp_tower_arbs, terraswap_factory)
 
         arb_routes: Sequence[TerraRepeatedTxArbitrage] = [
             *terra_cycle_arbs,
