@@ -64,6 +64,9 @@ class TerraswapLPReserveSimulationMixin:
                         changes = await pair.get_reserve_changes_from_msg(msg["value"])
                     except MaxSpreadAssertion:
                         continue
+                    except Exception:
+                        log.exception(f"Error when decoding {msg['value']}")
+                        continue
                     self._mempool_reserve_changes[pair] = (
                         self._mempool_reserve_changes[pair][0] + changes[0],
                         self._mempool_reserve_changes[pair][1] + changes[1],

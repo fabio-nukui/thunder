@@ -659,10 +659,9 @@ class LiquidityPair(BaseTerraLiquidityPair):
     async def get_reserve_changes_from_msg(self, msg: dict) -> AmountTuple:
         if msg["contract"] == self.contract_addr:
             amount_in, swap_msg = await self._parse_direct_pair_msg(msg)
-        cw20_token_addresses = [
+        elif msg["contract"] in (
             token.contract_addr for token in self.tokens if isinstance(token, CW20Token)
-        ]
-        if msg["contract"] in cw20_token_addresses:
+        ):
             amount_in, swap_msg = await self._parse_cw20_send_msg(msg)
         else:
             assert self.factory_address
