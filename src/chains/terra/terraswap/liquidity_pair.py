@@ -165,29 +165,28 @@ async def _decode_router_msg(
         raise TypeError(f"Could not extract pairs from {msg=}")
     pairs: list[RouterLiquidityPair] = []
     for op in operations:
-        if "native_swap" in op:
-            if op == operations[0]:
+        if op == operations[0]:
+            if "native_swap" in op:
                 token_in = TerraNativeToken(op["native_swap"]["offer_denom"])
+            else:
+                token_in = await token_from_data(op["terra_swap"]["offer_asset_info"], client)
+            if isinstance(token_in, TerraNativeToken):
                 amount_in = token_in.to_amount(int_amount=swap_operations["offer_amount"])
-            if op == operations[-1]:
+            else:
+                amount_in = token_in.to_amount(int_amount=execute_msg["send"]["amount"])
+        if op == operations[-1]:
+            if "native_swap" in op:
                 token_out = TerraNativeToken(op["native_swap"]["ask_denom"])
-                min_out = token_out.to_amount(int_amount=msg.get("minimum_receive", 0))
+            else:
+                token_out = await token_from_data(op["terra_swap"]["ask_asset_info"], client)
+            min_out = token_out.to_amount(int_amount=msg.get("minimum_receive", 0))
+        if "native_swap" in op:
             tokens = (
                 TerraNativeToken(op["native_swap"]["offer_denom"]),
                 TerraNativeToken(op["native_swap"]["ask_denom"]),
             )
             pairs.append(NativeLiquidityPair(client, tokens))
         else:
-            if op == operations[0]:
-                token_in = await token_from_data(op["terra_swap"]["offer_asset_info"], client)
-                if isinstance(token_in, TerraNativeToken):
-                    int_amount = swap_operations["offer_amount"]
-                else:
-                    int_amount = execute_msg["send"]["amount"]
-                amount_in = token_in.to_amount(int_amount=int_amount)
-            if op == operations[-1]:
-                token_out = await token_from_data(op["terra_swap"]["ask_asset_info"], client)
-                min_out = token_out.to_amount(int_amount=msg.get("minimum_receive", 0))
             asset_infos = [
                 op["terra_swap"]["offer_asset_info"],
                 op["terra_swap"]["ask_asset_info"],
