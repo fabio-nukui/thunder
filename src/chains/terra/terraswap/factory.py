@@ -138,6 +138,8 @@ class Factory:
             self.client,
             fee_rate=_get_fee_rate(contract_addr),
             factory_name=self.name,
+            factory_address=self.contract_addr,
+            router_address=self.router_address,
             check_liquidity=check_liquidity,
         )
 

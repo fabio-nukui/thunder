@@ -8,26 +8,38 @@ import math
 from copy import copy
 from decimal import Decimal
 from enum import Enum
+from typing import TYPE_CHECKING, NamedTuple
 
 from terra_sdk.core import AccAddress, Coins
 from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.exceptions import LCDResponseError
 
 from exceptions import InsufficientLiquidity, MaxSpreadAssertion, NotContract
-from utils.cache import CacheGroup, ttl_cache
+from utils.cache import CacheGroup, lru_cache, ttl_cache
 
 from ..client import TerraClient
-from ..native_liquidity_pair import BaseTerraLiquidityPair
+from ..native_liquidity_pair import BaseTerraLiquidityPair, NativeLiquidityPair
 from ..token import CW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
 from .utils import Operation, token_to_data
+
+if TYPE_CHECKING:
+    from .router import RouterLiquidityPair
 
 log = logging.getLogger(__name__)
 
 FEE = Decimal("0.003")
 MAX_SWAP_SLIPPAGE = Decimal("0.00001")
 MAX_ADD_LIQUIDITY_SLIPPAGE = Decimal("0.0005")
+ROUTER_DECODE_MSG_CACHE_SIZE = 1_000
+TOKEN_FROM_DATA_CACHE_SIZE = 5_000
 
 AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
+
+
+class RouterDecodedMsg(NamedTuple):
+    amount_in: TerraTokenAmount
+    min_out: TerraTokenAmount
+    pairs: list[RouterLiquidityPair]
 
 
 class Action(str, Enum):
@@ -56,6 +68,13 @@ async def pair_tokens_from_data(
     return token_0, token_1
 
 
+def _decode_msg(raw_msg: str | dict, always_base64: bool = False) -> dict:
+    if isinstance(raw_msg, dict):
+        return {} if always_base64 else raw_msg
+    return json.loads(base64.b64decode(raw_msg))
+
+
+@lru_cache(TOKEN_FROM_DATA_CACHE_SIZE)
 async def token_from_data(
     asset_info: dict,
     client: TerraClient,
@@ -83,10 +102,102 @@ def _token_amount_to_data(token_amount: TerraTokenAmount) -> dict:
     }
 
 
+@lru_cache(ROUTER_DECODE_MSG_CACHE_SIZE)
+async def get_router_reserve_changes_from_msg(
+    client: TerraClient,
+    factory_address: AccAddress,
+    router_address: AccAddress,
+    msg: dict,
+) -> dict[RouterLiquidityPair, tuple[TerraTokenAmount, TerraTokenAmount]]:
+    changes: dict[RouterLiquidityPair, tuple[TerraTokenAmount, TerraTokenAmount]] = {}
+    amount_in, min_out, pairs = await _decode_router_msg(
+        client, factory_address, router_address, msg
+    )
+    for pair in pairs:
+        if isinstance(pair, LiquidityPair):
+            amounts = await pair.get_swap_amounts(amount_in)
+        else:
+            # Placeholder until NativeLiquiditySwap reserve simulation is implemented
+            amounts = {
+                "pool_change": (pair.tokens[0].to_amount(0), pair.tokens[1].to_amount(0)),
+                "amounts_out": (
+                    await pair.get_swap_amount_out(amount_in),
+                    pair.tokens[0].to_amount(0),
+                ),
+            }
+        amounts_pool_change = amounts["pool_change"]
+        if amounts_pool_change[0].token == pair.tokens[0]:
+            changes[pair] = amounts_pool_change
+        else:
+            changes[pair] = amounts_pool_change[1], amounts_pool_change[0]
+        if amounts["amounts_out"][0].int_amount == 0:
+            amount_in = amounts["amounts_out"][1]
+        else:
+            amount_in = amounts["amounts_out"][0]
+    if amount_in < min_out:
+        raise MaxSpreadAssertion
+    return changes
+
+
+async def _decode_router_msg(
+    client: TerraClient,
+    factory_address: AccAddress,
+    router_address: AccAddress,
+    msg: dict,
+) -> RouterDecodedMsg:
+    action = "execute_swap_operations"
+    if (
+        msg["contract"] == router_address
+        and action in (execute_msg := msg["execute_msg"])
+        and "operations" in (swap_operations := execute_msg[action])
+    ):
+        operations = swap_operations["operations"]
+    elif (
+        "send" in (execute_msg := msg["execute_msg"])
+        and "msg" in (send := execute_msg["send"])
+        and send["contract"] == router_address
+        and action in (inner_msg := _decode_msg(send["msg"]))
+        and "operations" in (swap_operations := inner_msg[action])
+    ):
+        operations = swap_operations["operations"]
+    else:
+        raise TypeError(f"Could not extract pairs from {msg=}")
+    pairs: list[RouterLiquidityPair] = []
+    for op in operations:
+        if "native_swap" in op:
+            if op == operations[0]:
+                token_in = TerraNativeToken(op["native_swap"]["offer_denom"])
+                amount_in = token_in.to_amount(int_amount=msg["offer_amount"])
+            if op == operations[-1]:
+                token_out = TerraNativeToken(op["native_swap"]["ask_denom"])
+                min_out = token_out.to_amount(int_amount=msg.get("minimum_receive", 0))
+            tokens = (
+                TerraNativeToken(op["native_swap"]["offer_denom"]),
+                TerraNativeToken(op["native_swap"]["ask_denom"]),
+            )
+            pairs.append(NativeLiquidityPair(client, tokens))
+        else:
+            if op == operations[0]:
+                token_in = await token_from_data(op["terra_swap"]["offer_asset_info"], client)
+                amount_in = token_in.to_amount(int_amount=msg["execute_msg"]["send"]["amount"])
+            if op == operations[-1]:
+                token_out = await token_from_data(op["terra_swap"]["ask_asset_info"], client)
+                min_out = token_out.to_amount(int_amount=msg.get("minimum_receive", 0))
+            asset_infos = [
+                op["terra_swap"]["offer_asset_info"],
+                op["terra_swap"]["ask_asset_info"],
+            ]
+            query = {"pair": {"asset_infos": asset_infos}}
+            pair_info = await client.contract_query(factory_address, query)
+            pairs.append(await LiquidityPair.new(pair_info["contract_addr"], client))
+    return RouterDecodedMsg(amount_in, min_out, pairs)
+
+
 class LiquidityPair(BaseTerraLiquidityPair):
     contract_addr: AccAddress
     fee_rate: Decimal
     factory_name: str | None
+    factory_address: AccAddress | None
     router_address: AccAddress | None
     lp_token: LPToken
     _reserves: AmountTuple
@@ -101,6 +212,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
         client: TerraClient,
         fee_rate: Decimal = None,
         factory_name: str = None,
+        factory_address: AccAddress = None,
         router_address: AccAddress = None,
         recursive_lp_token_code_id: int = None,
         check_liquidity: bool = True,
@@ -117,6 +229,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
         self.client = client
         self.fee_rate = FEE if fee_rate is None else fee_rate
         self.factory_name = factory_name
+        self.factory_address = factory_address
         self.router_address = router_address
 
         self.lp_token = await LPToken.from_pool_contract(
@@ -543,6 +656,15 @@ class LiquidityPair(BaseTerraLiquidityPair):
         return msgs
 
     async def get_reserve_changes_from_msg(self, msg: dict) -> AmountTuple:
+        try:
+            assert self.factory_address
+            assert self.router_address
+            changes = await get_router_reserve_changes_from_msg(
+                self.client, self.factory_address, self.router_address, msg
+            )
+            return next(change for pair, change in changes.items() if self == pair)
+        except (KeyError, AttributeError, ValueError):
+            pass
         amount_in, swap_msg = await self._parse_msg(msg)
         max_spread = Decimal(swap_msg["max_spread"]) if "max_spread" in swap_msg else None
         belief_price = Decimal(swap_msg["belief_price"]) if "belief_price" in swap_msg else None
@@ -583,7 +705,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
             send_msg: dict = json.loads(base64.b64decode(raw_send_msg))
         else:
             send_msg = raw_send_msg
-        swap_msg = send_msg.get(Action.swap, {})
+        swap_msg = send_msg[Action.swap] if send_msg else {}
         token = await CW20Token.from_contract(msg["contract"], self.client)
         amount_in = token.to_amount(int_amount=msg["execute_msg"]["send"]["amount"])
 

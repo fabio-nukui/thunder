@@ -122,12 +122,6 @@ class FilterFirstActionRouterSwap(Filter):
         self.aways_base64 = aways_base64
         self.pairs = [p for p in pairs if p.router_address]
         self.router_addresses = {p.router_address for p in self.pairs}
-        self._token_contracts = {
-            token.contract_addr
-            for p in self.pairs
-            for token in p.tokens
-            if isinstance(token, CW20Token)
-        }
         self._token_ids = [
             {_get_token_id(p.tokens[0]), _get_token_id(p.tokens[1])} for p in self.pairs
         ]
@@ -152,8 +146,7 @@ class FilterFirstActionRouterSwap(Filter):
         ):
             operations = swap_operations["operations"]
         elif (
-            value["contract"] in self._token_contracts
-            and "send" in (execute_msg := value["execute_msg"])
+            "send" in (execute_msg := value["execute_msg"])
             and "msg" in (send := execute_msg["send"])
             and send["contract"] in self.router_addresses
             and action in (inner_msg := _decode_msg(send["msg"], self.aways_base64))
