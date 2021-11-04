@@ -30,8 +30,9 @@ log = logging.getLogger(__name__)
 FEE = Decimal("0.003")
 MAX_SWAP_SLIPPAGE = Decimal("0.00001")
 MAX_ADD_LIQUIDITY_SLIPPAGE = Decimal("0.0005")
-ROUTER_DECODE_MSG_CACHE_SIZE = 1_000
-TOKEN_FROM_DATA_CACHE_SIZE = 5_000
+TOKEN_FROM_DATA_CACHE_SIZE = 1000
+ROUTER_DECODE_MSG_CACHE_SIZE = 200
+ROUTER_DECODE_MSG_CACHE_TTL = 30
 
 AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
 
@@ -102,7 +103,7 @@ def _token_amount_to_data(token_amount: TerraTokenAmount) -> dict:
     }
 
 
-@lru_cache(ROUTER_DECODE_MSG_CACHE_SIZE)
+@ttl_cache(CacheGroup.TERRA, ROUTER_DECODE_MSG_CACHE_SIZE, ROUTER_DECODE_MSG_CACHE_TTL)
 async def get_router_reserve_changes_from_msg(
     client: TerraClient,
     factory_address: AccAddress,
