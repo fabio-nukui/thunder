@@ -113,7 +113,6 @@ async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
 
 def get_filters(
     arb_routes: list[TerraCyclesArbitrage],
-    terraswap_factory: terraswap.TerraswapFactory,
 ) -> dict[terraswap.RouterLiquidityPair, Filter]:
     filters: dict[terraswap.RouterLiquidityPair, Filter] = {}
     for arb_route in arb_routes:
@@ -122,7 +121,7 @@ def get_filters(
                 continue
             filters[pair] = FilterMsgsLength(1) & (
                 FilterFirstActionPairSwap(terraswap.Action.swap, [pair])
-                | FilterFirstActionRouterSwap(terraswap_factory, [pair])
+                | FilterFirstActionRouterSwap([pair])
             )
     return filters
 
@@ -561,6 +560,5 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
 async def run(max_n_blocks: int = None):
     async with TerraClient() as client:
         arb_routes = await get_arbitrages(client)
-        terraswap_factory = await terraswap.TerraswapFactory.new(client)
-        mempool_filters = get_filters(arb_routes, terraswap_factory)
+        mempool_filters = get_filters(arb_routes)
         await run_strategy(client, arb_routes, mempool_filters, max_n_blocks)

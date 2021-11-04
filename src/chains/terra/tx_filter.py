@@ -129,15 +129,12 @@ class FilterSingleSwapTerraswapPair(Filter):
 class FilterFirstActionRouterSwap(Filter):
     def __init__(
         self,
-        factory: terraswap.Factory,
         pairs: Iterable[terraswap.LiquidityPair],
         aways_base64: bool = False,
     ):
-        if not factory.router_address:
-            raise TypeError("Factory missing router address")
-        self.router_address = factory.router_address
         self.aways_base64 = aways_base64
-        self.pairs = [p for p in pairs if p.contract_addr in factory.pairs_addresses.values()]
+        self.pairs = [p for p in pairs if p.router_address]
+        self.router_addresses = {p.router_address for p in self.pairs}
         self._token_contracts = {
             token.contract_addr
             for p in pairs
@@ -162,7 +159,7 @@ class FilterFirstActionRouterSwap(Filter):
         action = "execute_swap_operations"
         operations: list[dict[str, dict]]
         if (
-            value["contract"] == self.router_address
+            value["contract"] in self.router_addresses
             and action in (execute_msg := value["execute_msg"])
             and "operations" in (swap_operations := execute_msg[action])
         ):
@@ -171,7 +168,7 @@ class FilterFirstActionRouterSwap(Filter):
             value["contract"] in self._token_contracts
             and "send" in (execute_msg := value["execute_msg"])
             and "msg" in (send := execute_msg["send"])
-            and send["contract"] == self.router_address
+            and send["contract"] in self.router_addresses
             and action in (inner_msg := _decode_msg(send["msg"], self.aways_base64))
             and "operations" in (swap_operations := inner_msg[action])
         ):
@@ -199,13 +196,9 @@ class FilterFirstActionRouterSwap(Filter):
 
 
 class FilterSingleSwapTerraswapRouter(Filter):
-    def __init__(
-        self,
-        factory: terraswap.Factory,
-        pairs: Iterable[terraswap.LiquidityPair],
-    ):
+    def __init__(self, pairs: Iterable[terraswap.LiquidityPair]):
         self.pairs = pairs
-        terraswap_filter = FilterFirstActionRouterSwap(factory, self.pairs)
+        terraswap_filter = FilterFirstActionRouterSwap(self.pairs)
         self._filter = FilterMsgsLength(1) & terraswap_filter
 
     def __repr__(self) -> str:
