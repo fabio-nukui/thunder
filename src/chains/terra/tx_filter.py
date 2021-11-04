@@ -186,7 +186,7 @@ class FilterSwapTerraswap(Filter):
     def __init__(self, pairs: Iterable[terraswap.LiquidityPair]):
         self.pairs = pairs
         filter_length = FilterMsgsLength(1)
-        filter_pair = FilterFirstActionRouterSwap(self.pairs)
+        filter_pair = FilterFirstActionPairSwap(terraswap.Action.swap, self.pairs)
         filter_router = FilterFirstActionRouterSwap(self.pairs)
         self._filter = filter_length & (filter_pair | filter_router)
 
