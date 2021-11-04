@@ -168,7 +168,7 @@ async def _decode_router_msg(
         if "native_swap" in op:
             if op == operations[0]:
                 token_in = TerraNativeToken(op["native_swap"]["offer_denom"])
-                amount_in = token_in.to_amount(int_amount=msg["offer_amount"])
+                amount_in = token_in.to_amount(int_amount=swap_operations["offer_amount"])
             if op == operations[-1]:
                 token_out = TerraNativeToken(op["native_swap"]["ask_denom"])
                 min_out = token_out.to_amount(int_amount=msg.get("minimum_receive", 0))
