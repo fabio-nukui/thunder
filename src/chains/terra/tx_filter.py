@@ -6,8 +6,6 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Iterable
 
-from terra_sdk.core import AccAddress
-
 from . import terraswap
 from .token import CW20Token, TerraNativeToken, TerraToken
 
@@ -135,13 +133,11 @@ class FilterFirstActionRouterSwap(Filter):
         pairs: Iterable[terraswap.LiquidityPair],
         aways_base64: bool = False,
     ):
-        if "router" not in factory.addresses:
+        if not factory.router_address:
             raise TypeError("Factory missing router address")
-        self.router_address: AccAddress = factory.addresses["router"]
+        self.router_address = factory.router_address
         self.aways_base64 = aways_base64
-        self.pairs = [
-            p for p in pairs if p.contract_addr in factory.addresses["pairs"].values()
-        ]
+        self.pairs = [p for p in pairs if p.contract_addr in factory.pairs_addresses.values()]
         self._token_contracts = {
             token.contract_addr
             for p in pairs

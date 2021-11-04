@@ -88,6 +88,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
     contract_addr: AccAddress
     fee_rate: Decimal
     factory_name: str | None
+    router_address: AccAddress | None
     lp_token: LPToken
     _reserves: AmountTuple
 
@@ -98,6 +99,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
         client: TerraClient,
         fee_rate: Decimal = None,
         factory_name: str = None,
+        router_address: AccAddress = None,
         recursive_lp_token_code_id: int = None,
         check_liquidity: bool = True,
     ) -> LiquidityPair:
@@ -106,6 +108,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
         self.client = client
         self.fee_rate = FEE if fee_rate is None else fee_rate
         self.factory_name = factory_name
+        self.router_address = router_address
 
         self.lp_token = await LPToken.from_pool_contract(
             self.contract_addr, self.client, recursive_lp_token_code_id

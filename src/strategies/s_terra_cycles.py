@@ -141,7 +141,7 @@ async def _get_ust_native_routes(
             client=client,
             start_token=UST,
             list_steps=[[loop_pair, terraswap_pair], [native_pair]],
-            router_address=terraswap_factory.addresses["router"],
+            router_address=terraswap_factory.router_address,
         )
     ]
 
@@ -153,7 +153,7 @@ async def _get_luna_native_routes(
     pat_token_symbol = re.compile(r"^[A-Z]+-LUNA$")
 
     routes: list[MultiRoutes] = []
-    for pair_symbol in factory.addresses["pairs"]:
+    for pair_symbol in factory.pairs_addresses:
         if not (match := pat_token_symbol.match(pair_symbol)) or pair_symbol == "UST-LUNA":
             continue
         terraswap_pair = await factory.get_pair(match.group(), check_liquidity=False)
@@ -163,7 +163,7 @@ async def _get_luna_native_routes(
         list_steps: Sequence[Sequence] = [[terraswap_pair], [native_pair]]
 
         routes.append(
-            MultiRoutes(client, LUNA, list_steps, router_address=factory.addresses["router"])
+            MultiRoutes(client, LUNA, list_steps, router_address=factory.router_address)
         )
     return routes
 
@@ -221,7 +221,7 @@ async def _get_ust_terraswap_3cycle_routes(
             client=client,
             start_token=UST,
             list_steps=[[beth_ust_pair], [meth_beth_pair], [ust_meth_pair]],
-            router_address=terraswap_factory.addresses["router"],
+            router_address=terraswap_factory.router_address,
         )
     ]
 
@@ -235,7 +235,7 @@ async def _get_ust_loop_3cycle_routes(
     pat_token_symbol = re.compile(r"^(?:([a-zA-Z]+)-LOOP|LOOP-([a-zA-Z]+))$")
 
     routes: list[MultiRoutes] = []
-    for pair_symbol in loop_factory.addresses["pairs"]:
+    for pair_symbol in loop_factory.pairs_addresses:
         if not (match := pat_token_symbol.match(pair_symbol)) or pair_symbol == "LOOP-UST":
             continue
         token_symbol = match.group(1) or match.group(2)
@@ -243,7 +243,7 @@ async def _get_ust_loop_3cycle_routes(
         ust_pairs: list[terraswap.LiquidityPair] = []
         for factory in (terraswap_factory, loop_factory):
             for ust_pair_symbol in (f"{token_symbol}-UST", f"UST-{token_symbol}"):
-                if ust_pair_symbol in factory.addresses["pairs"]:
+                if ust_pair_symbol in factory.pairs_addresses:
                     try:
                         ust_pairs.append(await factory.get_pair(ust_pair_symbol))
                     except InsufficientLiquidity:
@@ -269,13 +269,13 @@ async def _get_ust_loopdex_terraswap_2cycle_routes(
     pair_symbol: str
 
     routes: list[MultiRoutes] = []
-    for pair_symbol in loop_factory.addresses["pairs"]:
+    for pair_symbol in loop_factory.pairs_addresses:
         if not (match := pat_token_symbol.match(pair_symbol)):
             continue
         reversed_symbol = f"{match.group(2)}-UST" if match.group(2) else f"UST-{match.group(1)}"
-        if pair_symbol in terraswap_factory.addresses["pairs"]:
+        if pair_symbol in terraswap_factory.pairs_addresses:
             terraswap_pair_symbol = pair_symbol
-        elif reversed_symbol in terraswap_factory.addresses["pairs"]:
+        elif reversed_symbol in terraswap_factory.pairs_addresses:
             terraswap_pair_symbol = reversed_symbol
         else:
             continue
@@ -298,14 +298,14 @@ async def _get_ust_alte_3cycle_routes(
     pat_token_symbol = re.compile(r"^(?:([a-zA-Z]+)-ALTE|ALTE-([a-zA-Z]+))$")
 
     routes: list[MultiRoutes] = []
-    for pair_symbol in factory.addresses["pairs"]:
+    for pair_symbol in factory.pairs_addresses:
         if not (match := pat_token_symbol.match(pair_symbol)) or pair_symbol == "ALTE-UST":
             continue
         token_symbol = match.group(1) or match.group(2)
 
         ust_pairs: list[terraswap.LiquidityPair] = []
         for ust_pair_symbol in (f"{token_symbol}-UST", f"UST-{token_symbol}"):
-            if ust_pair_symbol in factory.addresses["pairs"]:
+            if ust_pair_symbol in factory.pairs_addresses:
                 try:
                     ust_pairs.append(await factory.get_pair(ust_pair_symbol))
                 except InsufficientLiquidity:
@@ -328,7 +328,7 @@ async def _pairs_from_factories(
     pairs = []
     for pair_symbol in (f"{symbol_0}-{symbol_1}", f"{symbol_1}-{symbol_0}"):
         for factory in terraswap_factories:
-            if pair_symbol in factory.addresses["pairs"]:
+            if pair_symbol in factory.pairs_addresses:
                 try:
                     pairs.append(await factory.get_pair(pair_symbol))
                 except InsufficientLiquidity:

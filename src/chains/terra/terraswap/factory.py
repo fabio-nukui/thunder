@@ -45,9 +45,10 @@ def _check_cw20_whitelist(token: TerraToken) -> bool:
 
 class Factory:
     client: TerraClient
-    addresses: dict[str, Any]
     name: str | None
     contract_addr: AccAddress
+    router_address: AccAddress | None
+    pairs_addresses: dict[str, AccAddress]
     pair_code_id: int
     lp_token_code_id: int
 
@@ -63,9 +64,10 @@ class Factory:
     ) -> _FactoryT:
         self = super().__new__(cls)
         self.client = client
-        self.addresses = addresses
         self.name = name
-        self.contract_addr = self.addresses["factory"]
+        self.contract_addr = addresses["factory"]
+        self.router_address = addresses.get("router")
+        self.pairs_addresses = addresses["pairs"]
 
         config = await client.contract_query(self.contract_addr, {"config": {}})
         self.pair_code_id = config["pair_code_id"]
@@ -127,7 +129,7 @@ class Factory:
 
     async def get_pair(self, pair_name: str, check_liquidity: bool = True) -> LiquidityPair:
         try:
-            contract_addr = self.addresses["pairs"][pair_name]
+            contract_addr = self.pairs_addresses[pair_name]
         except KeyError:
             raise Exception(f"{self}: {pair_name} not in pairs addresses")
         assert await self.is_pair(contract_addr)
@@ -140,9 +142,9 @@ class Factory:
         )
 
     def get_router(self, liquidity_pairs: Iterable[RouterLiquidityPair]) -> Router:
-        if "router" not in self.addresses:
+        if not self.router_address:
             raise Exception(f"{self}: no router address")
-        return Router(self.addresses["router"], liquidity_pairs, self.client)
+        return Router(self.router_address, liquidity_pairs, self.client)
 
     async def is_pair(self, contract_addr: AccAddress) -> bool:
         try:
