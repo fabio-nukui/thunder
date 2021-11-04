@@ -65,7 +65,7 @@ class TerraTokenAmount(TokenAmount):
 
 
 class BaseTerraToken(Token[TerraTokenAmount], ABC):
-    amount_class: type[TerraTokenAmount]
+    amount_class = TerraTokenAmount
 
     @abstractmethod
     async def get_balance(
@@ -82,8 +82,6 @@ class BaseTerraToken(Token[TerraTokenAmount], ABC):
 
 
 class TerraNativeToken(BaseTerraToken):
-    amount_class = TerraTokenAmount
-
     def __init__(self, denom: str):
         self.denom = denom
         self.symbol = "LUNA" if denom == "uluna" else denom[1:-1].upper() + "T"
@@ -108,8 +106,6 @@ class TerraNativeToken(BaseTerraToken):
 
 
 class CW20Token(BaseTerraToken):
-    amount_class = TerraTokenAmount
-
     def __init__(self, contract_addr: AccAddress, symbol: str, decimals: int):
         self.contract_addr = contract_addr
         self.symbol = symbol
