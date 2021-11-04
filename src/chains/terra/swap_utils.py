@@ -5,7 +5,7 @@ import itertools
 from functools import cache
 from typing import Iterable, Sequence, Union, cast
 
-from terra_sdk.core.strings import AccAddress
+from terra_sdk.core import AccAddress
 from terra_sdk.core.wasm import MsgExecuteContract
 
 from .client import TerraClient

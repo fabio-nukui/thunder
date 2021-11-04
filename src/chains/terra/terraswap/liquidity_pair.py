@@ -9,8 +9,7 @@ from copy import copy
 from decimal import Decimal
 from enum import Enum
 
-from terra_sdk.core import AccAddress
-from terra_sdk.core.coins import Coins
+from terra_sdk.core import AccAddress, Coins
 from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.exceptions import LCDResponseError
 

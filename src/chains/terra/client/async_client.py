@@ -10,8 +10,7 @@ from decimal import Decimal
 from typing import AsyncIterable
 
 from terra_sdk.core import AccAddress, Coins
-from terra_sdk.core.auth import TxLog
-from terra_sdk.core.auth.data.account import Account
+from terra_sdk.core.auth import Account, TxLog
 from terra_sdk.exceptions import LCDResponseError
 from terra_sdk.key.mnemonic import MnemonicKey
 

@@ -4,8 +4,7 @@ from abc import ABC, abstractmethod
 from decimal import Decimal
 from typing import TYPE_CHECKING, Optional, TypeVar, Union
 
-from terra_sdk.core import AccAddress, Coin
-from terra_sdk.core.numeric import Dec
+from terra_sdk.core import AccAddress, Coin, Dec
 from terra_sdk.core.wasm import MsgExecuteContract
 
 from common.token import DecInput, Token, TokenAmount

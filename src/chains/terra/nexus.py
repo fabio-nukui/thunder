@@ -5,7 +5,7 @@ import json
 from typing import TYPE_CHECKING, Sequence
 
 from terra_sdk.core import AccAddress
-from terra_sdk.core.wasm.msgs import MsgExecuteContract
+from terra_sdk.core.wasm import MsgExecuteContract
 
 from .native_liquidity_pair import BaseTerraLiquidityPair
 from .token import CW20Token, TerraTokenAmount

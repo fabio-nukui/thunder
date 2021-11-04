@@ -6,7 +6,7 @@ import logging
 from decimal import Decimal
 from typing import Any, Iterable, Tuple, TypeVar
 
-from terra_sdk.core.strings import AccAddress
+from terra_sdk.core import AccAddress
 from terra_sdk.exceptions import LCDResponseError
 
 from chains.terra.token import CW20Token, TerraToken
