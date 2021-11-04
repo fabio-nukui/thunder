@@ -40,7 +40,7 @@ JUPYTER_PORT = 8888
 DATA_SOURCE = s3://crypto-thunder
 PYTHON = python3
 GIT_BRANCH = $(shell git rev-parse --verify --short=12 HEAD)
-RESTART_SLEEP_TIME ?= 7
+RESTART_SLEEP_TIME ?= 1
 
 ################################################################################################
 ## GENERAL COMMANDS
@@ -122,11 +122,10 @@ start-terra_broadcaster:  ## Build and start terra-broadcast/ngnix containers/vo
 	docker-compose up -d --build terra_broadcaster
 
 restart: build  ## Restart running strategy "$STRAT" with updated code
-	docker rename $(ARBITRAGE_CONTAINER_NAME) $(ARBITRAGE_CONTAINER_NAME)_stopping
-	$(MAKE) start
+	docker stop $(ARBITRAGE_CONTAINER_NAME)
+	docker rm $(ARBITRAGE_CONTAINER_NAME)
 	sleep $(RESTART_SLEEP_TIME)
-	docker stop $(ARBITRAGE_CONTAINER_NAME)_stopping
-	docker rm $(ARBITRAGE_CONTAINER_NAME)_stopping
+	$(MAKE) start
 
 check-restart: check-all restart  ## Restart running strategy "$STRAT" with updated code
 
