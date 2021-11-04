@@ -28,12 +28,7 @@ from chains.terra import (
     TerraTokenAmount,
     terraswap,
 )
-from chains.terra.tx_filter import (
-    Filter,
-    FilterFirstActionPairSwap,
-    FilterFirstActionRouterSwap,
-    FilterMsgsLength,
-)
+from chains.terra.tx_filter import Filter, FilterSwapTerraswap
 from exceptions import FeeEstimationError, UnprofitableArbitrage
 
 from .common.default_params import MIN_PROFIT_UST, MIN_START_AMOUNT, OPTIMIZATION_TOLERANCE
@@ -105,10 +100,7 @@ def get_filters(
         for pair in arb_route.pairs:
             if not isinstance(pair, terraswap.LiquidityPair):
                 continue
-            filters[pair] = FilterMsgsLength(1) & (
-                FilterFirstActionPairSwap(terraswap.Action.swap, [pair])
-                | FilterFirstActionRouterSwap([pair])
-            )
+            filters[pair] = FilterSwapTerraswap([pair])
     return filters
 
 

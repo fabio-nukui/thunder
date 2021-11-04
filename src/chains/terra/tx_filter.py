@@ -113,19 +113,6 @@ class FilterFirstActionPairSwap(Filter):
         return False
 
 
-class FilterSingleSwapTerraswapPair(Filter):
-    def __init__(self, pair: terraswap.LiquidityPair):
-        self.pair = pair
-        terraswap_filter = FilterFirstActionPairSwap(terraswap.Action.swap, [self.pair])
-        self._filter = FilterMsgsLength(1) & terraswap_filter
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self.pair})"
-
-    def match_msgs(self, msgs: list[dict]) -> bool:
-        return self._filter.match_msgs(msgs)
-
-
 class FilterFirstActionRouterSwap(Filter):
     def __init__(
         self,
@@ -137,7 +124,7 @@ class FilterFirstActionRouterSwap(Filter):
         self.router_addresses = {p.router_address for p in self.pairs}
         self._token_contracts = {
             token.contract_addr
-            for p in pairs
+            for p in self.pairs
             for token in p.tokens
             if isinstance(token, CW20Token)
         }
@@ -195,11 +182,13 @@ class FilterFirstActionRouterSwap(Filter):
         return False
 
 
-class FilterSingleSwapTerraswapRouter(Filter):
+class FilterSwapTerraswap(Filter):
     def __init__(self, pairs: Iterable[terraswap.LiquidityPair]):
         self.pairs = pairs
-        terraswap_filter = FilterFirstActionRouterSwap(self.pairs)
-        self._filter = FilterMsgsLength(1) & terraswap_filter
+        filter_length = FilterMsgsLength(1)
+        filter_pair = FilterFirstActionRouterSwap(self.pairs)
+        filter_router = FilterFirstActionRouterSwap(self.pairs)
+        self._filter = filter_length & (filter_pair | filter_router)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(pairs={self.pairs})"
