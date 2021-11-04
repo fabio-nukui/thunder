@@ -91,6 +91,9 @@ class LiquidityPair(BaseTerraLiquidityPair):
     lp_token: LPToken
     _reserves: AmountTuple
 
+    _instances: dict[AccAddress, LiquidityPair] = {}
+    _instances_creation: dict[AccAddress, asyncio.Event] = {}
+
     @classmethod
     async def new(
         cls: type[LiquidityPair],
@@ -102,6 +105,13 @@ class LiquidityPair(BaseTerraLiquidityPair):
         recursive_lp_token_code_id: int = None,
         check_liquidity: bool = True,
     ) -> LiquidityPair:
+        if contract_addr in cls._instances:
+            return cls._instances[contract_addr]
+        if contract_addr in cls._instances_creation:
+            await cls._instances_creation[contract_addr].wait()
+            return cls._instances[contract_addr]
+        cls._instances_creation[contract_addr] = asyncio.Event()
+
         self = super().__new__(cls)
         self.contract_addr = contract_addr
         self.client = client
@@ -120,6 +130,9 @@ class LiquidityPair(BaseTerraLiquidityPair):
             log.debug(f"{self}: Zero liquidity on initialization")
             raise InsufficientLiquidity(self)
 
+        cls._instances[self.contract_addr] = self
+        cls._instances_creation[contract_addr].set()
+        del cls._instances_creation[contract_addr]
         return self
 
     def __repr__(self) -> str:
