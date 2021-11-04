@@ -5,7 +5,7 @@ from collections import defaultdict
 from enum import Enum
 from typing import Callable, Optional
 
-from cachetools import TTLCache
+from cachetools import LRUCache, TTLCache
 
 import configs
 
@@ -46,6 +46,17 @@ def _get_ttl_cache(
 
     _caches[group].append(cache)
     return cache
+
+
+def lru_cache(maxsize: int | Callable = 100):
+    """LRU cache decorator for sync and async functions"""
+    if callable(maxsize):
+        # ttl_cache was applied directly
+        func = maxsize
+        return cached(LRUCache(100), key=json_hashkey)(func)
+    if isinstance(maxsize, int):
+        return cached(LRUCache(maxsize), key=json_hashkey)
+    raise TypeError("Expected first argument to be an int or a callable")
 
 
 def ttl_cache(
