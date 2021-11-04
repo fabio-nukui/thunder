@@ -180,7 +180,11 @@ async def _decode_router_msg(
         else:
             if op == operations[0]:
                 token_in = await token_from_data(op["terra_swap"]["offer_asset_info"], client)
-                amount_in = token_in.to_amount(int_amount=msg["execute_msg"]["send"]["amount"])
+                if isinstance(token_in, TerraNativeToken):
+                    int_amount = swap_operations["offer_amount"]
+                else:
+                    int_amount = execute_msg["send"]["amount"]
+                amount_in = token_in.to_amount(int_amount=int_amount)
             if op == operations[-1]:
                 token_out = await token_from_data(op["terra_swap"]["ask_asset_info"], client)
                 min_out = token_out.to_amount(int_amount=msg.get("minimum_receive", 0))
