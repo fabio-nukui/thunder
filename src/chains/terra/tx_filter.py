@@ -156,6 +156,8 @@ class FilterFirstActionRouterSwap(Filter):
         return f"{self.__class__.__name__}(pairs={self.pairs})"
 
     def match_msgs(self, msgs: list[dict]) -> bool:
+        if not self.pairs:
+            return False
         msg = msgs[0]
         if "MsgExecuteContract" not in msg["type"]:
             return False

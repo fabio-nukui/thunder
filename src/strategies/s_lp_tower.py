@@ -28,7 +28,7 @@ from chains.terra import (
     TerraTokenAmount,
     terraswap,
 )
-from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
+from chains.terra.tx_filter import Filter, FilterSingleSwapTerraswapPair
 from exceptions import FeeEstimationError, UnprofitableArbitrage
 
 from .common.default_params import MIN_PROFIT_UST, MIN_START_AMOUNT, OPTIMIZATION_TOLERANCE
@@ -94,8 +94,8 @@ async def get_arbitrages(client: TerraClient) -> list[LPTowerArbitrage]:
 
 def get_filters(
     arb_routes: list[LPTowerArbitrage],
-) -> dict[terraswap.RouterLiquidityPair, FilterSingleSwapTerraswapPair]:
-    filters: dict[terraswap.RouterLiquidityPair, FilterSingleSwapTerraswapPair] = {}
+) -> dict[terraswap.RouterLiquidityPair, Filter]:
+    filters: dict[terraswap.RouterLiquidityPair, Filter] = {}
     for arb_route in arb_routes:
         for pair in arb_route.pairs:
             if not isinstance(pair, terraswap.LiquidityPair):

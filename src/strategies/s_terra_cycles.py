@@ -33,7 +33,13 @@ from chains.terra import (
     terraswap,
 )
 from chains.terra.swap_utils import MultiRoutes, SingleRoute
-from chains.terra.tx_filter import FilterSingleSwapTerraswapPair
+from chains.terra.terraswap.liquidity_pair import Action
+from chains.terra.tx_filter import (
+    Filter,
+    FilterFirstActionPairSwap,
+    FilterFirstActionRouterSwap,
+    FilterMsgsLength,
+)
 from exceptions import FeeEstimationError, InsufficientLiquidity, UnprofitableArbitrage
 from strategies.common.default_params import (
     MAX_N_REPEATS,
@@ -108,13 +114,17 @@ async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
 
 def get_filters(
     arb_routes: list[TerraCyclesArbitrage],
-) -> dict[terraswap.RouterLiquidityPair, FilterSingleSwapTerraswapPair]:
-    filters: dict[terraswap.RouterLiquidityPair, FilterSingleSwapTerraswapPair] = {}
+    terraswap_factory: terraswap.TerraswapFactory,
+) -> dict[terraswap.RouterLiquidityPair, Filter]:
+    filters: dict[terraswap.RouterLiquidityPair, Filter] = {}
     for arb_route in arb_routes:
         for pair in arb_route.pairs:
             if not isinstance(pair, terraswap.LiquidityPair):
                 continue
-            filters[pair] = FilterSingleSwapTerraswapPair(pair)
+            filters[pair] = FilterMsgsLength(1) & (
+                FilterFirstActionPairSwap(Action.swap, [pair])
+                | FilterFirstActionRouterSwap(terraswap_factory, [pair])
+            )
     return filters
 
 
@@ -552,5 +562,6 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
 async def run(max_n_blocks: int = None):
     async with TerraClient() as client:
         arb_routes = await get_arbitrages(client)
-        mempool_filters = get_filters(arb_routes)
+        terraswap_factory = await terraswap.TerraswapFactory.new(client)
+        mempool_filters = get_filters(arb_routes, terraswap_factory)
         await run_strategy(client, arb_routes, mempool_filters, max_n_blocks)
