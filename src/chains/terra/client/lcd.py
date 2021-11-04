@@ -25,7 +25,7 @@ class AsyncLCDClient2(AsyncLCDClient):
         try:
             async with self._requests_semaphore:
                 return await super()._get(*args, **kwargs)
-        except ServerDisconnectedError:
+        except (ServerDisconnectedError, RuntimeError):
             await self._reconnect_session()
             return await super()._get(*args, **kwargs)
 
@@ -33,7 +33,7 @@ class AsyncLCDClient2(AsyncLCDClient):
         try:
             async with self._requests_semaphore:
                 return await super()._post(*args, **kwargs)
-        except ServerDisconnectedError:
+        except (ServerDisconnectedError, RuntimeError):
             await self._reconnect_session()
             return await super()._post(*args, **kwargs)
 
