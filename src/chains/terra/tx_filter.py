@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from typing import Iterable
 
 from . import terraswap
+from .native_liquidity_pair import NativeLiquidityPair
 from .token import CW20Token, TerraNativeToken, TerraToken
 
 log = logging.getLogger(__name__)
@@ -116,14 +117,24 @@ class FilterFirstActionPairSwap(Filter):
 class FilterFirstActionRouterSwap(Filter):
     def __init__(
         self,
-        pairs: Iterable[terraswap.LiquidityPair],
+        pairs: Iterable[terraswap.RouterLiquidityPair],
         aways_base64: bool = False,
     ):
         self.aways_base64 = aways_base64
-        self.pairs = [p for p in pairs if p.router_address]
-        self.router_addresses = {p.router_address for p in self.pairs}
-        self._token_ids = [
-            {_get_token_id(p.tokens[0]), _get_token_id(p.tokens[1])} for p in self.pairs
+        self.pairs = [
+            p for p in pairs if isinstance(p, NativeLiquidityPair) or p.router_address
+        ]
+        self.router_addresses = {
+            p.router_address
+            for p in self.pairs
+            if isinstance(p, terraswap.LiquidityPair) and p.router_address
+        }
+        self._pair_ids = [
+            (
+                "native" if isinstance(p, NativeLiquidityPair) else "terraswap",
+                {_get_token_id(p.tokens[0]), _get_token_id(p.tokens[1])},
+            )
+            for p in self.pairs
         ]
 
     def __repr__(self) -> str:
@@ -158,17 +169,16 @@ class FilterFirstActionRouterSwap(Filter):
         try:
             for operation in operations:
                 if "native_swap" in operation:
-                    operation_ids = {
-                        operation["native_swap"]["ask_denom"],
-                        operation["native_swap"]["offer_denom"],
-                    }
+                    native_swap: dict[str, str] = operation["native_swap"]
+                    pair_id = ("native", {native_swap["ask_denom"], native_swap["offer_denom"]})
                 else:
-                    (ask_asset,) = operation["terra_swap"]["ask_asset_info"].values()
-                    (offer_asset,) = operation["terra_swap"]["offer_asset_info"].values()
+                    pair_swap: dict[str, dict[str, dict[str, str]]] = operation["terra_swap"]
+                    (ask_asset,) = pair_swap["ask_asset_info"].values()
+                    (offer_asset,) = pair_swap["offer_asset_info"].values()
                     (ask_asset_id,) = ask_asset.values()
                     (offer_asset_id,) = offer_asset.values()
-                    operation_ids = {ask_asset_id, offer_asset_id}
-                if any(operation_ids == ids for ids in self._token_ids):
+                    pair_id = ("terraswap", {ask_asset_id, offer_asset_id})
+                if any(pair_id == ids for ids in self._pair_ids):
                     return True
         except (KeyError, AttributeError, ValueError):
             log.debug("Unexpected msg format", extra={"data": msg})
