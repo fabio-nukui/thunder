@@ -138,7 +138,7 @@ class TerraClient(AsyncBlockchainClient):
 
     async def _is_broadcaster_ok(self) -> bool:
         try:
-            res = await self.broadcaster_client.get("lcd/blocks/latest")
+            res = await self.broadcaster_client.get("lcd/blocks/latest", supress_logs=True)
             height = int(res.json()["block"]["header"]["height"])
             if self.height - height > MAX_BROADCASTER_HEIGHT_DIFFERENCE:
                 raise Exception(f"Broadcaster {height=} behind {self.height=}")

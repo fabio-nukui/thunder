@@ -37,21 +37,37 @@ class AsyncClient(httpx.AsyncClient):
         self,
         url: URLTypes,
         n_tries: int = DEFAULT_N_TRIES,
+        supress_logs: bool = False,
         **kwargs,
     ) -> httpx.Response:
         """httpx GET with default retries"""
         async with self._semaphore_requests:
-            return await request("GET", url, n_tries=n_tries, httpx_client=self, **kwargs)
+            return await request(
+                "GET",
+                url,
+                n_tries=n_tries,
+                httpx_client=self,
+                supress_logs=supress_logs,
+                **kwargs,
+            )
 
     async def post(
         self,
         url: URLTypes,
         n_tries: int = DEFAULT_N_TRIES,
+        supress_logs: bool = False,
         **kwargs,
     ) -> httpx.Response:
         """httpx POST with default retries"""
         async with self._semaphore_requests:
-            return await request("POST", url, n_tries=n_tries, httpx_client=self, **kwargs)
+            return await request(
+                "POST",
+                url,
+                n_tries=n_tries,
+                httpx_client=self,
+                supress_logs=supress_logs,
+                **kwargs,
+            )
 
     async def check_connection(self, check_url: URLTypes) -> bool:
         try:
@@ -85,6 +101,7 @@ async def request(
     status_forcelist: Iterable[int] = DEFAULT_STATUS_FORCELIST,
     http2: bool = True,
     httpx_client: httpx.AsyncClient = None,
+    supress_logs: bool = False,
     **kwargs,
 ) -> httpx.Response:
     kwargs.setdefault("timeout", DEFAULT_TIMEOUT)
@@ -96,6 +113,7 @@ async def request(
             n_tries=n_tries,
             backoff_factor=backoff_factor,
             status_forcelist=status_forcelist,
+            supress_logs=supress_logs,
             **kwargs,
         )
     async with httpx.AsyncClient(http2=http2, timeout=kwargs["timeout"]) as client:
@@ -106,6 +124,7 @@ async def request(
             n_tries=n_tries,
             backoff_factor=backoff_factor,
             status_forcelist=status_forcelist,
+            supress_logs=supress_logs,
             **kwargs,
         )
 
@@ -117,6 +136,7 @@ async def _send_request(
     n_tries: int,
     backoff_factor: float,
     status_forcelist: Iterable[int],
+    supress_logs: bool,
     **kwargs,
 ) -> httpx.Response:
     """httpx request with default retries.
@@ -137,9 +157,11 @@ async def _send_request(
             )
         except httpx.RequestError as e:
             url = e.request.url
-            log.debug(f"Error on http {method} url={str(e.request.url)}", exc_info=True)
+            if not supress_logs:
+                log.debug(f"Error on http {method} url={str(e.request.url)}", exc_info=True)
         except Exception as e:
-            log.debug(f"Error on http {method}, {client.base_url=} ({e!r})", exc_info=True)
+            if not supress_logs:
+                log.debug(f"Error on http {method}, {client.base_url=} ({e!r})", exc_info=True)
         await asyncio.sleep((1 + backoff_factor) ** i - 1)
     raise httpx.HTTPError(f"httpx {method} failed after {n_tries=}")
 
