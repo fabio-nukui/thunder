@@ -37,6 +37,7 @@ log = logging.getLogger(__name__)
 
 TERRA_CONTRACT_QUERY_CACHE_SIZE = 10_000
 CONTRACT_INFO_CACHE_TTL = 86400  # Contract info should not change; 24h ttl
+MAX_BROADCASTER_HEIGHT_DIFFERENCE = 2
 _pat_missing_contract = re.compile(r"contract terra1(\w+): not found")
 
 
@@ -112,6 +113,7 @@ class TerraClient(AsyncBlockchainClient):
             self.fcd_client.check_connection("node_info"),
             self.rpc_http_client.check_connection("health"),
         ]
+        await self.check_broadcaster_health()
         if self.use_broadcaster:
             tasks.append(self.broadcaster_client.check_connection("lcd/node_info"))
         results = await asyncio.gather(*tasks)
@@ -120,6 +122,30 @@ class TerraClient(AsyncBlockchainClient):
             await asyncio.gather(
                 *(conn.check_connection("node_info") for conn in self.broadcast_lcd_clients)
             )
+
+    async def check_broadcaster_health(self):
+        if not configs.TERRA_USE_BROADCASTER:
+            return
+        broadcaster_ok = await self._is_broadcaster_ok()
+        if self.use_broadcaster and not broadcaster_ok:
+            log.info("Stop using broadcaster")
+            self.use_broadcaster = False
+        elif not self.use_broadcaster and broadcaster_ok:
+            log.info("Start using broadcaster")
+            self.use_broadcaster = True
+
+    async def _is_broadcaster_ok(self) -> bool:
+        try:
+            res = await self.broadcaster_client.get("lcd/blocks/latest")
+            height = int(res.json()["block"]["header"]["height"])
+            if self.height - height > MAX_BROADCASTER_HEIGHT_DIFFERENCE:
+                raise Exception(f"Broadcaster {height=} behind {self.height=}")
+        except Exception as e:
+            log.debug(f"Error with broadcaster connection: {e!r}")
+            return False
+        else:
+            log.debug("Broadcaster OK")
+            return True
 
     async def _fix_broadcaster_urls(self):
         host_ip = await utils.ahttp.get_host_ip()
