@@ -142,6 +142,6 @@ def get_host_ip() -> str:
     for url in ip_getter_service_urls:
         res = get(url, follow_redirects=True)
         ip = res.text.strip()
-        if re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", ip):
+        if re.match(r"^(?:\d{1,3}\.){3}\d{1,3}$", ip):
             ips.append(ip)
     return Counter(ips).most_common(1)[0][0]

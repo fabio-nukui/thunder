@@ -154,7 +154,7 @@ async def get_host_ip() -> str:
         "http://ipecho.net/plain",
     ]
     ips = await asyncio.gather(*(_get_text(url) for url in ip_getter_service_urls))
-    counter = Counter(ip for ip in ips if re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", ip))
+    counter = Counter(ip for ip in ips if re.match(r"^(?:\d{1,3}\.){3}\d{1,3}$", ip))
     return counter.most_common(1)[0][0]
 
 
