@@ -71,6 +71,7 @@ class TerraClient(AsyncBlockchainClient):
         self.gas_prices = gas_prices
         self.gas_adjustment = Decimal(gas_adjustment)
         self.raise_on_syncing = raise_on_syncing
+        self._log_broadcaster_error = True
 
         hd_wallet = auth_secrets.hd_wallet() if hd_wallet is None else hd_wallet
         self.key = MnemonicKey(hd_wallet["mnemonic"], hd_wallet["account"], hd_wallet_index)
@@ -127,6 +128,7 @@ class TerraClient(AsyncBlockchainClient):
         if not configs.TERRA_USE_BROADCASTER:
             return
         broadcaster_ok = await self._is_broadcaster_ok()
+        log.debug(f"{self}: {broadcaster_ok=}")
         if self.use_broadcaster and not broadcaster_ok:
             log.info("Stop using broadcaster")
             self.use_broadcaster = False
@@ -141,10 +143,12 @@ class TerraClient(AsyncBlockchainClient):
             if self.height - height > MAX_BROADCASTER_HEIGHT_DIFFERENCE:
                 raise Exception(f"Broadcaster {height=} behind {self.height=}")
         except Exception as e:
-            log.debug(f"Error with broadcaster connection: {e!r}")
+            if self._log_broadcaster_error:
+                log.debug(f"Error with broadcaster connection: {e!r}")
+                self._log_broadcaster_error = False
             return False
         else:
-            log.debug("Broadcaster OK")
+            self._log_broadcaster_error = True
             return True
 
     async def _fix_broadcaster_urls(self):
@@ -156,10 +160,7 @@ class TerraClient(AsyncBlockchainClient):
         ]
 
     def __repr__(self) -> str:
-        return (
-            f"{self.__class__.__name__}(lcd.url={self.lcd.url}, chain_id={self.chain_id}, "
-            f"account={self.key.acc_address})"
-        )
+        return f"{self.__class__.__name__}(lcd.url={self.lcd.url})"
 
     async def is_syncing(self) -> bool:
         return await self.lcd.tendermint.syncing()
