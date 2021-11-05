@@ -150,11 +150,12 @@ async def _send_request(
             status_code = e.response.status_code
             if status_code not in status_forcelist:
                 raise
-            log.debug(
-                f"Error on http {method}, url={str(e.request.url)}, "
-                f"{status_code=}, response={e.response.text!r}",
-                exc_info=True,
-            )
+            if not supress_logs:
+                log.debug(
+                    f"Error on http {method}, url={str(e.request.url)}, "
+                    f"{status_code=}, response={e.response.text!r}",
+                    exc_info=True,
+                )
         except httpx.RequestError as e:
             url = e.request.url
             if not supress_logs:
