@@ -128,7 +128,7 @@ class TerraClient(AsyncBlockchainClient):
         if not configs.TERRA_USE_BROADCASTER:
             return
         broadcaster_ok = await self._is_broadcaster_ok()
-        log.debug(f"{self}: {broadcaster_ok=}")
+        log.debug(f"{broadcaster_ok=}")
         if self.use_broadcaster and not broadcaster_ok:
             log.info("Stop using broadcaster")
             self.use_broadcaster = False
@@ -160,7 +160,10 @@ class TerraClient(AsyncBlockchainClient):
         ]
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(lcd.url={self.lcd.url})"
+        return (
+            f"{self.__class__.__name__}(lcd.url={self.lcd.url}, chain_id={self.chain_id}, "
+            f"account={self.key.acc_address})"
+        )
 
     async def is_syncing(self) -> bool:
         return await self.lcd.tendermint.syncing()
