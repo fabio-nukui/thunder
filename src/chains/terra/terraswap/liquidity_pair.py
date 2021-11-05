@@ -222,10 +222,10 @@ class LiquidityPair(BaseTerraLiquidityPair):
         check_liquidity: bool = True,
     ) -> LiquidityPair:
         if contract_addr in cls._instances:
-            return cls._instances[contract_addr]
+            return cls._get_instance(contract_addr, client)
         if contract_addr in cls._instances_creation:
             await cls._instances_creation[contract_addr].wait()
-            return cls._instances[contract_addr]
+            return cls._get_instance(contract_addr, client)
         cls._instances_creation[contract_addr] = asyncio.Event()
 
         self = super().__new__(cls)
@@ -251,6 +251,12 @@ class LiquidityPair(BaseTerraLiquidityPair):
         cls._instances_creation[contract_addr].set()
         del cls._instances_creation[contract_addr]
         return self
+
+    @classmethod
+    def _get_instance(cls, contract_addr: AccAddress, client: TerraClient) -> LiquidityPair:
+        instance = cls._instances[contract_addr]
+        instance.client = client
+        return instance
 
     def __repr__(self) -> str:
         if self.factory_name is None:
