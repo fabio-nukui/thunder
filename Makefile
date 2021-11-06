@@ -116,6 +116,7 @@ start: ## Start docker container running arbitrage strategy "$STRAT" (e.g.: make
 
 stop:  ## Stop docker conteiner running strategy "$STRAT" (e.g.: make stop STRAT=1)
 	docker stop $(ARBITRAGE_CONTAINER_NAME)
+	docker rm $(ARBITRAGE_CONTAINER_NAME)
 
 start-terra_broadcaster:  ## Build and start terra-broadcast/ngnix containers/volumes
 	echo $(GIT_BRANCH) > docker/git_commit
