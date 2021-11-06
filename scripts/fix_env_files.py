@@ -32,13 +32,13 @@ def main():
         lines = copy(lines_orig)
         for n, line in enumerate(lines):
             if "AWS_DEFAULT_REGION" in line:
-                if line != (fix := f"AWS_DEFAULT_REGION={region}\n"):
+                if line != (fix := f"AWS_DEFAULT_REGION={region}"):
                     print(f"Fixing region on {file.name}")
-                    lines[n] = fix
+                    lines[n] = fix + "\n"
             if "LOG_AWS_PREFIX" in line and log_prefix:
-                if line != (fix := f"LOG_AWS_PREFIX={log_prefix}\n"):
+                if line != (fix := f"LOG_AWS_PREFIX={log_prefix}"):
                     print(f"Fixing log prefix on {file.name}")
-                    lines[n] = fix
+                    lines[n] = fix + "\n"
         if lines != lines_orig:
             open(file, "w").write("".join(lines))
 
