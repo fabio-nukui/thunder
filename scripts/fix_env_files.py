@@ -24,7 +24,7 @@ def get_log_prefix() -> str:
 def main():
     region = get_region()
     log_prefix = get_log_prefix()
-    print(f"Replacing config files using {region=}")
+    print("Fixing env files with local configs")
     for file in Path("env").iterdir():
         if not file.name.startswith(".env"):
             continue
