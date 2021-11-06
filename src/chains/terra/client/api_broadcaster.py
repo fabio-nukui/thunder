@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Sequence, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Sequence, TypedDict, TypeVar
 
 from terra_sdk.core.auth import StdFee
 from terra_sdk.core.broadcast import SyncTxBroadcastResult
@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 BROADCASTER_CACHE_BLOCKS = 3
+_MsgType = TypeVar("_MsgType", dict, list)
 
 
 class BroadcasterPayload(TypedDict):
@@ -38,13 +39,15 @@ class BroadcastCacheKey(NamedTuple):
     n_repeat: int
 
 
-def _msg_to_key(msg: dict) -> dict:
-    return {k: _round_msg_values(v) for k, v in msg.items() if k != "msg"}
+def _msg_to_key(msg: _MsgType) -> _MsgType:
+    if isinstance(msg, dict):
+        return {k: _round_msg_values(v) for k, v in msg.items() if k != "msg"}  # type: ignore # https://githubmemory.com/repo/microsoft/pyright/issues/2428 # noqa: E501
+    return [_round_msg_values(v) for v in msg]  # type: ignore
 
 
 def _round_msg_values(value: Any) -> Any:
-    if isinstance(value, dict):
-        return _msg_to_key(value)
+    if isinstance(value, (dict, list)):
+        return _msg_to_key(value)  # type: ignore # https://githubmemory.com/repo/microsoft/pyright/issues/2428 # noqa: E501
     if isinstance(value, str):
         try:
             return f"{float(value):.1g}"
