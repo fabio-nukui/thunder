@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Literal, NamedTuple, Sequence, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Sequence, TypedDict
 
 from terra_sdk.core.auth import StdFee
 from terra_sdk.core.broadcast import SyncTxBroadcastResult
@@ -36,6 +36,23 @@ class BroadcasterResponse(TypedDict):
 class BroadcastCacheKey(NamedTuple):
     msgs: list[dict]
     n_repeat: int
+
+
+def _msg_to_key(msg: dict) -> dict:
+    return {k: _round_msg_values(v) for k, v in msg.items() if k != "msg"}
+
+
+def _round_msg_values(value: Any) -> Any:
+    if isinstance(value, dict):
+        return _msg_to_key(value)
+    if isinstance(value, str):
+        try:
+            return f"{float(value):.1g}"
+        except ValueError:
+            return value
+    if isinstance(value, (int, float)):
+        return f"{value:.1g}"
+    return value
 
 
 class BroadcasterApi(Api):
@@ -94,7 +111,8 @@ class BroadcasterApi(Api):
             for height, val in self._broadcaster_cache.items()
             if payload["height"] - height <= BROADCASTER_CACHE_BLOCKS
         }
-        key = BroadcastCacheKey(payload["msgs"], payload["n_repeat"])
+        msg_keys = [_msg_to_key(msg) for msg in payload["msgs"]]
+        key = BroadcastCacheKey(msg_keys, payload["n_repeat"])
         if any(key in values for values in self._broadcaster_cache.values()):
             return True
         if payload["height"] not in self._broadcaster_cache:
