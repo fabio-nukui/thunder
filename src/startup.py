@@ -19,9 +19,8 @@ def setup_logger():
     dict_config["handlers"]["logfile"]["filename"] = f"logs/{configs.STRATEGY}.log"
 
     if configs.LOG_AWS:
-        dict_config["handlers"]["watchtower"][
-            "stream_name"
-        ] = f"{configs.STRATEGY}-{{strftime:%y-%m-%d}}"
+        stream_name = f"{configs.LOG_AWS_PREFIX}{configs.STRATEGY}-{{strftime:%y-%m-%d}}"
+        dict_config["handlers"]["watchtower"]["stream_name"] = stream_name
     else:
         del dict_config["handlers"]["watchtower"]
         dict_config["root"]["handlers"].remove("watchtower")
