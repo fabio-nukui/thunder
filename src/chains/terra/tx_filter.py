@@ -9,7 +9,6 @@ from typing import Iterable
 from terra_sdk.core import AccAddress
 
 from . import terraswap
-from .native_liquidity_pair import NativeLiquidityPair
 from .token import CW20Token, TerraNativeToken, TerraToken
 
 log = logging.getLogger(__name__)
@@ -131,7 +130,7 @@ class FilterFirstActionRouterSwap(Filter):
         self.router_addresses = router_addresses
         self._pair_ids = [
             (
-                "native" if isinstance(p, NativeLiquidityPair) else "terraswap",
+                "native" if isinstance(p, terraswap.RouterNativeLiquidityPair) else "terraswap",
                 {_get_token_id(p.tokens[0]), _get_token_id(p.tokens[1])},
             )
             for p in self.pairs

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from copy import copy
 from decimal import Decimal
 from typing import TYPE_CHECKING, TypeVar
 
 from terra_sdk.core import AccAddress
 
+from .denoms import LUNA, SDT
 from .token import TerraNativeToken, TerraToken, TerraTokenAmount
 
 if TYPE_CHECKING:
@@ -14,6 +16,7 @@ if TYPE_CHECKING:
 
 AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
 _BaseTerraLiquidityPairT = TypeVar("_BaseTerraLiquidityPairT", bound="BaseTerraLiquidityPair")
+_NativeLiquidityPairT = TypeVar("_NativeLiquidityPairT", bound="NativeLiquidityPair")
 
 
 class BaseTerraLiquidityPair(ABC):
@@ -70,7 +73,7 @@ class NativeLiquidityPair(BaseTerraLiquidityPair):
         self.client = client
         self.tokens = tokens if (tokens[0] < tokens[1]) else (tokens[1], tokens[0])
         self._stop_updates = False
-        self._virtual_pool_changes = (Decimal(0), Decimal(0))
+        self._pool_delta_changes = Decimal(0)
 
     def __hash__(self) -> int:
         return hash((self.__class__, self.tokens))
@@ -80,6 +83,17 @@ class NativeLiquidityPair(BaseTerraLiquidityPair):
             return self.tokens == other.tokens
         return NotImplemented
 
+    async def get_swap_amounts(
+        self,
+        amount_in: TerraTokenAmount,
+        safety_margin: bool | int = False,
+    ) -> dict[str, AmountTuple]:
+        amount_out = await self.get_swap_amount_out(amount_in, safety_margin)
+        return {
+            "pool_change": (amount_in, -amount_out),
+            "amounts_out": (amount_in * 0, amount_out),
+        }
+
     async def get_swap_amount_out(
         self,
         amount_in: TerraTokenAmount,
@@ -87,12 +101,9 @@ class NativeLiquidityPair(BaseTerraLiquidityPair):
     ) -> TerraTokenAmount:
         assert amount_in.token in self.tokens
         token_out = self.tokens[0] if amount_in.token == self.tokens[1] else self.tokens[1]
-        vp = await self.get_virtual_pools()
-        return await self.client.market.get_amount_out(amount_in, token_out, safety_margin, vp)
-
-    async def get_virtual_pools(self) -> tuple[Decimal, Decimal]:
-        vp = await self.client.market.get_virtual_pools()
-        return vp[0] + self._virtual_pool_changes[0], vp[1] + self._virtual_pool_changes[1]
+        return await self.client.market.get_amount_out(
+            amount_in, token_out, safety_margin, self._pool_delta_changes
+        )
 
     async def op_swap(
         self,
@@ -102,8 +113,22 @@ class NativeLiquidityPair(BaseTerraLiquidityPair):
     ) -> Operation:
         raise NotImplementedError
 
-    async def simulate_reserve_change(self, amounts: AmountTuple) -> NativeLiquidityPair:
-        raise NotImplementedError
+    async def simulate_reserve_change(
+        self: _NativeLiquidityPairT,
+        amounts: AmountTuple,
+    ) -> _NativeLiquidityPairT:
+        """Based on https://github.com/terra-money/core/blob/v0.5.10/x/market/keeper/swap.go#L15"""
+        assert isinstance(amounts[0].token, TerraNativeToken)
+        assert isinstance(amounts[1].token, TerraNativeToken)
+        simulation = copy(self)
+
+        if LUNA not in (amounts[0].token, amounts[1].token):
+            return simulation
+
+        change_terra = amounts[0] if amounts[1].token == LUNA else amounts[1]
+        change_sdt = await self.client.market.compute_swap_no_spread(change_terra, SDT)
+        simulation._pool_delta_changes += change_sdt.amount
+        return simulation
 
     async def get_reserve_changes_from_msg(self, msg: dict) -> AmountTuple:
         raise NotImplementedError

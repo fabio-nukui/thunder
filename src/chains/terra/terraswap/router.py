@@ -8,13 +8,12 @@ from terra_sdk.core import AccAddress, Coins
 from terra_sdk.core.wasm import MsgExecuteContract
 
 from ..client import TerraClient
-from ..native_liquidity_pair import NativeLiquidityPair
 from ..token import CW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
-from .liquidity_pair import LiquidityPair
+from .liquidity_pair import LiquidityPair, RouterNativeLiquidityPair
 from .utils import Operation, token_to_data
 
-RouterLiquidityPair = Union[LiquidityPair, NativeLiquidityPair]
-
+AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
+RouterLiquidityPair = Union[LiquidityPair, RouterNativeLiquidityPair]
 
 ROUTER_EFFICIENCY = Decimal("0.9995")
 
@@ -83,16 +82,16 @@ class Router:
         client: TerraClient,
     ):
         self.terraswap_pairs: dict[tuple[TerraToken, TerraToken], LiquidityPair] = {}
-        self.native_pairs: dict[tuple[TerraToken, TerraToken], NativeLiquidityPair] = {}
+        self.native_pairs: dict[tuple[TerraToken, TerraToken], RouterNativeLiquidityPair] = {}
         for pair in liquidity_pairs:
             if isinstance(pair, LiquidityPair):
                 self.terraswap_pairs[pair.sorted_tokens] = pair
-            elif isinstance(pair, NativeLiquidityPair):
+            elif isinstance(pair, RouterNativeLiquidityPair):
                 self.native_pairs[pair.sorted_tokens] = pair
             else:
                 raise TypeError(
-                    "liquidity_pairs must be terraswap.LiquidityPair or NativeLiquidityPair, "
-                    f"received {pair.__class__.__name__}"
+                    "liquidity_pairs must be terraswap.LiquidityPair or "
+                    f"RouterNativeLiquidityPair, received {pair.__class__.__name__}"
                 )
         self.contract_addr = contract_addr
         self.client = client

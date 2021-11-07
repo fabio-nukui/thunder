@@ -9,8 +9,8 @@ from terra_sdk.core import AccAddress
 from terra_sdk.core.wasm import MsgExecuteContract
 
 from .client import TerraClient
-from .native_liquidity_pair import BaseTerraLiquidityPair, NativeLiquidityPair
-from .terraswap.liquidity_pair import LiquidityPair
+from .native_liquidity_pair import BaseTerraLiquidityPair
+from .terraswap.liquidity_pair import LiquidityPair, RouterNativeLiquidityPair
 from .terraswap.router import Router, RouteStep, RouteStepNative, RouteStepTerraswap
 from .token import TerraToken, TerraTokenAmount
 
@@ -80,8 +80,8 @@ class SingleRoute:
         if router_address is None:
             self.router = None
         else:
-            assert all(isinstance(p, (LiquidityPair, NativeLiquidityPair)) for p in pairs)
-            pairs_r = cast(Iterable[Union[LiquidityPair, NativeLiquidityPair]], pairs)
+            assert all(isinstance(p, (LiquidityPair, RouterNativeLiquidityPair)) for p in pairs)
+            pairs_r = cast(Iterable[Union[LiquidityPair, RouterNativeLiquidityPair]], pairs)
             self.router = Router(router_address, pairs_r, client)
         self.is_cycle = self.tokens[0] == self.tokens[-1]
 

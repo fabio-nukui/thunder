@@ -25,7 +25,6 @@ from chains.terra import (
     LUNA,
     UST,
     BaseTerraLiquidityPair,
-    NativeLiquidityPair,
     TerraClient,
     TerraNativeToken,
     TerraTokenAmount,
@@ -112,18 +111,12 @@ def get_filters(
     filters: dict[terraswap.RouterLiquidityPair, Filter] = {}
     for arb_route in arb_routes:
         for pair in arb_route.pairs:
-            if isinstance(pair, terraswap.LiquidityPair):
-                router_addresses = {pair.router_address} if pair.router_address else set()
-            elif isinstance(pair, NativeLiquidityPair):
-                router_addresses = {
-                    pair.router_address
-                    for pair in arb_route.pairs
-                    if isinstance(pair, terraswap.LiquidityPair)
-                    if pair.router_address
-                }
-            else:
+            if not isinstance(
+                pair, (terraswap.RouterNativeLiquidityPair, terraswap.LiquidityPair)
+            ):
                 continue
-            filters[pair] = FilterSwapTerraswap([pair], router_addresses)  # type: ignore
+            router_addresses = {pair.router_address} if pair.router_address else set()
+            filters[pair] = FilterSwapTerraswap([pair], router_addresses)
     return filters
 
 
@@ -134,7 +127,9 @@ async def _get_ust_native_routes(
 ) -> list[MultiRoutes]:
     loop_pair = await loop_factory.get_pair("LUNA-UST")
     terraswap_pair = await terraswap_factory.get_pair("UST-LUNA")
-    native_pair = NativeLiquidityPair(client, (UST, LUNA))
+    native_pair = terraswap.RouterNativeLiquidityPair(
+        client, (UST, LUNA), terraswap_factory.contract_addr, terraswap_factory.router_address
+    )
 
     return [
         MultiRoutes(
@@ -159,7 +154,12 @@ async def _get_luna_native_routes(
         terraswap_pair = await factory.get_pair(match.group(), check_liquidity=False)
         if not isinstance(terraswap_pair.tokens[0], TerraNativeToken):
             continue
-        native_pair = NativeLiquidityPair(client, terraswap_pair.tokens)  # type: ignore
+        native_pair = terraswap.RouterNativeLiquidityPair(
+            client,
+            terraswap_pair.tokens,  # type: ignore
+            factory.contract_addr,
+            factory.router_address,
+        )
         list_steps: Sequence[Sequence] = [[terraswap_pair], [native_pair]]
 
         routes.append(

@@ -103,6 +103,14 @@ def _token_amount_to_data(token_amount: TerraTokenAmount) -> dict:
     }
 
 
+def _is_router_msg(msg: dict, router_address: AccAddress | None) -> bool:
+    if msg["contract"] == router_address:
+        return True
+    if "send" not in (execute_msg := msg["execute_msg"]):
+        return False
+    return execute_msg["send"]["contract"] == router_address
+
+
 @ttl_cache(CacheGroup.TERRA, ROUTER_DECODE_MSG_CACHE_SIZE, ROUTER_DECODE_MSG_CACHE_TTL)
 async def get_router_reserve_changes_from_msg(
     client: TerraClient,
@@ -115,17 +123,7 @@ async def get_router_reserve_changes_from_msg(
         client, factory_address, router_address, msg
     )
     for pair in pairs:
-        if isinstance(pair, LiquidityPair):
-            amounts = await pair.get_swap_amounts(amount_in)
-        else:
-            # Placeholder until NativeLiquiditySwap reserve simulation is implemented
-            amounts = {
-                "pool_change": (pair.tokens[0].to_amount(0), pair.tokens[1].to_amount(0)),
-                "amounts_out": (
-                    await pair.get_swap_amount_out(amount_in),
-                    pair.tokens[0].to_amount(0),
-                ),
-            }
+        amounts = await pair.get_swap_amounts(amount_in)
         amounts_pool_change = amounts["pool_change"]
         if amounts_pool_change[0].token == pair.tokens[0]:
             changes[pair] = amounts_pool_change
@@ -185,7 +183,9 @@ async def _decode_router_msg(
                 TerraNativeToken(op["native_swap"]["offer_denom"]),
                 TerraNativeToken(op["native_swap"]["ask_denom"]),
             )
-            pairs.append(NativeLiquidityPair(client, tokens))
+            pairs.append(
+                RouterNativeLiquidityPair(client, tokens, factory_address, router_address)
+            )
         else:
             asset_infos = [
                 op["terra_swap"]["offer_asset_info"],
@@ -195,6 +195,27 @@ async def _decode_router_msg(
             pair_info = await client.contract_query(factory_address, query)
             pairs.append(await LiquidityPair.new(pair_info["contract_addr"], client))
     return RouterDecodedMsg(amount_in, min_out, pairs)
+
+
+class RouterNativeLiquidityPair(NativeLiquidityPair):
+    def __init__(
+        self,
+        client: TerraClient,
+        tokens: tuple[TerraNativeToken, TerraNativeToken],
+        factory_address: AccAddress,
+        router_address: AccAddress,
+    ):
+        super().__init__(client, tokens)
+        self.factory_address = factory_address
+        self.router_address = router_address
+
+    async def get_reserve_changes_from_msg(self, msg: dict) -> AmountTuple:
+        if _is_router_msg(msg, self.router_address):
+            changes = await get_router_reserve_changes_from_msg(
+                self.client, self.factory_address, self.router_address, msg
+            )
+            return changes[self]
+        return await super().get_reserve_changes_from_msg(msg)
 
 
 class LiquidityPair(BaseTerraLiquidityPair):
@@ -666,13 +687,13 @@ class LiquidityPair(BaseTerraLiquidityPair):
         return msgs
 
     async def get_reserve_changes_from_msg(self, msg: dict) -> AmountTuple:
-        if self._is_router_msg(msg):
+        if _is_router_msg(msg, self.router_address):
             assert self.factory_address
             assert self.router_address
             changes = await get_router_reserve_changes_from_msg(
                 self.client, self.factory_address, self.router_address, msg
             )
-            return next(change for pair, change in changes.items() if self == pair)
+            return changes[self]
         if msg["contract"] == self.contract_addr:
             amount_in, swap_msg = await self._parse_direct_pair_msg(msg)
         elif msg["contract"] in (
@@ -692,13 +713,6 @@ class LiquidityPair(BaseTerraLiquidityPair):
         if amounts_pool_change[0].token == self.tokens[0]:
             return amounts_pool_change
         return amounts_pool_change[1], amounts_pool_change[0]
-
-    def _is_router_msg(self, msg: dict) -> bool:
-        if msg["contract"] == self.router_address:
-            return True
-        if "send" not in (execute_msg := msg["execute_msg"]):
-            return False
-        return execute_msg["send"]["contract"] == self.router_address
 
     async def _parse_direct_pair_msg(self, msg: dict) -> tuple[TerraTokenAmount, dict]:
         if Action.swap in msg["execute_msg"]:

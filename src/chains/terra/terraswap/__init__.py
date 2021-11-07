@@ -2,19 +2,22 @@ from __future__ import annotations
 
 import json
 
+from terra_sdk.core import AccAddress
+
 from ..client import TerraClient
 from .factory import Factory
-from .liquidity_pair import Action, LiquidityPair
+from .liquidity_pair import Action, LiquidityPair, RouterNativeLiquidityPair
 from .router import Router, RouterLiquidityPair, RouteStep, RouteStepNative, RouteStepTerraswap
 
 __all__ = [
     "Action",
     "LiquidityPair",
+    "RouterNativeLiquidityPair",
+    "Router",
     "RouterLiquidityPair",
     "RouteStep",
     "RouteStepNative",
     "RouteStepTerraswap",
-    "Router",
     "TerraswapFactory",
     "LoopFactory",
 ]
@@ -27,6 +30,8 @@ def _get_addresses(chain_id: str, name: str) -> dict:
 
 
 class TerraswapFactory(Factory):
+    router_address: AccAddress
+
     @classmethod
     async def new(cls, client: TerraClient) -> TerraswapFactory:  # type: ignore[override]
         addresses = _get_addresses(client.chain_id, "terraswap")
