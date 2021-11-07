@@ -50,6 +50,7 @@ class LatestHeightThread(threading.Thread):
 
     def stop(self):
         self._stopped.set()
+        self.loop.close()
 
     async def _update_height(self):
         async for height in utils_rpc.loop_latest_height(self.mcm.client.rpc_websocket_uri):

@@ -15,7 +15,7 @@ from .ttl_cache_stats import TTLCacheStats
 
 log = logging.getLogger(__name__)
 
-_caches: dict[CacheGroup, list[TTLCache | TTLCacheStats]] = defaultdict(list)
+_caches: dict[CacheGroup, list[TTLCache | TTLCacheStats | LRUCache]] = defaultdict(list)
 
 
 class CacheGroup(Enum):
@@ -53,9 +53,13 @@ def lru_cache(maxsize: int | Callable = 100):
     if callable(maxsize):
         # ttl_cache was applied directly
         func = maxsize
-        return cached(LRUCache(100), key=json_hashkey)(func)
+        cache: LRUCache = LRUCache(100)
+        _caches[CacheGroup.DEFAULT].append(cache)
+        return cached(cache, key=json_hashkey)(func)
     if isinstance(maxsize, int):
-        return cached(LRUCache(maxsize), key=json_hashkey)
+        cache = LRUCache(maxsize)
+        _caches[CacheGroup.DEFAULT].append(cache)
+        return cached(cache, key=json_hashkey)
     raise TypeError("Expected first argument to be an int or a callable")
 
 

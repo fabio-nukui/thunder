@@ -3,6 +3,7 @@ import importlib
 import logging
 
 import configs
+import utils
 from exceptions import NodeSyncing
 from startup import setup
 
@@ -26,6 +27,7 @@ async def main():
             log.error("Error during strategy execution", exc_info=True)
             log.info("Restarting strategy in 5 seconds")
             await asyncio.sleep(5)
+        utils.cache.clear_caches(utils.cache.CacheGroup.ALL, clear_all=True)
 
 
 if __name__ == "__main__":
