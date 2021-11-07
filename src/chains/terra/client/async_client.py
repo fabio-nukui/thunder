@@ -98,7 +98,7 @@ class TerraClient(AsyncBlockchainClient):
         self.broadcast_lcd_clients = [
             utils.ahttp.AsyncClient(base_url=url) for url in self.broadcast_lcd_uris
         ]
-        await self._check_connections()
+
         self.lcd = AsyncLCDClient2(
             self.lcd_uri, self.chain_id, self.gas_prices, self.gas_adjustment
         )
@@ -106,6 +106,8 @@ class TerraClient(AsyncBlockchainClient):
         self.address = self.wallet.key.acc_address
 
         self.height = await self.get_latest_height()
+        await self._check_connections()
+
         self.account_sequence = (await self.get_account_data()).sequence
         if self.gas_prices is None:
             self.lcd.gas_prices = await self.tx.get_gas_prices()
