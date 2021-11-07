@@ -25,10 +25,14 @@ TERRA_LCD_URI = os.getenv("TERRA_LCD_URI", "https://lcd.terra.dev")
 TERRA_FCD_URI = os.getenv("TERRA_FCD_URI", "https://fcd.terra.dev")
 TERRA_RPC_HTTP_URI = os.getenv("TERRA_RPC_HTTP_URI", "")
 TERRA_RPC_WEBSOCKET_URI = os.getenv("TERRA_RPC_WEBSOCKET_URI", "")
+
 TERRA_USE_BROADCASTER = os.getenv("TERRA_USE_BROADCASTER", "").lower() == "true"
-TERRA_BROADCASTER_URI = os.getenv("TERRA_BROADCASTER_URI", "http://localhost:1318")
+_TERRA_BROADCASTER_URIS_STR = os.getenv("TERRA_BROADCASTER_URIS", "http://localhost:1318")
+TERRA_BROADCASTER_URIS = [s for s in _TERRA_BROADCASTER_URIS_STR.split(",") if s]
+
 _TERRA_BROADCAST_LCD_URIS_STR = os.getenv("TERRA_BROADCAST_LCD_URIS", "https://lcd.terra.dev")
-TERRA_BROADCAST_LCD_URIS = _TERRA_BROADCAST_LCD_URIS_STR.split(",")
+TERRA_BROADCAST_LCD_URIS = [s for s in _TERRA_BROADCAST_LCD_URIS_STR.split(",") if s]
+
 TERRA_CACHE_TTL = float(os.getenv("TERRA_CACHE_TTL", "5.0"))
 TERRA_POLL_INTERVAL = float(os.getenv("TERRA_POLL_INTERVAL", "0.001"))
 TERRA_GAS_ADJUSTMENT = Decimal(os.getenv("TERRA_GAS_ADJUSTMENT", "1.15"))

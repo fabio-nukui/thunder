@@ -177,6 +177,7 @@ class MempoolCacheManager:
                 timeout=DECODE_TX_TIMEOUT,
                 follow_redirects=True,
                 n_tries=1,
+                supress_logs=True,
             )
         except httpx.HTTPError as e:
             if isinstance(e, httpx.HTTPStatusError) and "not support" in e.response.text:

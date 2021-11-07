@@ -79,7 +79,8 @@ class BroadcasterApi(Api):
             "fee": fee.to_data() if fee is not None else None,
             "fee_denom": fee_denom,
         }
-        res = await self.client.broadcaster_client.post("txs", json=payload, n_tries=1)
+        assert self.client.active_broadcaster is not None
+        res = await self.client.active_broadcaster.post("txs", json=payload, n_tries=1)
         data: BroadcasterResponse = res.json()
         if data["result"] == "repeated_tx":
             raise TxAlreadyBroadcasted("Tx broadcasted by other host")

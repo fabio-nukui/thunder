@@ -128,7 +128,7 @@ async def run_strategy(
     async for height, mempool in client.mempool.iter_height_mempool(mempool_filters):
         if any(height > arb_route.last_run_height for arb_route in arb_routes):
             utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)
-            asyncio.create_task(client.check_broadcaster_health())
+            asyncio.create_task(client.update_active_broadcaster())
         tasks: list[Awaitable] = []
         for arb_route in arb_routes:
             mempool_route = {

@@ -19,6 +19,7 @@ import configs
 import utils
 from common.blockchain_client import AsyncBlockchainClient
 from exceptions import NotContract
+from utils.ahttp import AsyncClient
 from utils.cache import CacheGroup, ttl_cache
 
 from ..denoms import UST
@@ -49,7 +50,7 @@ class TerraClient(AsyncBlockchainClient):
         rpc_http_uri: str = configs.TERRA_RPC_HTTP_URI,
         rpc_websocket_uri: str = configs.TERRA_RPC_WEBSOCKET_URI,
         use_broadcaster: bool = configs.TERRA_USE_BROADCASTER,
-        broadcaster_uri: str = configs.TERRA_BROADCASTER_URI,
+        broadcaster_uris: list[str] = configs.TERRA_BROADCASTER_URIS,
         broadcast_lcd_uris: list[str] = configs.TERRA_BROADCAST_LCD_URIS,
         chain_id: str = configs.TERRA_CHAIN_ID,
         fee_denom: str = UST.denom,
@@ -64,14 +65,15 @@ class TerraClient(AsyncBlockchainClient):
         self.rpc_http_uri = rpc_http_uri
         self.rpc_websocket_uri = rpc_websocket_uri
         self.use_broadcaster = use_broadcaster
-        self.broadcaster_uri = broadcaster_uri
+        self.broadcaster_uris = broadcaster_uris
         self.broadcast_lcd_uris = broadcast_lcd_uris
         self.chain_id = chain_id
         self.fee_denom = fee_denom
         self.gas_prices = gas_prices
         self.gas_adjustment = Decimal(gas_adjustment)
         self.raise_on_syncing = raise_on_syncing
-        self._log_broadcaster_error = True
+        self._broadcasters_status: dict[AsyncClient, bool] = {}
+        self.active_broadcaster: AsyncClient | None = None
 
         hd_wallet = auth_secrets.hd_wallet() if hd_wallet is None else hd_wallet
         self.key = MnemonicKey(hd_wallet["mnemonic"], hd_wallet["account"], hd_wallet_index)
@@ -90,7 +92,9 @@ class TerraClient(AsyncBlockchainClient):
         self.lcd_http_client = utils.ahttp.AsyncClient(base_url=self.lcd_uri)
         self.fcd_client = utils.ahttp.AsyncClient(base_url=self.fcd_uri)
         self.rpc_http_client = utils.ahttp.AsyncClient(base_url=self.rpc_http_uri)
-        self.broadcaster_client = utils.ahttp.AsyncClient(base_url=self.broadcaster_uri)
+        self._broadcaster_clients = [
+            utils.ahttp.AsyncClient(base_url=url) for url in self.broadcaster_uris
+        ]
         self.broadcast_lcd_clients = [
             utils.ahttp.AsyncClient(base_url=url) for url in self.broadcast_lcd_uris
         ]
@@ -108,56 +112,65 @@ class TerraClient(AsyncBlockchainClient):
         self.mempool.start()
         await super().start()
 
+    async def _fix_broadcaster_urls(self):
+        host_ip = await utils.ahttp.get_host_ip()
+        self.broadcaster_uris = [
+            url.replace(host_ip, "localhost") for url in self.broadcaster_uris
+        ]
+        self.broadcast_lcd_uris = [url for url in self.broadcast_lcd_uris if host_ip not in url]
+
     async def _check_connections(self):
         tasks = [
             self.lcd_http_client.check_connection("node_info"),
             self.fcd_client.check_connection("node_info"),
             self.rpc_http_client.check_connection("health"),
         ]
-        await self.check_broadcaster_health()
-        if self.use_broadcaster:
-            tasks.append(self.broadcaster_client.check_connection("lcd/node_info"))
         results = await asyncio.gather(*tasks)
         assert all(results), "Connection error(s)"
+        await self.update_active_broadcaster()
         if not self.use_broadcaster:
             await asyncio.gather(
                 *(conn.check_connection("node_info") for conn in self.broadcast_lcd_clients)
             )
 
-    async def check_broadcaster_health(self):
+    async def update_active_broadcaster(self):
         if not configs.TERRA_USE_BROADCASTER:
             return
-        broadcaster_ok = await self._is_broadcaster_ok()
-        log.debug(f"{broadcaster_ok=}")
-        if self.use_broadcaster and not broadcaster_ok:
+        tasks = (self._set_broadcaster_status(c) for c in self._broadcaster_clients)
+        await asyncio.gather(*tasks)
+
+        n_ok = sum(self._broadcasters_status.values())
+        n_total = len(self._broadcasters_status)
+        log.debug(f"{n_ok}/{n_total} broadcasters OK")
+
+        if self.use_broadcaster and not n_ok:
             log.info("Stop using broadcaster")
             self.use_broadcaster = False
-        elif not self.use_broadcaster and broadcaster_ok:
+        elif not self.use_broadcaster and n_ok:
             log.info("Start using broadcaster")
             self.use_broadcaster = True
 
-    async def _is_broadcaster_ok(self) -> bool:
+        if self.use_broadcaster:
+            for client, status_ok in self._broadcasters_status.items():
+                if status_ok:
+                    if self.active_broadcaster != client:
+                        log.info(f"Switching broadcaster to {client.base_url}")
+                        self.active_broadcaster = client
+                    return
+
+    async def _set_broadcaster_status(self, broadcaster_client: AsyncClient):
         try:
-            res = await self.broadcaster_client.get("lcd/blocks/latest", supress_logs=True)
+            res = await broadcaster_client.get("lcd/blocks/latest", supress_logs=True)
             height = int(res.json()["block"]["header"]["height"])
             if self.height - height > MAX_BROADCASTER_HEIGHT_DIFFERENCE:
                 raise Exception(f"Broadcaster {height=} behind {self.height=}")
         except Exception as e:
-            if self._log_broadcaster_error:
-                log.debug(f"Error with broadcaster connection: {e!r}")
-                self._log_broadcaster_error = False
-            return False
+            previous_status = self._broadcasters_status.get(broadcaster_client)
+            if previous_status or previous_status is None:
+                log.debug(f"Error with broadcaster={broadcaster_client.base_url}: {e!r}")
+                self._broadcasters_status[broadcaster_client] = False
         else:
-            self._log_broadcaster_error = True
-            return True
-
-    async def _fix_broadcaster_urls(self):
-        host_ip = await utils.ahttp.get_host_ip()
-        if f"http://{host_ip}:1318" == self.broadcaster_uri:
-            self.broadcaster_uri = "http://localhost:1318"
-        self.broadcast_lcd_uris = [
-            url for url in self.broadcast_lcd_uris if url and host_ip not in url
-        ]
+            self._broadcasters_status[broadcaster_client] = True
 
     def __repr__(self) -> str:
         return (
