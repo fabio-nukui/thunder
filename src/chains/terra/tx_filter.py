@@ -6,6 +6,8 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Iterable
 
+from terra_sdk.core import AccAddress
+
 from . import terraswap
 from .native_liquidity_pair import NativeLiquidityPair
 from .token import CW20Token, TerraNativeToken, TerraToken
@@ -90,6 +92,9 @@ class FilterFirstActionPairSwap(Filter):
         return f"{self.__class__.__name__}(action={self.action}, pairs={self.pairs})"
 
     def match_msgs(self, msgs: list[dict]) -> bool:
+        if not self.pairs:
+            return False
+
         msg = msgs[0]
         if "MsgExecuteContract" not in msg["type"]:
             return False
@@ -118,17 +123,12 @@ class FilterFirstActionRouterSwap(Filter):
     def __init__(
         self,
         pairs: Iterable[terraswap.RouterLiquidityPair],
+        router_addresses: Iterable[AccAddress],
         aways_base64: bool = False,
     ):
         self.aways_base64 = aways_base64
-        self.pairs = [
-            p for p in pairs if isinstance(p, NativeLiquidityPair) or p.router_address
-        ]
-        self.router_addresses = {
-            p.router_address
-            for p in self.pairs
-            if isinstance(p, terraswap.LiquidityPair) and p.router_address
-        }
+        self.pairs = pairs
+        self.router_addresses = router_addresses
         self._pair_ids = [
             (
                 "native" if isinstance(p, NativeLiquidityPair) else "terraswap",
@@ -141,8 +141,9 @@ class FilterFirstActionRouterSwap(Filter):
         return f"{self.__class__.__name__}(pairs={self.pairs})"
 
     def match_msgs(self, msgs: list[dict]) -> bool:
-        if not self.pairs:
+        if not self.pairs or not self.router_addresses:
             return False
+
         msg = msgs[0]
         if "MsgExecuteContract" not in msg["type"]:
             return False
@@ -186,11 +187,18 @@ class FilterFirstActionRouterSwap(Filter):
 
 
 class FilterSwapTerraswap(Filter):
-    def __init__(self, pairs: Iterable[terraswap.LiquidityPair]):
+    def __init__(
+        self,
+        pairs: Iterable[terraswap.RouterLiquidityPair],
+        router_addresses: Iterable[AccAddress],
+    ):
         self.pairs = pairs
+
         filter_length = FilterMsgsLength(1)
-        filter_pair = FilterFirstActionPairSwap(terraswap.Action.swap, self.pairs)
-        filter_router = FilterFirstActionRouterSwap(self.pairs)
+        terraswap_pairs = [p for p in self.pairs if isinstance(p, terraswap.LiquidityPair)]
+        filter_pair = FilterFirstActionPairSwap(terraswap.Action.swap, terraswap_pairs)
+        filter_router = FilterFirstActionRouterSwap(self.pairs, router_addresses)
+
         self._filter = filter_length & (filter_pair | filter_router)
 
     def __repr__(self) -> str:

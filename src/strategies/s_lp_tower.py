@@ -22,6 +22,7 @@ from arbitrage.terra import (
 from chains.terra import (
     LUNA,
     UST,
+    NativeLiquidityPair,
     TerraClient,
     TerraNativeToken,
     TerraToken,
@@ -98,9 +99,18 @@ def get_filters(
     filters: dict[terraswap.RouterLiquidityPair, Filter] = {}
     for arb_route in arb_routes:
         for pair in arb_route.pairs:
-            if not isinstance(pair, terraswap.LiquidityPair):
+            if isinstance(pair, terraswap.LiquidityPair):
+                router_addresses = {pair.router_address} if pair.router_address else set()
+            elif isinstance(pair, NativeLiquidityPair):
+                router_addresses = {
+                    pair.router_address
+                    for pair in arb_route.pairs
+                    if isinstance(pair, terraswap.LiquidityPair)
+                    if pair.router_address
+                }
+            else:
                 continue
-            filters[pair] = FilterSwapTerraswap([pair])
+            filters[pair] = FilterSwapTerraswap([pair], router_addresses)
     return filters
 
 
