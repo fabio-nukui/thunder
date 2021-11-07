@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from decimal import Decimal
 from typing import TYPE_CHECKING, TypeVar
 
 from terra_sdk.core import AccAddress
@@ -69,6 +70,7 @@ class NativeLiquidityPair(BaseTerraLiquidityPair):
         self.client = client
         self.tokens = tokens if (tokens[0] < tokens[1]) else (tokens[1], tokens[0])
         self._stop_updates = False
+        self._virtual_pool_changes = (Decimal(0), Decimal(0))
 
     def __hash__(self) -> int:
         return hash((self.__class__, self.tokens))
@@ -85,7 +87,12 @@ class NativeLiquidityPair(BaseTerraLiquidityPair):
     ) -> TerraTokenAmount:
         assert amount_in.token in self.tokens
         token_out = self.tokens[0] if amount_in.token == self.tokens[1] else self.tokens[1]
-        return await self.client.market.get_amount_out(amount_in, token_out, safety_margin)
+        vp = await self.get_virtual_pools()
+        return await self.client.market.get_amount_out(amount_in, token_out, safety_margin, vp)
+
+    async def get_virtual_pools(self) -> tuple[Decimal, Decimal]:
+        vp = await self.client.market.get_virtual_pools()
+        return vp[0] + self._virtual_pool_changes[0], vp[1] + self._virtual_pool_changes[1]
 
     async def op_swap(
         self,

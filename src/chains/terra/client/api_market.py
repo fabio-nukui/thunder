@@ -17,6 +17,7 @@ class MarketApi(Api):
         offer_amount: TerraTokenAmount,
         ask_denom: TerraNativeToken,
         safety_margin: bool | int = False,
+        virtual_pools: tuple[Decimal, Decimal] = None,
     ) -> TerraTokenAmount:
         """Get market swap amount, based on Terra implementation at
         https://github.com/terra-money/core/blob/v0.5.5/x/market/keeper/swap.go
@@ -25,7 +26,9 @@ class MarketApi(Api):
             raise TypeError("Market trades only available to native tokens")
 
         if LUNA in (offer_amount.token, ask_denom):
-            vp_terra, vp_luna = await self.get_virtual_pools()
+            vp_terra, vp_luna = (
+                await self.get_virtual_pools() if virtual_pools is None else virtual_pools
+            )
             vp_offer, vp_ask = (vp_terra, vp_luna) if ask_denom == LUNA else (vp_luna, vp_terra)
 
             offer_amount_sdr = (await self.compute_swap_no_spread(offer_amount, SDT)).amount
@@ -45,7 +48,7 @@ class MarketApi(Api):
         """Calculate virtual liquidity pool reserves in SDR
         See https://docs.terra.money/Reference/Terra-core/Module-specifications/spec-market.html#market-making-algorithm  # noqa: E501
         """
-        base_bool = SDT.decimalize((await self.get_market_parameter("base_pool")))
+        base_bool = SDT.decimalize(await self.get_market_parameter("base_pool"))
         terra_pool_delta = SDT.decimalize(str(await self.client.lcd.market.terra_pool_delta()))
 
         pool_terra = base_bool + terra_pool_delta
