@@ -1,5 +1,5 @@
 # flake8: noqa
-SSL_FILES_DIR = "/home/thunder/work/docker/lab"
+SSL_FILES_DIR = "/home/thunder/work/config/lab"
 c.ExtensionApp.open_browser = False
 c.ServerApp.allow_origin = "*"
 c.ServerApp.allow_password_change = False
