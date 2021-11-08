@@ -18,7 +18,7 @@ def get_region(filepath: Path = Path("~/.aws/config")) -> str:
 def get_log_prefix() -> str:
     if not LOG_PREFIX_FILE.exists():
         return ""
-    return open(LOG_PREFIX_FILE).read()
+    return open(LOG_PREFIX_FILE).read().strip()
 
 
 def main():
@@ -32,13 +32,13 @@ def main():
         lines = copy(lines_orig)
         for n, line in enumerate(lines):
             if "AWS_DEFAULT_REGION" in line:
-                if line != (fix := f"AWS_DEFAULT_REGION={region}"):
+                if line != (fix := f"AWS_DEFAULT_REGION={region}\n"):
                     print(f"Fixing region on {file.name}")
-                    lines[n] = fix + "\n"
+                    lines[n] = fix
             if "LOG_AWS_PREFIX" in line and log_prefix:
-                if line != (fix := f"LOG_AWS_PREFIX={log_prefix}"):
+                if line != (fix := f"LOG_AWS_PREFIX={log_prefix}\n"):
                     print(f"Fixing log prefix on {file.name}")
-                    lines[n] = fix + "\n"
+                    lines[n] = fix
         if lines != lines_orig:
             open(file, "w").write("".join(lines))
 
