@@ -121,7 +121,7 @@ RUN conda install --quiet --yes \
     npm cache clean --force  && \
     jupyter notebook --generate-config  && \
     jupyter lab clean && \
-    rm -rf $HOME/.cache/yarn  && \
+    rm -rf $HOME/.cache/yarn && \
     fix-permissions $HOME $CONDA_DIR
 
 RUN jupyter labextension install -y \
@@ -140,3 +140,9 @@ COPY config/lab/jupyter_lab_config.py $HOME/.jupyter/
 COPY config/lab/tracker.jupyterlab-settings $HOME/.jupyter/lab/user-settings/@jupyterlab/notebook-extension/
 
 COPY config/lab/shortcuts.jupyterlab-settings $HOME/.jupyter/lab/user-settings/@jupyterlab/shortcuts-extension/
+
+USER root
+
+RUN fix-permissions ${HOME}/.jupyter
+
+USER $USER
