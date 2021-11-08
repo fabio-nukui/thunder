@@ -3,8 +3,10 @@
   "ANC": "terra14z56l0fp2lsf86zy3hty2z47ezkhnthtr9yq76",
   "BETH": "terra1dzhzukyezv0etz22ud940z7adyv7xgcjkahuun",
   "BLUNA": "terra1kc87mu460fwkqte29rquh4hc20m54fxwtsx7gp",
+  "DOSH": "terra14mvkydkwm2pzz62cgrkpeusphm4trrqrzd88ju",
   "DKWON": "terra14f7u8z4eqpxcrp4xr6knhgfp5n4h68nwy3yzg5",
   "DPH": "terra17jnhankdfl8vyzj6vejt7ag8uz0cjc9crkl2h7",
+  "H2E": "terra1nl9dx4pkat90gzw2j99n338n984e4cw7nxq65w",
   "JUTA": "terra1l6nqyv78m3kj8v4wa7r5fr3vhp0qzrauwkx5av",
   "KINGS": "terra19mcqz609t5vcudfatwexuhta0mrs49fu9dqj2s",
   "LOOP": "terra1nef5jf6c7js9x6gkntlehgywvjlpytm7pcgkn4",
@@ -14,7 +16,7 @@
   "MINE": "terra1kcthelkax4j9x8d3ny6sdag0qmxxynl3qtcrpy",
   "MIR": "terra15gwkyepfc6xgca5t5zefzwy42uts8l2m4g40k6",
   "MOON": "terra1hmxxq0y8h79f3228vs0czc4uz5jdgjt0appp26",
-  "whORION": "terra1mddcdx0ujx89f38gu7zspk2r2ffdl5enyz2u03",
+  "TSquid": "terra15dcd0j3tqtefj96nhqryt59qyr820tyxq3l0dr",
   "Psi": "terra12897djskt9rge8dtmm86w654g7kzckkd698608",
   "SDOLLAR": "terra1l0y8yg0s86x299nqw0p6fhh7ngex3r4phtjeuq",
   "SPEC": "terra1s5eczhe0h0jutf46re52x5z4r03c8hupacxmdr",
@@ -24,8 +26,6 @@
   "TMeta": "terra1u72jtyujxu8dmpxedrrtmt5tekn0usf09r2a9h",
   "TWD": "terra19djkaepjjswucys4npd5ltaxgsntl7jf0xz7w6",
   "VKR": "terra1dy9kmlm4anr92e42mrkjwzyvfqwz66un00rwr5",
-  "whWBTC": "terra1aa7upykmmqqc63l924l5qfap8mrmx5rfdm0v55",
-  "whWETH": "terra14tl83xcwqjy0ken9peu4pjjuu755lrry2uy25r",
   "mAAPL": "terra1vxtwu4ehgzz77mnfwrntyrmgl64qjs75mpwqaz",
   "mABNB": "terra1g4x2pzmkc9z3mseewxf758rllg08z3797xly0n",
   "mAMC": "terra1qelfthdanju7wavc5tq0k5r0rhsyzyyrsn09qy",
@@ -56,5 +56,8 @@
   "mVIXY": "terra19cmt6vzvhnnnfsmccaaxzy2uaj06zjktu6yzjx",
   "nETH": "terra178v546c407pdnx5rer3hu8s2c0fc924k74ymnn",
   "nLuna": "terra10f2mt82kjnkxqj2gepgwl637u2w4ue2z5nhz5j",
-  "tSHIBA": "terra140k6k2pmh2lmy4q4wyz5znqmtgwvs3gkgfeevq"
+  "tSHIBA": "terra140k6k2pmh2lmy4q4wyz5znqmtgwvs3gkgfeevq",
+  "whWBTC": "terra1aa7upykmmqqc63l924l5qfap8mrmx5rfdm0v55",
+  "whORION": "terra1mddcdx0ujx89f38gu7zspk2r2ffdl5enyz2u03",
+  "whWETH": "terra14tl83xcwqjy0ken9peu4pjjuu755lrry2uy25r"
 }
