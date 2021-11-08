@@ -80,6 +80,7 @@ class BroadcasterApi(Api):
             "fee_denom": fee_denom,
         }
         assert self.client.active_broadcaster is not None
+        log.info(f"Posting to broadcaster {self.client.active_broadcaster.base_url}")
         res = await self.client.active_broadcaster.post("txs", json=payload, n_tries=1)
         data: BroadcasterResponse = res.json()
         if data["result"] == "repeated_tx":

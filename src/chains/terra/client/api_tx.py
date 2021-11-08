@@ -148,7 +148,6 @@ class TxApi(Api):
         **kwargs,
     ) -> list[tuple[float, SyncTxBroadcastResult]]:
         if self.client.use_broadcaster:
-            log.info("Posting to broadcaster")
             return await self.client.broadcaster.post(
                 msgs, n_repeat, expect_logs_, fee, fee_denom
             )
@@ -189,7 +188,6 @@ class TxApi(Api):
         **kwargs,
     ) -> SyncTxBroadcastResult:
         if self.client.use_broadcaster:
-            log.info("Posting to broadcaster")
             ((timestamp, result),) = await self.client.broadcaster.post(
                 msgs, n_repeat=1, expect_logs=expect_logs_, fee=fee, fee_denom=fee_denom
             )
