@@ -11,6 +11,8 @@
     "LOOP-MINE": "terra1a26j00ywq0llvms707hqycwlkl9erwhacr6jve",
     "LOOP-MIR": "terra13ay3hftcft25uazl76q8gmdk993y9nyv9avu2h",
     "LOOP-UST": "terra106a00unep7pvwvcck4wylt4fffjhgkf9a0u6eu",
+    "LOOP-whWBTC": "terra1tksv8cn7j95mecxjhj3dgcz3xtylcw5xkarre7",
+    "LOOP-whWETH": "terra1x4msd26x8ncqcng3dapx8306rmgwuwtlg30a2j",
     "LOOPR-UST": "terra1dw5j23l6nwge69z0enemutfmyc93c36aqnzjj5",
     "LOTA-UST": "terra15568nqrqcawm263yqcuuuvj5mh763tp8jyscq3",
     "LUNA-UST": "terra1sgu6yca6yjk0a34l86u6ju4apjcd6refwuhgzv",
@@ -18,6 +20,11 @@
     "MIR-UST": "terra1cpzkckgzz90pq8fkumdjc58ee5llrxt2yka9fp",
     "SPEC-UST": "terra1jkr0ef9fpghdru38ht70ds6jfldprgttw6xlek",
     "STT-UST": "terra1lgazu0ltsxm3ayellqa2mhnhlvgx3hevkqeqy2",
-    "TWD-UST": "terra1jfp5ew4tsru98wthajsqegtzaxt49ty4z2qws0"
+    "TWD-UST": "terra1jfp5ew4tsru98wthajsqegtzaxt49ty4z2qws0",
+    "whORION-UST": "terra18z7sjrnxydznm0zzpflkhxc7xrkejfesa46y9v",
+    "whWBTC-LUNA": "terra1fgc8tmys2kxzyl39k3gtgw9dlxxuhlqux7k38e",
+    "whWBTC-UST": "terra17e0aslpj3rrt62gwh7utj3fayas4h8dl3y8ju3",
+    "whWETH-LUNA": "terra1pmmfz205es7axymwpl4jj2ruxnevufu3462f02",
+    "whWETH-UST": "terra17kmgn775v2y9m35gunn3pnw8s2ggv6h95wvkxr"
   }
 }

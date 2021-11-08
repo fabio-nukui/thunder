@@ -10,6 +10,7 @@
     "BLUNA-LUNA": "terra1jxazgm67et0ce260kvrpfv50acuushpjsz2y0p",
     "DKWON-UST": "terra1uz8hhjwg3472744kgkz69jfqf3d2uwl5aw66mw",
     "DPH-UST": "terra1zz39wfyyqt4tjz7dz6p7s9c8pwmcw2xzde3xl8",
+    "KINGS-UST": "terra187pxc9su35stqfdd02xy2r778qd83lruaey3fq",
     "KRT-LUNA": "terra1zw0kfxrxgrs5l087mjm79hcmj3y8z6tljuhpmc",
     "LOTA-UST": "terra1pn20mcwnmeyxf68vpt3cyel3n57qm9mp289jta",
     "MIAW-ALTE": "terra1c7uxt89gap5gcclvhtqvx3wpd0ee2dpjhf0ct6",
@@ -26,6 +27,7 @@
     "SPEC-UST": "terra1tn8ejzw8kpuc87nu42f6qeyen4c7qy35tl8t20",
     "STT-ALTE": "terra1r0288hx3mjgx0zrpmpc8rulm6ca8jheqtwhwq5",
     "STT-UST": "terra19pg6d7rrndg4z4t0jhcd7z9nhl3p5ygqttxjll",
+    "TFLOKI-UST": "terra1uyvksaz9xpgxpqnq8vz9vzg59up8mlhx3463tf",
     "TKUB-UST": "terra1f9aln0c98j9w749szx958la7x25chdnz9hqx0v",
     "TMeta-UST": "terra17y0ujwl2far0rtm5qqjlx6ghtndcpyzqulur3e",
     "TWD-ALTE": "terra16eecm8exp3p82ld5eh5feweup0qvfv8468np6j",
@@ -65,7 +67,9 @@
     "mETH-BETH": "terra1c5swgtnuunpf75klq5uztynurazuwqf0mmmcyy",
     "nETH-Psi": "terra14zhkur7l7ut7tx6kvj28fp5q982lrqns59mnp3",
     "nLuna-Psi": "terra1zvn8z6y8u2ndwvsjhtpsjsghk6pa6ugwzxp6vx",
-    "tSHIBA-UST": "terra1stdzf28wlq7llzfecse366r657rtdh6wtrdfk2"
+    "tSHIBA-UST": "terra1stdzf28wlq7llzfecse366r657rtdh6wtrdfk2",
+    "whORION-LUNA": "terra170hht9lwe50ugfhnruzjaezpj29l7nvw3l6725",
+    "whORION-UST": "terra1z6tp0ruxvynsx5r9mmcc2wcezz9ey9pmrw5r8g"
   },
   "router": "terra19qx5xe6q9ll4w0890ux7lv2p4mf3csd4qvt3ex"
 }
