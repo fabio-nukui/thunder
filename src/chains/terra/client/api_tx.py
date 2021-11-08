@@ -151,6 +151,7 @@ class TxApi(Api):
             return await self.client.broadcaster.post(
                 msgs, n_repeat, expect_logs_, fee, fee_denom
             )
+        log.info("Broadcasting with local LCD")
         account_number, sequence = await self.client._valid_account_params(
             account_number, sequence
         )
