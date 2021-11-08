@@ -135,9 +135,8 @@ RUN jupyter labextension install -y \
     rm -rf $HOME/.local && \
     fix-permissions $HOME $CONDA_DIR
 
-COPY config/lab $HOME/.jupyter/
+COPY config/lab/jupyter_lab_config.py $HOME/.jupyter/
 
-RUN mv $HOME/.jupyter/tracker.jupyterlab-settings \
-        $HOME/.jupyter/lab/user-settings/@jupyterlab/notebook-extension/ && \
-    mv $HOME/.jupyter/shortcuts.jupyterlab-settings \
-        $HOME/.jupyter/lab/user-settings/@jupyterlab/shortcuts-extension/
+COPY config/lab/tracker.jupyterlab-settings $HOME/.jupyter/lab/user-settings/@jupyterlab/notebook-extension/
+
+COPY config/lab/shortcuts.jupyterlab-settings $HOME/.jupyter/lab/user-settings/@jupyterlab/shortcuts-extension/
