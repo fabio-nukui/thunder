@@ -131,4 +131,11 @@ class NativeLiquidityPair(BaseTerraLiquidityPair):
         return simulation
 
     async def get_reserve_changes_from_msg(self, msg: dict) -> AmountTuple:
-        raise NotImplementedError
+        token = TerraNativeToken(msg["offer_coin"]["denom"])
+        assert token in self.tokens
+        assert msg["ask_denom"] in (self.tokens[0].denom, self.tokens[1].denom)
+
+        amount_in = token.to_amount(int_amount=msg["offer_coin"]["amount"])
+        amounts = await self.get_swap_amounts(amount_in)
+
+        return amounts["pool_change"]
