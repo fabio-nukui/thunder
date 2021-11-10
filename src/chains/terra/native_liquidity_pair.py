@@ -3,9 +3,12 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from copy import copy
 from decimal import Decimal
+from functools import reduce
 from typing import TYPE_CHECKING, TypeVar
 
 from terra_sdk.core import AccAddress
+
+from exceptions import MaxSpreadAssertion
 
 from .denoms import LUNA, SDT
 from .token import TerraNativeToken, TerraToken, TerraTokenAmount
@@ -64,6 +67,28 @@ class BaseTerraLiquidityPair(ABC):
     @abstractmethod
     async def get_reserve_changes_from_msg(self, msg: dict) -> AmountTuple:
         ...
+
+    async def get_reserve_changes_from_msgs(self, msgs: list[dict]) -> AmountTuple:
+        changes: list[AmountTuple] = []
+        errors = []
+        for msg in msgs:
+            try:
+                change = await self.get_reserve_changes_from_msg(msg["value"])
+                changes.append(self.fix_amounts_order(change))
+            except MaxSpreadAssertion:
+                raise
+            except Exception as e:
+                errors.append(e)
+        if not changes:
+            raise Exception(f"Error when parsing msgs: {errors}")
+        return reduce(lambda x, y: (x[0] + y[0], x[1] + y[1]), changes)
+
+    def fix_amounts_order(self, amounts: AmountTuple) -> AmountTuple:
+        if (amounts[1].token, amounts[0].token) == self.tokens:
+            return amounts[1], amounts[0]
+        if (amounts[0].token, amounts[1].token) == self.tokens:
+            return amounts
+        raise Exception("Tokens in amounts do not match reserves")
 
 
 class NativeLiquidityPair(BaseTerraLiquidityPair):

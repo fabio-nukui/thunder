@@ -303,17 +303,10 @@ class LiquidityPair(BaseTerraLiquidityPair):
     async def simulate_reserve_change(self, amounts: AmountTuple) -> LiquidityPair:
         simulation = copy(self)
         simulation._stop_updates = True
-        amounts = self._fix_amounts_order(amounts)
+        amounts = self.fix_amounts_order(amounts)
         reserves = await self.get_reserves()
         simulation._reserves = reserves[0] + amounts[0], reserves[1] + amounts[1]
         return simulation
-
-    def _fix_amounts_order(self, amounts: AmountTuple) -> AmountTuple:
-        if (amounts[1].token, amounts[0].token) == self.tokens:
-            return amounts[1], amounts[0]
-        if (amounts[0].token, amounts[1].token) == self.tokens:
-            return amounts
-        raise Exception("Tokens in amounts do not match reserves")
 
     async def get_price(self, token_quote: TerraNativeToken) -> Decimal:
         if token_quote in self.tokens:
@@ -646,7 +639,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
             MAX_ADD_LIQUIDITY_SLIPPAGE if slippage_tolerance is None else slippage_tolerance
         )
         reserves = await self.get_reserves()
-        amounts_in = self._fix_amounts_order(amounts_in)
+        amounts_in = self.fix_amounts_order(amounts_in)
         amounts_ratio = amounts_in[0].amount / amounts_in[1].amount
         current_ratio = reserves[0].amount / reserves[1].amount
         assert abs(amounts_ratio / current_ratio - 1) < slippage_tolerance
