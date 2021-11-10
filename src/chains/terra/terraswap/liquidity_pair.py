@@ -193,7 +193,10 @@ async def _decode_router_msg(
             ]
             query = {"pair": {"asset_infos": asset_infos}}
             pair_info = await client.contract_query(factory_address, query)
-            pairs.append(await LiquidityPair.new(pair_info["contract_addr"], client))
+            pair = await LiquidityPair.new(
+                pair_info["contract_addr"], client, check_liquidity=False
+            )
+            pairs.append(pair)
     return RouterDecodedMsg(amount_in, min_out, pairs)
 
 
