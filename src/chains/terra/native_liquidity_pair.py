@@ -78,6 +78,8 @@ class BaseTerraLiquidityPair(ABC):
             except MaxSpreadAssertion:
                 raise
             except Exception as e:
+                if len(msgs) == 1:
+                    raise e
                 errors.append(e)
         if not changes:
             raise Exception(f"Error when parsing msgs: {errors}")

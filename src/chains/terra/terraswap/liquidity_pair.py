@@ -104,6 +104,8 @@ def _token_amount_to_data(token_amount: TerraTokenAmount) -> dict:
 
 
 def _is_router_msg(msg: dict, router_address: AccAddress | None) -> bool:
+    if "contract" not in msg:
+        return False
     if msg["contract"] == router_address:
         return True
     if "send" not in (execute_msg := msg["execute_msg"]):
