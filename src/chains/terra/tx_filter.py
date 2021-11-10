@@ -9,6 +9,7 @@ from typing import Iterable
 from terra_sdk.core import AccAddress
 
 from . import terraswap
+from .native_liquidity_pair import NativeLiquidityPair
 from .token import CW20Token, TerraNativeToken, TerraToken
 
 log = logging.getLogger(__name__)
@@ -114,6 +115,28 @@ class FilterFirstActionPairSwap(Filter):
                     and send["contract"] == pair.contract_addr
                     and self.action in _decode_msg(send["msg"], self.aways_base64)
                 ):
+                    return True
+        return False
+
+
+class FilterNativeSwap(Filter):
+    def __init__(self, pairs: Iterable[NativeLiquidityPair]):
+        self.denoms = [{token.denom for token in pair.tokens} for pair in pairs]
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(denoms={self.denoms})"
+
+    def match_msgs(self, msgs: list[dict]) -> bool:
+        if not self.denoms:
+            return False
+
+        for msg in msgs:
+            if "MsgSwap" not in msg["type"]:
+                continue
+            value = msg["value"]
+
+            for denom_pair in self.denoms:
+                if {value["offer_coin"]["denom"], value["ask_denom"]} == denom_pair:
                     return True
         return False
 
