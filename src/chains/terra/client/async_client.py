@@ -103,20 +103,21 @@ class TerraClient(AsyncBlockchainClient):
         self.lcd = AsyncLCDClient2(
             self.lcd_uri, self.chain_id, self.gas_prices, self.gas_adjustment
         )
+        self.wallet = self.lcd.wallet(self.key)
+        self.address = self.wallet.key.acc_address
+
         try:
-            self.wallet = self.lcd.wallet(self.key)
-            self.address = self.wallet.key.acc_address
-
             self.height = await self.get_latest_height()
-            await self._check_connections()
-
             self.account_sequence = (await self.get_account_data()).sequence
-            if self.gas_prices is None:
-                self.lcd.gas_prices = await self.tx.get_gas_prices()
-            self.mempool.start()
-            await super().start()
         except Exception:
             await self.lcd.session.close()
+            raise
+        await self._check_connections()
+
+        if self.gas_prices is None:
+            self.lcd.gas_prices = await self.tx.get_gas_prices()
+        self.mempool.start()
+        await super().start()
 
     async def _fix_broadcaster_urls(self):
         host_ip = await utils.ahttp.get_host_ip()
