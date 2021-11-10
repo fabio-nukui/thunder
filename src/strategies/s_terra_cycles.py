@@ -25,6 +25,7 @@ from chains.terra import (
     LUNA,
     UST,
     BaseTerraLiquidityPair,
+    NativeLiquidityPair,
     TerraClient,
     TerraNativeToken,
     TerraTokenAmount,
@@ -32,7 +33,7 @@ from chains.terra import (
     terraswap,
 )
 from chains.terra.swap_utils import MultiRoutes, SingleRoute
-from chains.terra.tx_filter import Filter, FilterSwapTerraswap
+from chains.terra.tx_filter import Filter, FilterNativeSwap, FilterSwapTerraswap
 from exceptions import FeeEstimationError, InsufficientLiquidity, UnprofitableArbitrage
 from strategies.common.default_params import (
     MAX_N_REPEATS,
@@ -116,7 +117,10 @@ def get_filters(
             ):
                 continue
             router_addresses = {pair.router_address} if pair.router_address else set()
-            filters[pair] = FilterSwapTerraswap([pair], router_addresses)
+            filter_: Filter = FilterSwapTerraswap([pair], router_addresses)
+            if isinstance(pair, NativeLiquidityPair):
+                filter_ = filter_ | FilterNativeSwap([pair])
+            filters[pair] = filter_  # type: ignore
     return filters
 
 

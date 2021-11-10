@@ -22,13 +22,14 @@ from arbitrage.terra import (
 from chains.terra import (
     LUNA,
     UST,
+    NativeLiquidityPair,
     TerraClient,
     TerraNativeToken,
     TerraToken,
     TerraTokenAmount,
     terraswap,
 )
-from chains.terra.tx_filter import Filter, FilterSwapTerraswap
+from chains.terra.tx_filter import Filter, FilterNativeSwap, FilterSwapTerraswap
 from exceptions import FeeEstimationError, UnprofitableArbitrage
 
 from .common.default_params import MIN_PROFIT_UST, MIN_START_AMOUNT, OPTIMIZATION_TOLERANCE
@@ -103,7 +104,10 @@ def get_filters(
             ):
                 continue
             router_addresses = {pair.router_address} if pair.router_address else set()
-            filters[pair] = FilterSwapTerraswap([pair], router_addresses)
+            filter_ = FilterSwapTerraswap([pair], router_addresses)
+            if isinstance(pair, NativeLiquidityPair):
+                filter_ = filter_ | FilterNativeSwap([pair])
+            filters[pair] = filter_
     return filters
 
 
