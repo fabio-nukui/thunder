@@ -116,13 +116,14 @@ def _is_router_msg(msg: dict, router_address: AccAddress | None) -> bool:
 @ttl_cache(CacheGroup.TERRA, ROUTER_DECODE_MSG_CACHE_SIZE, ROUTER_DECODE_MSG_CACHE_TTL)
 async def get_router_reserve_changes_from_msg(
     client: TerraClient,
+    msg: dict,
     factory_address: AccAddress,
     router_address: AccAddress,
-    msg: dict,
+    assert_limit_order_address: AccAddress | None,
 ) -> dict[RouterLiquidityPair, tuple[TerraTokenAmount, TerraTokenAmount]]:
     changes: dict[RouterLiquidityPair, tuple[TerraTokenAmount, TerraTokenAmount]] = {}
     amount_in, min_out, pairs = await _decode_router_msg(
-        client, factory_address, router_address, msg
+        client, msg, factory_address, router_address, assert_limit_order_address
     )
     for pair in pairs:
         amounts = await pair.get_swap_amounts(amount_in)
@@ -142,9 +143,10 @@ async def get_router_reserve_changes_from_msg(
 
 async def _decode_router_msg(
     client: TerraClient,
+    msg: dict,
     factory_address: AccAddress,
     router_address: AccAddress,
-    msg: dict,
+    assert_limit_order_address: AccAddress | None,
 ) -> RouterDecodedMsg:
     action = "execute_swap_operations"
     if (
@@ -186,7 +188,9 @@ async def _decode_router_msg(
                 TerraNativeToken(op["native_swap"]["ask_denom"]),
             )
             pairs.append(
-                RouterNativeLiquidityPair(client, tokens, factory_address, router_address)
+                RouterNativeLiquidityPair(
+                    client, tokens, factory_address, router_address, assert_limit_order_address
+                )
             )
         else:
             asset_infos = [
@@ -209,15 +213,43 @@ class RouterNativeLiquidityPair(NativeLiquidityPair):
         tokens: tuple[TerraNativeToken, TerraNativeToken],
         factory_address: AccAddress,
         router_address: AccAddress,
+        assert_limit_order_address: AccAddress | None,
     ):
         super().__init__(client, tokens)
         self.factory_address = factory_address
         self.router_address = router_address
+        self.assert_limit_order_address = assert_limit_order_address
+
+    async def get_reserve_changes_from_msgs(self, msgs: list[dict]) -> AmountTuple:
+        changes = await super().get_reserve_changes_from_msgs(msgs)
+        if (
+            self.assert_limit_order_address is not None
+            and msgs[0]["value"].get("contract") == self.assert_limit_order_address
+        ):
+            await self._assert_limit_order_min_out(msgs)
+        return changes
+
+    async def _assert_limit_order_min_out(self, msgs: list[dict]):
+        order = msgs[0]["value"]["execute_msg"]["assert_limit_order"]
+        if not (min_receive := order.get("minimum_receive")):
+            return
+        token_in = TerraNativeToken(order["offer_coin"]["denom"])
+        token_out = TerraNativeToken(order["ask_denom"])
+        amount_in = token_in.to_amount(int_amount=order["offer_coin"]["amount"])
+        min_out = token_out.to_amount(int_amount=min_receive)
+
+        amount_out = await self.get_swap_amount_out(amount_in)
+        if amount_out < min_out:
+            raise MaxSpreadAssertion(f"{min_out=} < {amount_out=}")
 
     async def get_reserve_changes_from_msg(self, msg: dict) -> AmountTuple:
         if _is_router_msg(msg, self.router_address):
             changes = await get_router_reserve_changes_from_msg(
-                self.client, self.factory_address, self.router_address, msg
+                self.client,
+                msg,
+                self.factory_address,
+                self.router_address,
+                self.assert_limit_order_address,
             )
             return changes[self]
         return await super().get_reserve_changes_from_msg(msg)
@@ -229,6 +261,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
     factory_name: str | None
     factory_address: AccAddress | None
     router_address: AccAddress | None
+    assert_limit_order_address: AccAddress | None
     lp_token: LPToken
     _reserves: AmountTuple
 
@@ -244,6 +277,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
         factory_name: str = None,
         factory_address: AccAddress = None,
         router_address: AccAddress = None,
+        assert_limit_order_address: AccAddress = None,
         recursive_lp_token_code_id: int = None,
         check_liquidity: bool = True,
     ) -> LiquidityPair:
@@ -261,6 +295,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
         self.factory_name = factory_name
         self.factory_address = factory_address
         self.router_address = router_address
+        self.assert_limit_order_address = assert_limit_order_address
 
         self.lp_token = await LPToken.from_pool_contract(
             self.contract_addr, self.client, recursive_lp_token_code_id
@@ -689,7 +724,11 @@ class LiquidityPair(BaseTerraLiquidityPair):
             assert self.factory_address
             assert self.router_address
             changes = await get_router_reserve_changes_from_msg(
-                self.client, self.factory_address, self.router_address, msg
+                self.client,
+                msg,
+                self.factory_address,
+                self.router_address,
+                self.assert_limit_order_address,
             )
             return changes[self]
         if msg["contract"] == self.contract_addr:

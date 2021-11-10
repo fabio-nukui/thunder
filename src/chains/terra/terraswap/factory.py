@@ -9,11 +9,16 @@ from typing import Any, Iterable, Tuple, TypeVar
 from terra_sdk.core import AccAddress
 from terra_sdk.exceptions import LCDResponseError
 
-from chains.terra.token import CW20Token, TerraToken
+from chains.terra.token import CW20Token, TerraNativeToken, TerraToken
 from exceptions import NotContract
 
 from ..client import TerraClient
-from .liquidity_pair import LiquidityPair, LPToken, pair_tokens_from_data
+from .liquidity_pair import (
+    LiquidityPair,
+    LPToken,
+    RouterNativeLiquidityPair,
+    pair_tokens_from_data,
+)
 from .router import Router, RouterLiquidityPair
 
 _FactoryT = TypeVar("_FactoryT", bound="Factory")
@@ -49,6 +54,7 @@ class Factory:
     contract_addr: AccAddress
     router_address: AccAddress | None
     pairs_addresses: dict[str, AccAddress]
+    assert_limit_order_address: AccAddress | None
     pair_code_id: int
     lp_token_code_id: int
 
@@ -68,6 +74,7 @@ class Factory:
         self.contract_addr = addresses["factory"]
         self.router_address = addresses.get("router")
         self.pairs_addresses = addresses["pairs"]
+        self.assert_limit_order_address = addresses.get("assert_limit_order")
 
         config = await client.contract_query(self.contract_addr, {"config": {}})
         self.pair_code_id = config["pair_code_id"]
@@ -140,7 +147,21 @@ class Factory:
             factory_name=self.name,
             factory_address=self.contract_addr,
             router_address=self.router_address,
+            assert_limit_order_address=self.assert_limit_order_address,
             check_liquidity=check_liquidity,
+        )
+
+    def get_native_pair(
+        self, tokens: tuple[TerraNativeToken, TerraNativeToken]
+    ) -> RouterNativeLiquidityPair:
+        if self.router_address is None:
+            raise Exception("Cannot create native pair if router_addres is None")
+        return RouterNativeLiquidityPair(
+            self.client,
+            tokens,
+            self.contract_addr,
+            self.router_address,
+            self.assert_limit_order_address,
         )
 
     def get_router(self, liquidity_pairs: Iterable[RouterLiquidityPair]) -> Router:

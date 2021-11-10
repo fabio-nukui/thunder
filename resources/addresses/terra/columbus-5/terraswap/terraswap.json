@@ -74,5 +74,6 @@
     "whORION-LUNA": "terra170hht9lwe50ugfhnruzjaezpj29l7nvw3l6725",
     "whORION-UST": "terra1z6tp0ruxvynsx5r9mmcc2wcezz9ey9pmrw5r8g"
   },
-  "router": "terra19qx5xe6q9ll4w0890ux7lv2p4mf3csd4qvt3ex"
+  "router": "terra19qx5xe6q9ll4w0890ux7lv2p4mf3csd4qvt3ex",
+  "assert_limit_order": "terra1vs9jr7pxuqwct3j29lez3pfetuu8xmq7tk3lzk"
 }

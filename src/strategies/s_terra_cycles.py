@@ -131,9 +131,7 @@ async def _get_ust_native_routes(
 ) -> list[MultiRoutes]:
     loop_pair = await loop_factory.get_pair("LUNA-UST")
     terraswap_pair = await terraswap_factory.get_pair("UST-LUNA")
-    native_pair = terraswap.RouterNativeLiquidityPair(
-        client, (UST, LUNA), terraswap_factory.contract_addr, terraswap_factory.router_address
-    )
+    native_pair = terraswap_factory.get_native_pair((UST, LUNA))
 
     return [
         MultiRoutes(
@@ -158,12 +156,7 @@ async def _get_luna_native_routes(
         terraswap_pair = await factory.get_pair(match.group(), check_liquidity=False)
         if not isinstance(terraswap_pair.tokens[0], TerraNativeToken):
             continue
-        native_pair = terraswap.RouterNativeLiquidityPair(
-            client,
-            terraswap_pair.tokens,  # type: ignore
-            factory.contract_addr,
-            factory.router_address,
-        )
+        native_pair = factory.get_native_pair(terraswap_pair.tokens)  # type: ignore
         list_steps: Sequence[Sequence] = [[terraswap_pair], [native_pair]]
 
         routes.append(
