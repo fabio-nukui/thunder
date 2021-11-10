@@ -48,21 +48,6 @@ def _get_ttl_cache(
     return cache
 
 
-def lru_cache(maxsize: int | Callable = 100):
-    """LRU cache decorator for sync and async functions"""
-    if callable(maxsize):
-        # ttl_cache was applied directly
-        func = maxsize
-        cache: LRUCache = LRUCache(100)
-        _caches[CacheGroup.DEFAULT].append(cache)
-        return cached(cache, key=json_hashkey)(func)
-    if isinstance(maxsize, int):
-        cache = LRUCache(maxsize)
-        _caches[CacheGroup.DEFAULT].append(cache)
-        return cached(cache, key=json_hashkey)
-    raise TypeError("Expected first argument to be an int or a callable")
-
-
 def ttl_cache(
     group: CacheGroup | Callable = CacheGroup.DEFAULT,
     maxsize: int = 100,
@@ -78,6 +63,21 @@ def ttl_cache(
         cache = _get_ttl_cache(group, maxsize, ttl)
         return cached(cache, key=json_hashkey)
     raise TypeError("Expected first argument to be a CacheGroup or a callable")
+
+
+def lru_cache(maxsize: int | Callable = 100):
+    """LRU cache decorator for sync and async functions"""
+    if callable(maxsize):
+        # ttl_cache was applied directly
+        func = maxsize
+        cache: LRUCache = LRUCache(100)
+        _caches[CacheGroup.DEFAULT].append(cache)
+        return cached(cache, key=json_hashkey)(func)
+    if isinstance(maxsize, int):
+        cache = LRUCache(maxsize)
+        _caches[CacheGroup.DEFAULT].append(cache)
+        return cached(cache, key=json_hashkey)
+    raise TypeError("Expected first argument to be an int or a callable")
 
 
 def clear_caches(
