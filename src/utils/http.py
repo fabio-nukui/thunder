@@ -30,6 +30,9 @@ class Client(httpx.Client):
         self.backoff_factor = backoff_factor
         self.status_forcelist = status_forcelist
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(base_url={str(self.base_url)})"
+
     def get(
         self,
         url: URLTypes,

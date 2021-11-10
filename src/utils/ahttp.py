@@ -33,6 +33,9 @@ class AsyncClient(httpx.AsyncClient):
         self.status_forcelist = status_forcelist
         self._semaphore_requests = asyncio.Semaphore(max_concurrent_requests)
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(base_url={str(self.base_url)})"
+
     async def get(
         self,
         url: URLTypes,
