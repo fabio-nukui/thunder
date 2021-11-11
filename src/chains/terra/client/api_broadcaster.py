@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Sequence, TypedDict, TypeVar
 
 from terra_sdk.core.auth import StdFee
@@ -50,11 +51,11 @@ def _round_msg_values(value: Any) -> Any:
         return _msg_to_key(value)  # type: ignore # https://githubmemory.com/repo/microsoft/pyright/issues/2428 # noqa: E501
     if isinstance(value, str):
         try:
-            return f"{float(value):.1g}"
+            return math.floor(math.log10(float(value)))
         except ValueError:
             return value
     if isinstance(value, (int, float)):
-        return f"{value:.1g}"
+        return math.floor(math.log10(value))
     return value
 
 
