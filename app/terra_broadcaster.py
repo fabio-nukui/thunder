@@ -31,8 +31,15 @@ async def shutdown():
 
 @app.route("/lcd/<path:path>")
 async def lcd_get(path):
-    res = await client.lcd_http_client.request(request.method, path)
-    return await res.aread()
+    try:
+        res = await client.lcd_http_client.request(request.method, path)
+        return await res.aread()
+    except Exception as e:
+        msg = f"Error when querying local LCD endpoint {e!r}"
+        log.debug(msg, exc_info=True)
+        return Response(
+            json.dumps({"message": msg}), status=500, content_type="application/json"
+        )
 
 
 @app.route("/txs", methods=["POST"])
