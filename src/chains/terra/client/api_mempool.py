@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, AsyncIterable, Mapping, TypeVar
 import httpx
 
 import configs
+import utils
 from utils.cache import CacheGroup, ttl_cache
 
 from ..tx_filter import Filter
@@ -42,15 +43,16 @@ class LatestHeightThread(threading.Thread):
         super().__init__(*args, daemon=daemon, **kargs)
 
         self.mcm = mcm
-        self.loop = asyncio.new_event_loop()
+        self._loop = asyncio.new_event_loop()
         self._stopped = threading.Event()
 
     def run(self):
-        self.loop.run_until_complete(self._update_height())
+        self._loop.create_task(self._update_height())
+        self._loop.run_forever()
 
     def stop(self):
         self._stopped.set()
-        self.loop.stop()
+        self._loop.create_task(utils.async_.stop_loop(self._loop))
 
     async def _update_height(self):
         async for height in utils_rpc.loop_latest_height(self.mcm.client.rpc_websocket_uri):
