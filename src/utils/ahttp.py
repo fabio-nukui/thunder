@@ -103,7 +103,7 @@ async def request(
     backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
     status_forcelist: Iterable[int] = DEFAULT_STATUS_FORCELIST,
     http2: bool = True,
-    httpx_client: httpx.AsyncClient = None,
+    httpx_client: AsyncClient = None,
     supress_logs: bool = False,
     **kwargs,
 ) -> httpx.Response:
@@ -119,7 +119,7 @@ async def request(
             supress_logs=supress_logs,
             **kwargs,
         )
-    async with httpx.AsyncClient(http2=http2, timeout=kwargs["timeout"]) as client:
+    async with AsyncClient(http2=http2, timeout=kwargs["timeout"]) as client:
         return await _send_request(
             client,
             method,
@@ -133,7 +133,7 @@ async def request(
 
 
 async def _send_request(
-    client: httpx.AsyncClient,
+    client: AsyncClient,
     method: str,
     url: URLTypes,
     n_tries: int,

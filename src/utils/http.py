@@ -72,7 +72,7 @@ def request(
     backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
     status_forcelist: Iterable[int] = DEFAULT_STATUS_FORCELIST,
     http2: bool = True,
-    httpx_client: httpx.Client = None,
+    httpx_client: Client = None,
     **kwargs,
 ) -> httpx.Response:
     kwargs.setdefault("timeout", DEFAULT_TIMEOUT)
@@ -86,7 +86,7 @@ def request(
             status_forcelist=status_forcelist,
             **kwargs,
         )
-    with httpx.Client(http2=http2, timeout=kwargs["timeout"]) as client:
+    with Client(http2=http2, timeout=kwargs["timeout"]) as client:
         return _send_request(
             client,
             method,
@@ -99,7 +99,7 @@ def request(
 
 
 def _send_request(
-    client: httpx.Client,
+    client: Client,
     method: str,
     url: URLTypes,
     n_tries: int,
