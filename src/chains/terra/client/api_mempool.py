@@ -35,7 +35,6 @@ class DecodeError(Exception):
 class UpdateEvent(Enum):
     new_block = auto()
     mempool = auto()
-    null = auto()
 
 
 class LatestHeightThread(threading.Thread):
@@ -113,14 +112,16 @@ class MempoolCacheManager:
         cor_wait_next_block = self._wait_next_block(height)
         cor_mempool_txs = self._update_mempool_txs(wait_for_changes=True)
         self._stop_tasks = False
-        tasks = asyncio.as_completed((cor_wait_next_block, cor_mempool_txs))
-        event = await next(tasks)
-        if new_block_only and event != UpdateEvent.new_block:
-            await next(tasks)
+        done, pending = await asyncio.wait(
+            [cor_wait_next_block, cor_mempool_txs], return_when="FIRST_COMPLETED"
+        )
+        first_task = done.pop()
+        second_task = pending.pop() if pending else done.pop()
+        if new_block_only and first_task.result() != UpdateEvent.new_block:
+            await second_task
+        else:
+            second_task.cancel()
         self._stop_tasks = True
-        del tasks
-        del cor_wait_next_block
-        del cor_mempool_txs
         unread_txs_msgs = [
             tx["msg"] for key, tx in self._txs_cache.items() if key not in self._read_txs
         ]
@@ -129,16 +130,12 @@ class MempoolCacheManager:
 
     async def _wait_next_block(self, min_height: int) -> UpdateEvent:
         while True:
-            if self._stop_tasks:
-                return UpdateEvent.null
             if self.height > min_height:
                 return UpdateEvent.new_block
             await asyncio.sleep(configs.TERRA_POLL_INTERVAL)
 
     async def _update_mempool_txs(self, wait_for_changes: bool) -> UpdateEvent:
         while True:
-            if self._stop_tasks:
-                return UpdateEvent.null
             res = await self.client.rpc_http_client.get("unconfirmed_txs")
             raw_txs: set[str] = {
                 tx for tx in res.json()["result"]["txs"] if len(tx) < MAX_RAW_TX_LENGTH
@@ -167,7 +164,6 @@ class MempoolCacheManager:
         return UpdateEvent.mempool
 
     async def fetch_mempool_txs(self) -> dict[str, dict]:
-        self._stop_tasks = False
         await self._update_mempool_txs(wait_for_changes=False)
         return self._txs_cache
 
