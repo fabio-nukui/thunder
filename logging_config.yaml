@@ -8,11 +8,6 @@ formatters:
     format: "[%(asctime)s] %(name)s %(levelname)s: %(message)s"
     class: utils.logger.ExtraDataFormatter
 handlers:
-  console:
-    class: logging.StreamHandler
-    formatter: plaintext
-    level: DEBUG
-    stream: ext://sys.stdout
   logfile:
     class: logging.handlers.RotatingFileHandler
     formatter: plaintext
