@@ -253,4 +253,7 @@ class TxApi(Api):
             client.post("txs", json=payload, n_tries=2)
             for client in self.client.broadcast_lcd_clients
         )
-        await asyncio.gather(*tasks)
+        res = await asyncio.gather(*tasks, return_exceptions=True)
+        for e in res:
+            if isinstance(e, Exception):
+                log.debug(f"Error on async broadcast: {e!r}")
