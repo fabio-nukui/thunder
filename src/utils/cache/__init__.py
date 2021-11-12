@@ -91,7 +91,7 @@ def clear_caches(
     else:
         caches_clear = _caches[group]
     for cache in caches_clear:
-        if cache._TTLCache__ttl <= ttl_treshold or clear_all:  # type: ignore
+        if clear_all or isinstance(cache, TTLCache) and cache._TTLCache__ttl <= ttl_treshold:  # type: ignore # noqa: E501
             cache.clear()
 
 

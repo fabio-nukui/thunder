@@ -24,7 +24,7 @@ handlers:
     create_log_group: True
 root:
   level: DEBUG
-  handlers: [console, logfile, watchtower]
+  handlers: [logfile, watchtower]
 loggers:
   asyncio:
     level: WARNING
