@@ -93,7 +93,7 @@ class TerraClient(AsyncBlockchainClient):
         self.fcd_client = utils.ahttp.AsyncClient(base_url=self.fcd_uri)
         self.rpc_http_client = utils.ahttp.AsyncClient(base_url=self.rpc_http_uri)
         self._broadcaster_clients = [
-            utils.ahttp.AsyncClient(base_url=url) for url in self.broadcaster_uris
+            utils.ahttp.AsyncClient(base_url=url, verify=False) for url in self.broadcaster_uris
         ]
         self._broadcasters_status = {c: False for c in self._broadcaster_clients}
         self.broadcast_lcd_clients = [
