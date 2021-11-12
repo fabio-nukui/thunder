@@ -140,14 +140,15 @@ class MempoolCacheManager:
             if self._stop_tasks:
                 return UpdateEvent.null
             res = await self.client.rpc_http_client.get("unconfirmed_txs")
-            raw_txs: list[str] = [
+            raw_txs: set[str] = {
                 tx for tx in res.json()["result"]["txs"] if len(tx) < MAX_RAW_TX_LENGTH
-            ]
-            if not wait_for_changes or set(raw_txs) != set(self._txs_cache):
+            }
+            set_cache = set(self._txs_cache)
+            if not wait_for_changes or raw_txs != set_cache:
                 break
             await asyncio.sleep(configs.TERRA_POLL_INTERVAL)
 
-        if not set(self._txs_cache).issubset(raw_txs):
+        if not set_cache < raw_txs:
             # Some txs were removed from mempool, a new block has arrived
             self._txs_cache = {}
             self._read_txs = set()
