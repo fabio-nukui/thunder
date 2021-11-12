@@ -144,6 +144,7 @@ async def _send_request(
 ) -> httpx.Response:
     """httpx request with default retries.
     inspired by https://www.peterbe.com/plog/best-practice-with-retries-with-requests"""
+    errors: list[Exception] = []
     for i in range(n_tries):
         try:
             res = await client.request(method, url, **kwargs)
@@ -159,15 +160,18 @@ async def _send_request(
                     f"{status_code=}, response={e.response.text!r}",
                     exc_info=True,
                 )
+            errors.append(e)
         except httpx.RequestError as e:
             url = e.request.url
             if not supress_logs:
                 log.debug(f"Error on http {method} url={str(e.request.url)}", exc_info=True)
+            errors.append(e)
         except Exception as e:
             if not supress_logs:
                 log.debug(f"Error on http {method}, {client.base_url=} ({e!r})", exc_info=True)
+            errors.append(e)
         await asyncio.sleep((1 + backoff_factor) ** i - 1)
-    raise httpx.HTTPError(f"httpx {method} failed after {n_tries=}")
+    raise httpx.HTTPError(f"httpx {method} failed after {n_tries=}, {errors=}")
 
 
 async def get_host_ip() -> str:
