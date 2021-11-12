@@ -59,7 +59,7 @@ def main():
         loop.run_forever()
     finally:
         loop.close()
-        logging.info("Successfully shutdown")
+        log.info("Successfully shutdown")
 
 
 if __name__ == "__main__":
