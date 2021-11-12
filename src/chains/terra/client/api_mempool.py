@@ -97,11 +97,11 @@ class MempoolCacheManager:
         while True:
             new_height, mempool = await self.get_new_height_mempool(height, new_block_only)
             filtered_mempool = {
-                key: [msgs for msgs in mempool if filter_.match_msgs(msgs)]
+                key: list_msgs
                 for key, filter_ in filters.items()
+                if (list_msgs := [msgs for msgs in mempool if filter_.match_msgs(msgs)])
             }
-            any_filtered_msg = any(list_msgs for list_msgs in filtered_mempool.values())
-            if new_height > height or any_filtered_msg:
+            if new_height > height or filtered_mempool:
                 return new_height, filtered_mempool
 
     async def get_new_height_mempool(

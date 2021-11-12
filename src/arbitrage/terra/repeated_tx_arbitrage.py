@@ -137,18 +137,18 @@ async def run_strategy(
         if log_time:
             start = time.time()
         if is_new_block := any(height > arb_route.last_run_height for arb_route in arb_routes):
-            log.debug(f"New {height=}")
+            log.debug(f"New block: {height=}")
             utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)
             asyncio.create_task(client.update_active_broadcaster())
         if mempool:
-            log.debug(f"{len(mempool)=}")
+            n_msgs = sum(len(list_msgs) for list_msgs in mempool.values())
+            log.debug(f"New mempool txs: {n_msgs=}")
         tasks: list[Awaitable] = []
         for arb_route in arb_routes:
             mempool_route = {
-                key: filter_ for key, filter_ in mempool.items() if key in arb_route.filter_keys
+                k: list_msgs for k, list_msgs in mempool.items() if k in arb_route.filter_keys
             }
-            any_new_mempool_msg = any(list_msgs for list_msgs in mempool_route.values())
-            if height > arb_route.last_run_height or any_new_mempool_msg:
+            if height > arb_route.last_run_height or mempool_route:
                 tasks.append(arb_route.run(height, mempool_route, hold_broadcast=True))
         await asyncio.gather(*tasks)
         broadcast_tasks: dict[TerraRepeatedTxArbitrage, Awaitable] = {}
@@ -168,9 +168,9 @@ async def run_strategy(
             break
         if log_time:
             total_time_ms = round((time.time() - start) * 1000)  # type: ignore
-            msg = f"{total_time_ms}ms; {len(tasks)=}, {len(broadcast_tasks)=}"
+            stats = f"{total_time_ms}ms; {len(tasks)=}, {len(broadcast_tasks)=}"
             if is_new_block:
-                log.debug(f"{height=} took {msg}")
+                log.debug(f"Processed block: {height=} in {stats}")
             else:
-                log.debug(f"Mempool processing took {msg}")
+                log.debug(f"Processed mempool txs: {n_msgs=} in {stats}")
     log.info(f"Stopped execution after {n_blocks=}")

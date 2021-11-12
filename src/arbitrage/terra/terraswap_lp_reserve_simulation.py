@@ -51,10 +51,7 @@ class TerraswapLPReserveSimulationMixin:
         self,
         filtered_mempool: dict[BaseTerraLiquidityPair, list[list[dict]]] = None,
     ):
-        if filtered_mempool is None:
-            yield self.pairs
-            return
-        if not any(list_msgs for list_msgs in filtered_mempool.values()):
+        if not filtered_mempool:
             yield self.pairs
             return
         for pair, list_msgs in filtered_mempool.items():
