@@ -48,6 +48,8 @@ class BaseArbParams(ABC):
 
 @dataclass
 class ArbTx:
+    __slots__ = ("timestamp_sent", "tx_hash")
+
     timestamp_sent: float
     tx_hash: str
 

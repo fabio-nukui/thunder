@@ -51,6 +51,19 @@ MIN_N_ARBITRAGES = 20
 
 @dataclass
 class ArbParams(TerraArbParams):
+    __slots__ = (
+        "timestamp_found",
+        "block_found",
+        "initial_balance",
+        "route",
+        "reverse",
+        "initial_amount",
+        "msgs",
+        "n_repeat",
+        "est_final_amount",
+        "est_fee",
+        "est_net_profit_usd",
+    )
     timestamp_found: float
     block_found: int
 

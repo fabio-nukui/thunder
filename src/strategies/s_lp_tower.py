@@ -50,6 +50,21 @@ class Pairs(NamedTuple):
 
 @dataclass
 class ArbParams(TerraArbParams):
+    __slots__ = (
+        "timestamp_found",
+        "block_found",
+        "prices",
+        "prices_denom",
+        "lp_tower_reserves",
+        "pool_0_lp_balance",
+        "direction",
+        "initial_amount",
+        "msgs",
+        "n_repeat",
+        "est_final_amount",
+        "est_fee",
+        "est_net_profit_usd",
+    )
     timestamp_found: float
     block_found: int
 
