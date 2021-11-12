@@ -186,6 +186,7 @@ async def get_host_ip() -> str:
 
 async def _get_text(url) -> str:
     try:
-        return (await get(url)).text
-    except Exception:
+        return (await get(url, follow_redirects=True, supress_logs=True)).text.strip()
+    except Exception as e:
+        log.debug(f"Error on ip getter service {url=} ({e!r})")
         return ""
