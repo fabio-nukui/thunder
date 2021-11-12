@@ -12,7 +12,7 @@ from startup import setup
 
 app = Quart(__name__)
 log = logging.getLogger(__name__)
-client = TerraClient(use_broadcaster=False)
+client = TerraClient(use_broadcaster=False, raise_on_syncing=False)
 
 GIT_COMMIT = open("git_commit").read().strip()
 
