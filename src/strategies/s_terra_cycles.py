@@ -45,7 +45,7 @@ from strategies.common.default_params import (
 
 log = logging.getLogger(__name__)
 
-MIN_RESERVED_AMOUNT = UST.to_amount(10)
+MIN_RESERVED_AMOUNT = UST.to_amount(30)
 MIN_N_ARBITRAGES = 20
 
 
