@@ -450,8 +450,12 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
         reverse = await route.should_reverse(self.min_start_amount)
         initial_amount = await self._get_optimal_argitrage_amount(route, reverse)
         final_amount, msgs = await route.op_swap(initial_amount, reverse)
-        single_initial_amount, n_repeat = self._check_repeats(initial_amount, initial_balance)
-        if n_repeat > 1:
+        single_initial_amount, n_repeat, capped_amount = self._check_repeats(
+            initial_amount, initial_balance
+        )
+        if capped_amount:
+            initial_amount = single_initial_amount
+        if n_repeat > 1 or capped_amount:
             _, msgs = await route.op_swap(single_initial_amount, reverse)
         try:
             fee = await self.client.tx.estimate_fee(
@@ -522,24 +526,24 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
         self,
         initial_amount: TerraTokenAmount,
         initial_balance: TerraTokenAmount,
-    ) -> tuple[TerraTokenAmount, int]:
+    ) -> tuple[TerraTokenAmount, int, bool]:
         available_amount = initial_balance - self.min_reserved_amount
         if not self.use_router:
             if initial_amount > available_amount:
                 symbol = self.start_token.symbol
-                self.log.warning(
+                self.log.info(
                     "Not enough balance for full arbitrage: "
                     f"wanted {symbol} {initial_amount.amount:,.2f}, "
                     f"have {symbol} {available_amount.amount:,.2f}"
                 )
-                return available_amount, 1
-            return initial_amount, 1
+                return available_amount, 1, True
+            return initial_amount, 1, False
         max_amount = min(available_amount.amount, self.max_single_arbitrage.amount)
         n_repeat = math.ceil(initial_amount.amount / max_amount)
         if n_repeat > MAX_N_REPEATS:
             self.log.warning(f"{n_repeat=} is too hight, reducing to {MAX_N_REPEATS}")
             n_repeat = MAX_N_REPEATS
-        return initial_amount / n_repeat, n_repeat
+        return initial_amount / n_repeat, n_repeat, False
 
     async def _extract_returns_from_info(
         self,
