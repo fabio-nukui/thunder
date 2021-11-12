@@ -39,6 +39,7 @@ class BaseArbParams(ABC):
     block_found: int
 
     n_repeat: int
+    est_net_profit_usd: Decimal
 
     @abstractmethod
     def to_data(self) -> dict:
@@ -139,7 +140,15 @@ class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
             return State.waiting_confirmation
         return State.finished
 
-    async def run(self, height: int, filtered_mempool: dict[Any, list[list[dict]]] = None):
+    def reset(self):
+        self.data.reset()
+
+    async def run(
+        self,
+        height: int,
+        filtered_mempool: dict[Any, list[list[dict]]] = None,
+        hold_broadcast: bool = False,
+    ):
         if height > self.last_run_height:
             self._reset_mempool_params()
         try:
@@ -162,7 +171,7 @@ class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
                         for res in self.data.results
                     ):
                         self.log.warning("Out of gas")
-                    self.data.reset()
+                    self.reset()
                 except IsBusy:
                     return
             if self.state == State.ready_to_generate_parameters:
@@ -177,6 +186,8 @@ class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
                 except TxAlreadyBroadcasted as e:
                     self.log.info(e)
                     return
+                if hold_broadcast:
+                    return
             if self.state == State.ready_to_broadcast:
                 n_txs = self.data.params.n_repeat  # type: ignore
                 self.log.info(f"Broadcasting {n_txs} transaction(s)")
@@ -188,10 +199,10 @@ class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
                     self.log.debug("Arbitrage broadcasted", extra={"data": self.data.to_data()})
                 except TxAlreadyBroadcasted as e:
                     self.log.debug(e)
-                    self.data.reset()
+                    self.reset()
                 except BlockchainNewState as e:
                     self.log.warning(e)
-                    self.data.reset()
+                    self.reset()
                 return
         finally:
             self.last_run_height = height

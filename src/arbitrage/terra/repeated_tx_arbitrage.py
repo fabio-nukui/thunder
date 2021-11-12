@@ -19,6 +19,7 @@ from ..repeated_tx_arbitrage import (
     ArbTx,
     BaseArbParams,
     RepeatedTxArbitrage,
+    State,
     TxStatus,
 )
 
@@ -125,6 +126,10 @@ async def run_strategy(
     max_n_blocks: int = None,
 ):
     start_height = client.height
+    routes_by_key = {
+        key: [arb_route for arb_route in arb_routes if key in arb_route.filter_keys]
+        for key in mempool_filters
+    }
     async for height, mempool in client.mempool.iter_height_mempool(mempool_filters):
         if any(height > arb_route.last_run_height for arb_route in arb_routes):
             utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)
@@ -136,8 +141,21 @@ async def run_strategy(
             }
             any_new_mempool_msg = any(list_msgs for list_msgs in mempool_route.values())
             if height > arb_route.last_run_height or any_new_mempool_msg:
-                tasks.append(arb_route.run(height, mempool_route))
+                tasks.append(arb_route.run(height, mempool_route, hold_broadcast=True))
         await asyncio.gather(*tasks)
+        broadcast_tasks: dict[TerraRepeatedTxArbitrage, Awaitable] = {}
+        for key, routes in routes_by_key.items():
+            ready_arbs = [r for r in routes if r.state == State.ready_to_broadcast]
+            if not ready_arbs:
+                continue
+            log.info(f"{key=} has {len(routes)} possible arbitrages")
+            best_route = max(ready_arbs, key=lambda x: x.data.params.est_net_profit_usd)  # type: ignore # noqa: E501
+            if best_route not in broadcast_tasks:
+                broadcast_tasks[best_route] = best_route.run(height)
+        await asyncio.gather(*broadcast_tasks.values())
+        for route in arb_routes:
+            if route.state == State.ready_to_broadcast:
+                route.reset()
         if max_n_blocks is not None and (n_blocks := height - start_height) >= max_n_blocks:
             break
     log.info(f"Stopped execution after {n_blocks=}")
