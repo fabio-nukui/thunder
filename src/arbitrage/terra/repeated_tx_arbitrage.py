@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from abc import ABC, abstractmethod
 from datetime import datetime
 from decimal import Decimal
@@ -124,16 +125,23 @@ async def run_strategy(
     arb_routes: Sequence[TerraRepeatedTxArbitrage],
     mempool_filters: Mapping[Any, Filter],
     max_n_blocks: int = None,
+    log_time: bool = True,
 ):
+    log.info(f"Running strategy with {len(arb_routes)=} and {len(mempool_filters)=}")
     start_height = client.height
     routes_by_key = {
         key: [arb_route for arb_route in arb_routes if key in arb_route.filter_keys]
         for key in mempool_filters
     }
     async for height, mempool in client.mempool.iter_height_mempool(mempool_filters):
-        if any(height > arb_route.last_run_height for arb_route in arb_routes):
+        if log_time:
+            start = time.time()
+        if is_new_block := any(height > arb_route.last_run_height for arb_route in arb_routes):
+            log.debug(f"New {height=}")
             utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)
             asyncio.create_task(client.update_active_broadcaster())
+        if mempool:
+            log.debug(f"{len(mempool)=}")
         tasks: list[Awaitable] = []
         for arb_route in arb_routes:
             mempool_route = {
@@ -158,4 +166,11 @@ async def run_strategy(
                 route.reset()
         if max_n_blocks is not None and (n_blocks := height - start_height) >= max_n_blocks:
             break
+        if log_time:
+            total_time_ms = round((time.time() - start) * 1000)  # type: ignore
+            msg = f"{total_time_ms}ms; {len(tasks)=}, {len(broadcast_tasks)=}"
+            if is_new_block:
+                log.debug(f"{height=} took {msg}")
+            else:
+                log.debug(f"Mempool processing took {msg}")
     log.info(f"Stopped execution after {n_blocks=}")
