@@ -46,8 +46,7 @@ class LatestHeightThread(threading.Thread):
         self._stopped = threading.Event()
 
     def run(self):
-        self._loop.create_task(self._update_height())
-        self._loop.run_forever()
+        self._loop.run_until_complete(self._update_height())
 
     def stop(self):
         self._stopped.set()
