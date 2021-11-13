@@ -50,7 +50,7 @@ def main():
     loop = asyncio.get_event_loop()
     signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
     for sig in signals:
-        handler = partial(asyncio.create_task, shutdown(loop, sig))
+        handler = partial(loop.create_task, shutdown(loop, sig))
         loop.add_signal_handler(sig, handler)
     loop.set_exception_handler(handle_exception)
 
