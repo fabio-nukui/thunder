@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import threading
 from enum import Enum, auto
 from typing import TYPE_CHECKING, AsyncIterable, Mapping, TypeVar
 
 import httpx
 
 import configs
-import utils
 from utils.cache import CacheGroup, ttl_cache
 
 from ..tx_filter import Filter
@@ -37,38 +35,13 @@ class UpdateEvent(Enum):
     mempool = auto()
 
 
-class LatestHeightThread(threading.Thread):
-    def __init__(self, mcm: MempoolCacheManager, *args, daemon: bool = True, **kargs):
-        super().__init__(*args, daemon=daemon, **kargs)
-
-        self.mcm = mcm
-        self._loop = asyncio.new_event_loop()
-        self._stopped = threading.Event()
-
-    def run(self):
-        self._loop.run_until_complete(self._update_height())
-
-    def stop(self):
-        self._stopped.set()
-        self._loop.create_task(utils.async_.stop_loop(self._loop))
-
-    async def _update_height(self):
-        async for height in utils_rpc.loop_latest_height(self.mcm.client.rpc_websocket_uri):
-            self.mcm.height = height
-            if self._stopped.is_set():
-                return
-
-
 class MempoolCacheManager:
     def __init__(self, client: TerraClient):
         self.client = client
 
+        self._height = 0
         self._txs_cache: dict[str, dict] = {}
         self._read_txs: set[str] = set()
-
-        self._height = 0
-        self._height_thread = LatestHeightThread(self)
-        self._stop_tasks = False
 
     @property
     def height(self) -> int:
@@ -82,10 +55,14 @@ class MempoolCacheManager:
 
     def start(self):
         self._height = self.client.height
-        self._height_thread.start()
+        self._update_task = asyncio.create_task(self._update_height())
 
     def stop(self):
-        self._height_thread.stop()
+        self._update_task.cancel()
+
+    async def _update_height(self):
+        async for height in utils_rpc.loop_latest_height(self.client.rpc_websocket_uri):
+            self.height = height
 
     async def filter_new_height_mempool(
         self,
@@ -110,7 +87,7 @@ class MempoolCacheManager:
     ) -> tuple[int, list[list[dict]]]:
         cor_wait_next_block = self._wait_next_block(height)
         cor_mempool_txs = self._update_mempool_txs(wait_for_changes=True)
-        self._stop_tasks = False
+
         done, pending = await asyncio.wait(
             [cor_wait_next_block, cor_mempool_txs], return_when="FIRST_COMPLETED"
         )
@@ -120,7 +97,7 @@ class MempoolCacheManager:
             await second_task
         else:
             second_task.cancel()
-        self._stop_tasks = True
+
         unread_txs_msgs = [
             tx["msg"] for key, tx in self._txs_cache.items() if key not in self._read_txs
         ]

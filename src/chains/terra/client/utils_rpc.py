@@ -8,7 +8,7 @@ import websockets.exceptions
 
 log = logging.getLogger(__name__)
 
-MAX_TIME_WAIT_BLOCK = 15
+MAX_TIME_WAIT_EVENTS = 15
 
 
 class SubscriptionMsg(TypedDict):
@@ -39,9 +39,11 @@ async def loop_latest_height(rpc_websocket_uri: str) -> AsyncIterable[int]:
     while True:
         try:
             async with websockets.client.connect(rpc_websocket_uri) as client:
-                await _subscribe_rpc(client, subscription_msg)
+                await asyncio.wait_for(
+                    _subscribe_rpc(client, subscription_msg), MAX_TIME_WAIT_EVENTS
+                )
                 while True:
-                    task_get_header = asyncio.wait_for(client.recv(), MAX_TIME_WAIT_BLOCK)
+                    task_get_header = asyncio.wait_for(client.recv(), MAX_TIME_WAIT_EVENTS)
                     response = json.loads(await task_get_header)
                     yield int(response["result"]["data"]["value"]["header"]["height"])
         except websockets.exceptions.ConnectionClosed:
