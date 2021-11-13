@@ -85,18 +85,15 @@ class MempoolCacheManager:
         height: int,
         new_block_only: bool,
     ) -> tuple[int, list[list[dict]]]:
-        cor_wait_next_block = self._wait_next_block(height)
-        cor_mempool_txs = self._update_mempool_txs(wait_for_changes=True)
+        task_wait_next_block = asyncio.create_task(self._wait_next_block(height))
+        task_mempool_txs = asyncio.create_task(self._update_mempool_txs(wait_for_changes=True))
 
-        done, pending = await asyncio.wait(
-            [cor_wait_next_block, cor_mempool_txs], return_when="FIRST_COMPLETED"
-        )
-        first_task = done.pop()
-        second_task = pending.pop() if pending else done.pop()
-        if new_block_only and first_task.result() != UpdateEvent.new_block:
-            await second_task
+        tasks = asyncio.as_completed([task_wait_next_block, task_mempool_txs])
+        event = await next(tasks)
+        if new_block_only and event != UpdateEvent.new_block:
+            await next(tasks)
         else:
-            second_task.cancel()
+            task_wait_next_block.cancel()
 
         unread_txs_msgs = [
             tx["msg"] for key, tx in self._txs_cache.items() if key not in self._read_txs
