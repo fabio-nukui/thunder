@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, AsyncIterable, Mapping, TypeVar
 import httpx
 
 import configs
+import utils
 from utils.cache import CacheGroup, ttl_cache
 
 from ..tx_filter import Filter
@@ -56,6 +57,7 @@ class MempoolCacheManager:
     def start(self):
         self._height = self.client.height
         self._update_task = asyncio.create_task(self._update_height())
+        self._update_task.add_done_callback(utils.async_.raise_task_exception)
 
     def stop(self):
         self._update_task.cancel()

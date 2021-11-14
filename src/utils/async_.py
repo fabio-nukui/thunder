@@ -12,3 +12,11 @@ async def stop_loop(loop: asyncio.AbstractEventLoop):
 
     await asyncio.gather(*tasks, return_exceptions=True)
     loop.stop()
+
+
+def raise_task_exception(task: asyncio.Task):
+    try:
+        if e := task.exception():
+            raise e
+    except asyncio.CancelledError:
+        pass
