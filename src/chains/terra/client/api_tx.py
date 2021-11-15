@@ -4,13 +4,16 @@ import asyncio
 import logging
 import re
 import time
+from copy import copy
 from decimal import Decimal
 from typing import Sequence
 
+from terra_sdk.client.lcd.api.tx import CreateTxOptions
 from terra_sdk.core import Coins
-from terra_sdk.core.auth import StdFee
 from terra_sdk.core.broadcast import SyncTxBroadcastResult
+from terra_sdk.core.fee import Fee
 from terra_sdk.core.msg import Msg
+from terra_sdk.core.tx import Tx
 from terra_sdk.exceptions import LCDResponseError
 
 import configs
@@ -30,9 +33,9 @@ MAX_FEE_ESTIMATION_TRIES = 5
 _pat_sequence_error = re.compile(r"account sequence mismatch, expected (\d+)")
 
 
-class NoLogError(Exception):
+class BroadcastError(Exception):
     def __init__(self, data):
-        self.message = data.get("raw_log", "")
+        self.message = getattr(data, "raw_log", "")
         super().__init__(data)
 
 
@@ -54,30 +57,28 @@ class TxApi(Api):
         estimated_gas_use: int = None,
         native_amount: TerraTokenAmount = None,
         fee_denom: str = None,
-        account_number: int = None,
-        sequence: int = None,
-    ) -> StdFee:
-        fee_denom = self.client.fee_denom if fee_denom is None else fee_denom
-        account_number, sequence = await self.client._valid_account_params(
-            account_number, sequence
-        )
+    ) -> Fee:
+        fee_denom = fee_denom or self.client.fee_denom
+        gas_adjustment = gas_adjustment or self.client.gas_adjustment
+        signer = self.client.signer
         for i in range(1, MAX_FEE_ESTIMATION_TRIES + 1):
+            create_tx_options = CreateTxOptions(
+                msgs,
+                gas_prices=self.client.gas_prices,
+                gas_adjustment=gas_adjustment,
+                fee_denoms=[fee_denom],
+                sequence=signer.sequence,
+            )
             try:
-                fee = await self.client.lcd.tx.estimate_fee(
-                    self.client.address,
-                    msgs,
-                    gas_adjustment=gas_adjustment,
-                    fee_denoms=[fee_denom],
-                    account_number=account_number,
-                    sequence=sequence,
-                )
+                fee = await self.client.lcd.tx.estimate_fee([signer], create_tx_options)
             except LCDResponseError as e:
                 if match := _pat_sequence_error.search(e.message):
                     if i == MAX_FEE_ESTIMATION_TRIES:
                         raise Exception(f"Fee estimation failed after {i} tries", e)
                     await self._check_msgs_in_mempool(msgs)
-                    sequence = int(match.group(1))
-                    log.debug(f"Retrying fee estimation with updated {sequence=}")
+                    signer = copy(signer)
+                    signer.sequence = int(match.group(1))
+                    log.debug(f"Retrying fee estimation with updated {signer.sequence=}")
                     continue
                 if not use_fallback_estimate:
                     raise e
@@ -97,7 +98,7 @@ class TxApi(Api):
                     estimated_gas_use, native_amount, fee_denom, gas_adjustment
                 )
             else:
-                self.client.account_sequence = sequence
+                self.client.signer = signer
                 return fee
         raise Exception("Should never reach")
 
@@ -113,14 +114,14 @@ class TxApi(Api):
         native_amount: TerraTokenAmount,
         fee_denom: str,
         gas_adjustment: Decimal = None,
-    ) -> StdFee:
+    ) -> Fee:
         assert isinstance(native_amount.token, TerraNativeToken)
 
         gas_adjustment = (
             self.client.gas_adjustment if gas_adjustment is None else gas_adjustment
         )
         gas_adjustment += FALLBACK_EXTRA_GAS_ADJUSTMENT
-        adjusted_gas_use = round(estimated_gas_use * gas_adjustment)
+        gas_limit = round(estimated_gas_use * gas_adjustment)
 
         tax = await self.client.treasury.calculate_tax(native_amount)
         try:
@@ -129,10 +130,10 @@ class TxApi(Api):
             )
         except StopIteration:
             raise TypeError(f"Invalid {fee_denom=}")
-        gas_fee = int(gas_price.amount * adjusted_gas_use)
+        gas_fee = int(gas_price.amount * gas_limit)
         amount = Coins({fee_denom: tax.int_amount + gas_fee})
 
-        fee = StdFee(gas=adjusted_gas_use, amount=amount)
+        fee = Fee(gas_limit, amount)
         log.debug(f"Fallback gas fee estimation: {fee}")
         return fee
 
@@ -140,117 +141,72 @@ class TxApi(Api):
         self,
         msgs: Sequence[Msg],
         n_repeat: int,
-        expect_logs_: bool = True,
-        account_number: int = None,
-        sequence: int = None,
-        fee: StdFee = None,
+        fee: Fee = None,
         fee_denom: str = None,
-        **kwargs,
     ) -> list[tuple[float, SyncTxBroadcastResult]]:
         if self.client.use_broadcaster:
-            return await self.client.broadcaster.post(
-                msgs, n_repeat, expect_logs_, fee, fee_denom
-            )
+            return await self.client.broadcaster.post(msgs, n_repeat, fee, fee_denom)
         log.info("Broadcasting with local LCD")
-        account_number, sequence = await self.client._valid_account_params(
-            account_number, sequence
-        )
         if fee is None:
-            fee = await self.estimate_fee(
-                msgs, account_number=account_number, sequence=sequence
-            )
+            fee = await self.estimate_fee(msgs, fee_denom=fee_denom)
         log.debug(f"Executing messages {n_repeat} time(s): {msgs}")
         results: list[tuple[float, SyncTxBroadcastResult]] = []
         for i in range(1, n_repeat + 1):
             log.debug(f"Executing message {i} if {n_repeat}")
-            res = await self.execute_msgs(
-                msgs,
-                expect_logs_,
-                account_number,
-                sequence,
-                fee,
-                fee_denom,
-                log_=False,
-                **kwargs,
-            )
+            res = await self.execute_msgs(msgs, fee, fee_denom, log_=False)
             results.append((time.time(), res))
-            sequence = max(self.client.account_sequence, sequence + 1)
         return results
 
     async def execute_msgs(
         self,
         msgs: Sequence[Msg],
-        expect_logs_: bool = True,
-        account_number: int = None,
-        sequence: int = None,
-        fee: StdFee = None,
+        fee: Fee = None,
         fee_denom: str = None,
         log_: bool = True,
-        **kwargs,
     ) -> SyncTxBroadcastResult:
         if self.client.use_broadcaster:
             ((timestamp, result),) = await self.client.broadcaster.post(
-                msgs, n_repeat=1, expect_logs=expect_logs_, fee=fee, fee_denom=fee_denom
+                msgs, n_repeat=1, fee=fee, fee_denom=fee_denom
             )
             log.info(f"Broadcaster sent payload to blockchain at {timestamp=}")
             return result
         if log_:
             log.debug(f"Sending tx: {msgs}")
         fee_denom = self.client.fee_denom if fee_denom is None else fee_denom
-
-        account_number, sequence = await self.client._valid_account_params(
-            account_number, sequence
-        )
-        # Fixes bug in terraswap_sdk==1.0.0b2
         if fee is None:
-            fee = await self.estimate_fee(
-                msgs, account_number=account_number, sequence=sequence
-            )
+            fee = await self.estimate_fee(msgs, self.client.gas_adjustment, fee_denom=fee_denom)
+
+        signer = self.client.signer
         for i in range(1, MAX_BROADCAST_TRIES + 1):
-            signed_tx = await self.client.wallet.create_and_sign_tx(
-                msgs,
-                fee=fee,
-                fee_denoms=[fee_denom],
-                account_number=account_number,
-                sequence=sequence,
-                **kwargs,
+            create_tx_options = CreateTxOptions(
+                msgs, fee, fee_denoms=[fee_denom], sequence=signer.sequence
             )
-            payload = {
-                "tx": signed_tx.to_data()["value"],
-                "mode": "sync",
-                "sequences": [str(sequence)],
-            }
+            tx = await self.client.wallet.create_and_sign_tx([signer], create_tx_options)
             try:
-                res = await self.client.lcd_http_client.post("txs", json=payload)
-                data: dict = res.json()
-                if expect_logs_ and data.get("logs") is None:
-                    raise NoLogError(data)
-            except (NoLogError, LCDResponseError) as e:
+                res = await self.client.lcd.tx.broadcast_sync(tx)
+                if res.is_tx_error():
+                    raise BroadcastError(res)
+            except (BroadcastError, LCDResponseError) as e:
                 if i == MAX_BROADCAST_TRIES:
                     raise Exception(f"Broadcast failed after {i} tries", e)
                 if match := _pat_sequence_error.search(e.message):
                     await self._check_msgs_in_mempool(msgs)
-                    sequence = int(match.group(1))
-                    log.debug(f"Retrying broadcast with updated {sequence=}")
+                    signer = copy(signer)
+                    signer.sequence = int(match.group(1))
+                    log.debug(f"Retrying broadcast with updated {signer.sequence=}")
                 else:
                     raise e
             else:
-                self.client.account_sequence = sequence + 1
-                asyncio.create_task(self._broadcast_async(payload))
-                break
+                self.client.signer.sequence = (signer.sequence or 0) + 1
+                asyncio.create_task(self._broadcast_async(tx))
+                log.debug(f"Tx executed: {res.txhash}")
+                return res
+        raise Exception("Should never reach")
 
-        log.debug(f"Tx executed: {data['txhash']}")
-        return SyncTxBroadcastResult(
-            txhash=data["txhash"],
-            raw_log=data.get("raw_log"),
-            code=data.get("code"),
-            codespace=data.get("codespace"),
-        )
-
-    async def _broadcast_async(self, payload: dict):
-        payload["mode"] = "async"
+    async def _broadcast_async(self, tx: Tx):
+        data = {"tx_bytes": self.client.lcd.tx.encode(tx), "mode": "BROADCAST_MODE_ASYNC"}
         tasks = (
-            client.post("txs", json=payload, n_tries=2)
+            client.post("cosmos/tx/v1beta1/txs", json=data, n_tries=2)
             for client in self.client.broadcast_lcd_clients
         )
         res = await asyncio.gather(*tasks, return_exceptions=True)

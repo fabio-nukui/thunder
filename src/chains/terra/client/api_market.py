@@ -74,7 +74,7 @@ class MarketApi(Api):
     @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=MARKET_PARAMETERS_TTL)
     async def get_market_parameters(self) -> dict[str, Decimal]:
         params = await self.client.lcd.market.parameters()
-        return {k: Decimal(v) for k, v in params.items()}
+        return {k: Decimal(str(v)) for k, v in params.items()}
 
     async def compute_swap_no_spread(
         self,

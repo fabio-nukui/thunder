@@ -6,7 +6,8 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Awaitable, Iterable, Mapping, Sequence
 
-from terra_sdk.core.auth import StdFee, TxInfo
+from terra_sdk.core.auth import TxInfo
+from terra_sdk.core.fee import Fee
 from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.exceptions import LCDResponseError
 
@@ -36,7 +37,7 @@ class TerraArbParams(BaseArbParams):
 
     n_repeat: int
     msgs: list[MsgExecuteContract]
-    est_fee: StdFee
+    est_fee: Fee
 
 
 class TerraRepeatedTxArbitrage(RepeatedTxArbitrage[TerraClient], ABC):
@@ -90,7 +91,7 @@ class TerraRepeatedTxArbitrage(RepeatedTxArbitrage[TerraClient], ABC):
             raise
         if height - info.height < MIN_CONFIRMATIONS:
             raise IsBusy
-        gas_cost = TerraTokenAmount.from_coin(*info.tx.fee.amount)
+        gas_cost = TerraTokenAmount.from_coin(*info.tx.auth_info.fee.amount)
         if info.logs is None:
             status = TxStatus.failed
             tx_err_log = info.rawlog

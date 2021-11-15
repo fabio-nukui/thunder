@@ -18,7 +18,7 @@ async def optimize(
     max_iter: int = DEFAULT_MAX_ITER,
     use_fallback: bool = True,
 ) -> tuple[Decimal, Decimal]:
-    """Maximizes function using Newton's method and finite differences, where variables are in int.
+    """Maximizes function using Newton's method and finite differences
 
     Args:
         x0 (Decimal): Initial guess
@@ -45,7 +45,7 @@ async def optimize_newton(
     max_iter: int = DEFAULT_MAX_ITER,
     positive_only: bool = True,
 ) -> tuple[Decimal, Decimal]:
-    """Optimizes function using Newton's method and finite differences, where variables are in int.
+    """Optimizes function using Newton's method and finite differences
     Guaranteed to converge for convex functions
 
     Args:

@@ -9,8 +9,10 @@ from collections import defaultdict
 from decimal import Decimal
 from typing import AsyncIterable
 
+from terra_sdk.client.lcd.api.tx import SignerOptions
 from terra_sdk.core import AccAddress, Coins
-from terra_sdk.core.auth import Account, TxLog
+from terra_sdk.core.auth import TxLog
+from terra_sdk.core.auth.data import BaseAccount
 from terra_sdk.exceptions import LCDResponseError
 from terra_sdk.key.mnemonic import MnemonicKey
 
@@ -69,7 +71,7 @@ class TerraClient(AsyncBlockchainClient):
         self.broadcast_lcd_uris = broadcast_lcd_uris
         self.chain_id = chain_id
         self.fee_denom = fee_denom
-        self.gas_prices = gas_prices
+        self.gas_prices = Coins(gas_prices)
         self.gas_adjustment = Decimal(gas_adjustment)
         self.raise_on_syncing = raise_on_syncing
         self._broadcasters_status: dict[AsyncClient, bool] = {}
@@ -78,7 +80,6 @@ class TerraClient(AsyncBlockchainClient):
         hd_wallet = auth_secrets.hd_wallet() if hd_wallet is None else hd_wallet
         self.key = MnemonicKey(hd_wallet["mnemonic"], hd_wallet["account"], hd_wallet_index)
         self.height = 0
-        self.account_sequence = 0
 
         self.broadcaster = BroadcasterApi(self)
         self.market = MarketApi(self)
@@ -105,16 +106,17 @@ class TerraClient(AsyncBlockchainClient):
         )
         self.wallet = self.lcd.wallet(self.key)
         self.address = self.wallet.key.acc_address
+        self.signer = SignerOptions(self.address, public_key=self.wallet.key.public_key)
 
         try:
             self.height = await self.get_latest_height()
-            self.account_sequence = (await self.get_account_data()).sequence
+            self.signer.sequence = (await self.get_account_data()).sequence
         except Exception:
             await self.lcd.session.close()
             raise
         await self._check_connections()
 
-        if self.gas_prices is None:
+        if not self.gas_prices:
             self.lcd.gas_prices = await self.tx.get_gas_prices()
         self.mempool.start()
         await super().start()
@@ -225,15 +227,15 @@ class TerraClient(AsyncBlockchainClient):
         address: AccAddress = None,
     ) -> list[TerraTokenAmount]:
         address = self.address if address is None else address
-        coins_balance = await self.lcd.bank.balance(address)
+        coins_balance, _ = await self.lcd.bank.balance(address)
         return [
             TerraTokenAmount.from_coin(c)
-            for c in coins_balance
+            for c in coins_balance.to_list()
             if denoms is None or c.denom in denoms
         ]
 
     @ttl_cache(CacheGroup.TERRA)
-    async def get_account_data(self, address: AccAddress = None) -> Account:
+    async def get_account_data(self, address: AccAddress = None) -> BaseAccount:
         address = self.address if address is None else address
         return await self.lcd.auth.account_info(address)
 
@@ -242,26 +244,15 @@ class TerraClient(AsyncBlockchainClient):
 
     async def get_account_sequence(self, address: AccAddress = None) -> int:
         on_chain = (await self.get_account_data(address)).sequence
-        local = self.account_sequence
+        local = self.signer.sequence or 0
         if on_chain == local:
             return on_chain
         if on_chain > local:
             log.debug(f"Using higher on-chain sequence value ({on_chain=}, {local=})")
-            self.account_sequence = on_chain
+            self.signer.sequence = on_chain
             return on_chain
         log.debug(f"Using higher local sequence value ({local=}, {on_chain=})")
-        return self.account_sequence
-
-    async def _valid_account_params(
-        self,
-        account_number: int | None,
-        sequence: int | None,
-    ) -> tuple[int, int]:
-        if account_number is None:
-            account_number = await self.get_account_number()
-        if sequence is None:
-            sequence = await self.get_account_sequence()
-        return account_number, sequence
+        return self.signer.sequence or 0
 
     @staticmethod
     def encode_msg(msg: dict) -> str:

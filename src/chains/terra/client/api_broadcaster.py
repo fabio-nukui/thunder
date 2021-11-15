@@ -4,8 +4,8 @@ import logging
 import math
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Sequence, TypedDict, TypeVar
 
-from terra_sdk.core.auth import StdFee
 from terra_sdk.core.broadcast import SyncTxBroadcastResult
+from terra_sdk.core.fee import Fee
 from terra_sdk.core.msg import Msg
 
 from exceptions import TxAlreadyBroadcasted
@@ -25,7 +25,6 @@ class BroadcasterPayload(TypedDict):
     height: int
     msgs: list[dict]
     n_repeat: int
-    expect_logs: bool
     fee: dict | None
     fee_denom: str | None
 
@@ -68,15 +67,13 @@ class BroadcasterApi(Api):
         self,
         msgs: Sequence[Msg],
         n_repeat: int,
-        expect_logs: bool,
-        fee: StdFee = None,
+        fee: Fee = None,
         fee_denom: str = None,
     ) -> list[tuple[float, SyncTxBroadcastResult]]:
         payload: BroadcasterPayload = {
             "height": self.client.height,
             "msgs": [m.to_data() for m in msgs],
             "n_repeat": n_repeat,
-            "expect_logs": expect_logs,
             "fee": fee.to_data() if fee is not None else None,
             "fee_denom": fee_denom,
         }
@@ -96,14 +93,11 @@ class BroadcasterApi(Api):
             return {"result": "repeated_tx", "data": []}
         msgs = [Msg.from_data(d) for d in payload["msgs"]]
         n_repeat = payload["n_repeat"]
-        expect_logs = payload["expect_logs"]
-        fee = StdFee.from_data(payload["fee"]) if payload["fee"] is not None else None
+        fee = Fee.from_data(payload["fee"]) if payload["fee"] is not None else None
         fee_denom = payload["fee_denom"]
 
         try:
-            res = await self.client.tx.execute_multi_msgs(
-                msgs, n_repeat, expect_logs, fee=fee, fee_denom=fee_denom
-            )
+            res = await self.client.tx.execute_multi_msgs(msgs, n_repeat, fee, fee_denom)
         except TxAlreadyBroadcasted:
             return {"result": "repeated_tx", "data": []}
         return {

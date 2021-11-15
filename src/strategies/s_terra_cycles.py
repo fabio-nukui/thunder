@@ -10,7 +10,8 @@ from decimal import Decimal
 from functools import partial
 from typing import Sequence
 
-from terra_sdk.core.auth import StdFee, TxInfo
+from terra_sdk.core.auth import TxInfo
+from terra_sdk.core.fee import Fee
 from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.exceptions import LCDResponseError
 
@@ -75,7 +76,7 @@ class ArbParams(TerraArbParams):
     msgs: list[MsgExecuteContract]
     n_repeat: int
     est_final_amount: TerraTokenAmount
-    est_fee: StdFee
+    est_fee: Fee
     est_net_profit_usd: Decimal
 
     def to_data(self) -> dict:
@@ -414,7 +415,7 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
                 fee = await self.client.tx.estimate_fee(msgs)
             except Exception as e:
                 raise FeeEstimationError(e)
-            list_gas.append(fee.gas)
+            list_gas.append(fee.gas_limit)
         return max(list_gas)
 
     async def _get_arbitrage_params(

@@ -8,7 +8,8 @@ from enum import Enum
 from functools import partial
 from typing import Any, NamedTuple
 
-from terra_sdk.core.auth import StdFee, TxInfo
+from terra_sdk.core.auth import TxInfo
+from terra_sdk.core.fee import Fee
 from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.exceptions import LCDResponseError
 
@@ -78,7 +79,7 @@ class ArbParams(TerraArbParams):
     msgs: list[MsgExecuteContract]
     n_repeat: int
     est_final_amount: TerraTokenAmount
-    est_fee: StdFee
+    est_fee: Fee
     est_net_profit_usd: Decimal
 
     def to_data(self) -> dict:
