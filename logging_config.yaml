@@ -8,6 +8,11 @@ formatters:
     format: "[%(asctime)s] %(name)s %(levelname)s: %(message)s"
     class: utils.logger.ExtraDataFormatter
 handlers:
+  console:
+    class: logging.StreamHandler
+    formatter: plaintext
+    level: DEBUG
+    stream: ext://sys.stdout
   logfile:
     class: logging.handlers.RotatingFileHandler
     formatter: plaintext
@@ -24,7 +29,7 @@ handlers:
     create_log_group: True
 root:
   level: DEBUG
-  handlers: [logfile, watchtower]
+  handlers: [console, logfile, watchtower]
 loggers:
   asyncio:
     level: WARNING

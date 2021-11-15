@@ -24,6 +24,9 @@ def setup_logger():
     else:
         del dict_config["handlers"]["watchtower"]
         dict_config["root"]["handlers"].remove("watchtower")
+    if not configs.LOG_STDOUT:
+        del dict_config["handlers"]["console"]
+        dict_config["root"]["handlers"].remove("console")
 
     dict_config["loggers"]["utils.cache"] = {"level": configs.CACHE_LOG_LEVEL}
     for handler in dict_config["handlers"].values():

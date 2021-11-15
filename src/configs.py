@@ -5,6 +5,7 @@ from decimal import Decimal
 STRATEGY = os.getenv("STRATEGY", "no_strategy")
 
 # Logs
+LOG_STDOUT = os.getenv("LOG_STDOUT", "").lower() == "true"
 LOG_AWS = os.getenv("LOG_AWS", "").lower() == "true"
 LOG_AWS_PREFIX = os.getenv("LOG_AWS_STREAM_PREFIX", "")
 MIN_LOG_LEVEL = os.getenv("MIN_LOG_LEVEL", "DEBUG")
