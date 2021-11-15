@@ -144,7 +144,7 @@ class NativeLiquidityPair(BaseTerraLiquidityPair):
         self: _NativeLiquidityPairT,
         amounts: AmountTuple,
     ) -> _NativeLiquidityPairT:
-        """Based on https://github.com/terra-money/core/blob/v0.5.10/x/market/keeper/swap.go#L15"""
+        """Based on https://github.com/terra-money/core/blob/v0.5.10/x/market/keeper/swap.go#L15"""  # noqa: E501
         assert isinstance(amounts[0].token, TerraNativeToken)
         assert isinstance(amounts[1].token, TerraNativeToken)
         simulation = copy(self)

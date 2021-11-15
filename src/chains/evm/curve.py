@@ -111,7 +111,7 @@ class CurvePool:
         for _i in range(N_ITERATIONS):
             D_P = D
             for _x in xp:
-                # If division by 0, this will be borked: only withdrawal will work. And that is good
+                # If division by 0, this will be borked: only withdrawal will work.
                 D_P = D_P * D // (_x * self.n_coins)
             Dprev = D
             D = (Ann * S + D_P * self.n_coins) * D // ((Ann - 1) * D + (self.n_coins + 1) * D_P)

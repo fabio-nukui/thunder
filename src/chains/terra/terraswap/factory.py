@@ -132,7 +132,7 @@ class Factory:
         return addresses
 
     async def get_pairs(self, pairs_names: Iterable[str]) -> Tuple[LiquidityPair, ...]:
-        return await asyncio.gather(*(self.get_pair(pair) for pair in pairs_names))  # type: ignore
+        return await asyncio.gather(*(self.get_pair(pair) for pair in pairs_names))  # type: ignore  # noqa: E501
 
     async def get_pair(self, pair_name: str, check_liquidity: bool = True) -> LiquidityPair:
         try:

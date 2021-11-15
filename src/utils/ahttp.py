@@ -1,4 +1,4 @@
-"""Drop-in replacement for part of httpx module with some extra retry features. (async version)"""
+"""Drop-in replacement for part of httpx module with some extra retry features. (async)"""
 import asyncio
 import logging
 import re
