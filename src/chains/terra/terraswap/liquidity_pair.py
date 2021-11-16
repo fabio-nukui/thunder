@@ -265,7 +265,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
     lp_token: LPToken
     _reserves: AmountTuple
 
-    _instances: dict[AccAddress, LiquidityPair] = {}
+    _instances: dict[AccAddress, LiquidityPair | Exception] = {}
     _instances_creation: dict[AccAddress, asyncio.Event] = {}
 
     @classmethod
@@ -282,10 +282,10 @@ class LiquidityPair(BaseTerraLiquidityPair):
         check_liquidity: bool = True,
     ) -> LiquidityPair:
         if contract_addr in cls._instances:
-            return cls._get_instance(contract_addr, client)
+            return await cls._get_instance(contract_addr, client, check_liquidity)
         if contract_addr in cls._instances_creation:
             await cls._instances_creation[contract_addr].wait()
-            return cls._get_instance(contract_addr, client)
+            return await cls._get_instance(contract_addr, client, check_liquidity)
         cls._instances_creation[contract_addr] = asyncio.Event()
 
         self = super().__new__(cls)
@@ -297,26 +297,40 @@ class LiquidityPair(BaseTerraLiquidityPair):
         self.router_address = router_address
         self.assert_limit_order_address = assert_limit_order_address
 
-        self.lp_token = await LPToken.from_pool_contract(
-            self.contract_addr, self.client, recursive_lp_token_code_id
-        )
-        self.tokens = self.lp_token.pair_tokens
-
         self._stop_updates = False
-        self._reserves = self.tokens[0].to_amount(), self.tokens[1].to_amount()
-        if check_liquidity and any(r == 0 for r in await self.get_reserves()):
+        try:
+            self.lp_token = await LPToken.from_pool_contract(
+                self.contract_addr, self.client, recursive_lp_token_code_id
+            )
+            self.tokens = self.lp_token.pair_tokens
+            cls._instances[self.contract_addr] = self
+        except Exception as e:
+            cls._instances[self.contract_addr] = e
+        finally:
+            cls._instances_creation[contract_addr].set()
+            del cls._instances_creation[contract_addr]
+        if check_liquidity:
+            await self._check_liquidity()
+        return self
+
+    async def _check_liquidity(self):
+        if any(r == 0 for r in await self.get_reserves()):
             log.debug(f"{self}: Zero liquidity on initialization")
             raise InsufficientLiquidity(self)
 
-        cls._instances[self.contract_addr] = self
-        cls._instances_creation[contract_addr].set()
-        del cls._instances_creation[contract_addr]
-        return self
-
     @classmethod
-    def _get_instance(cls, contract_addr: AccAddress, client: TerraClient) -> LiquidityPair:
+    async def _get_instance(
+        cls,
+        contract_addr: AccAddress,
+        client: TerraClient,
+        check_liquidity: bool,
+    ) -> LiquidityPair:
         instance = cls._instances[contract_addr]
+        if isinstance(instance, Exception):
+            raise instance
         instance.client = client
+        if check_liquidity:
+            await instance._check_liquidity()
         return instance
 
     def __repr__(self) -> str:
