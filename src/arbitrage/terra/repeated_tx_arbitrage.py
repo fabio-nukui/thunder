@@ -136,7 +136,7 @@ async def run_strategy(
     }
     async for height, mempool in client.mempool.iter_height_mempool(mempool_filters):
         if log_time:
-            start = time.time()
+            start = time.perf_counter()
         if is_new_block := any(height > arb_route.last_run_height for arb_route in arb_routes):
             log.debug(f"New block: {height=}")
             utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)
@@ -168,7 +168,7 @@ async def run_strategy(
         if max_n_blocks is not None and (n_blocks := height - start_height) >= max_n_blocks:
             break
         if log_time:
-            total_time_ms = (time.time() - start) * 1000  # type: ignore
+            total_time_ms = (time.perf_counter() - start) * 1000  # type: ignore
             stats = f"{total_time_ms:.1f}ms; {len(tasks)=}, {len(broadcast_tasks)=}"
             if is_new_block:
                 log.debug(f"Processed block: {height=} in {stats}")
