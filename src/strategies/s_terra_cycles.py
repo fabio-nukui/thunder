@@ -5,6 +5,7 @@ import logging
 import math
 import re
 import time
+from collections import defaultdict
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
@@ -29,6 +30,7 @@ from chains.terra import (
     NativeLiquidityPair,
     TerraClient,
     TerraNativeToken,
+    TerraToken,
     TerraTokenAmount,
     nexus,
     terraswap,
@@ -48,6 +50,10 @@ log = logging.getLogger(__name__)
 
 MIN_RESERVED_AMOUNT = UST.to_amount(30)
 MIN_N_ARBITRAGES = 20
+
+
+class NoPairFound(Exception):
+    pass
 
 
 @dataclass
@@ -104,10 +110,8 @@ async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
         _get_ust_native_routes(client, loop_factory, terraswap_factory),
         _get_luna_native_routes(client, terraswap_factory),
         _get_psi_routes(client, nexus_factory, [terraswap_factory, loop_factory]),
-        _get_ust_terraswap_3cycle_routes(client, terraswap_factory),
-        _get_ust_loop_3cycle_routes(client, loop_factory, terraswap_factory),
+        _get_ust_dex_3cycle_routes(client, [terraswap_factory, loop_factory]),
         _get_ust_loopdex_terraswap_2cycle_routes(client, loop_factory, terraswap_factory),
-        _get_ust_alte_3cycle_routes(client, terraswap_factory),
     )
     arbs: list[TerraCyclesArbitrage] = []
     for route_group in list_route_groups:
@@ -220,54 +224,33 @@ async def _get_psi_routes(
     return routes
 
 
-async def _get_ust_terraswap_3cycle_routes(
+async def _get_ust_dex_3cycle_routes(
     client: TerraClient,
-    terraswap_factory: terraswap.TerraswapFactory,
+    factories: list[terraswap.Factory],
 ) -> list[MultiRoutes]:
-    beth_ust_pair, meth_beth_pair, ust_meth_pair = await terraswap_factory.get_pairs(
-        ["BETH-UST", "mETH-BETH", "UST-mETH"]
+    pat_ust_pair_symbol = re.compile(r"^(?:[a-zA-Z]+-UST|UST-[a-zA-Z]+)$")
+    tasks = (
+        f.get_pair(name)
+        for f in factories
+        for name in f.pairs_addresses
+        if not pat_ust_pair_symbol.match(name)
     )
-    return [
-        MultiRoutes(
-            client=client,
-            start_token=UST,
-            list_steps=[[beth_ust_pair], [meth_beth_pair], [ust_meth_pair]],
-            router_address=terraswap_factory.router_address,
-        )
-    ]
-
-
-async def _get_ust_loop_3cycle_routes(
-    client: TerraClient,
-    loop_factory: terraswap.LoopFactory,
-    terraswap_factory: terraswap.TerraswapFactory,
-) -> list[MultiRoutes]:
-    loop_ust_pair = await loop_factory.get_pair("LOOP-UST")
-    pat_token_symbol = re.compile(r"^(?:([a-zA-Z]+)-LOOP|LOOP-([a-zA-Z]+))$")
+    non_ust_pairs: dict[tuple[TerraToken, TerraToken], list[terraswap.LiquidityPair]]
+    non_ust_pairs = defaultdict(list)
+    for pair in await asyncio.gather(*tasks, return_exceptions=True):
+        if isinstance(pair, terraswap.LiquidityPair):
+            non_ust_pairs[pair.sorted_tokens].append(pair)
 
     routes: list[MultiRoutes] = []
-    for pair_symbol in loop_factory.pairs_addresses:
-        if not (match := pat_token_symbol.match(pair_symbol)) or pair_symbol == "LOOP-UST":
-            continue
-        token_symbol = match.group(1) or match.group(2)
-
-        ust_pairs: list[terraswap.LiquidityPair] = []
-        for factory in (terraswap_factory, loop_factory):
-            for ust_pair_symbol in (f"{token_symbol}-UST", f"UST-{token_symbol}"):
-                if ust_pair_symbol in factory.pairs_addresses:
-                    try:
-                        ust_pairs.append(await factory.get_pair(ust_pair_symbol))
-                    except InsufficientLiquidity:
-                        continue
-        assert ust_pairs, f"No UST pairs found for {token_symbol}"
-
+    for tokens, pairs in non_ust_pairs.items():
         try:
-            loop_token_pair = await loop_factory.get_pair(pair_symbol)
-        except InsufficientLiquidity:
+            ust_first_pairs, ust_second_pairs = await asyncio.gather(
+                _pairs_from_factories(factories, "UST", tokens[0].symbol),
+                _pairs_from_factories(factories, tokens[1].symbol, "UST"),
+            )
+        except NoPairFound:
             continue
-        list_steps = [ust_pairs, [loop_token_pair], [loop_ust_pair]]
-
-        routes.append(MultiRoutes(client, UST, list_steps))
+        routes.append(MultiRoutes(client, UST, [ust_first_pairs, pairs, ust_second_pairs]))
     return routes
 
 
@@ -301,36 +284,6 @@ async def _get_ust_loopdex_terraswap_2cycle_routes(
     return routes
 
 
-async def _get_ust_alte_3cycle_routes(
-    client: TerraClient,
-    factory: terraswap.TerraswapFactory,
-) -> list[MultiRoutes]:
-    alte_ust_pair = await factory.get_pair("ALTE-UST")
-    pat_token_symbol = re.compile(r"^(?:([a-zA-Z]+)-ALTE|ALTE-([a-zA-Z]+))$")
-
-    routes: list[MultiRoutes] = []
-    for pair_symbol in factory.pairs_addresses:
-        if not (match := pat_token_symbol.match(pair_symbol)) or pair_symbol == "ALTE-UST":
-            continue
-        token_symbol = match.group(1) or match.group(2)
-
-        ust_pairs: list[terraswap.LiquidityPair] = []
-        for ust_pair_symbol in (f"{token_symbol}-UST", f"UST-{token_symbol}"):
-            if ust_pair_symbol in factory.pairs_addresses:
-                try:
-                    ust_pairs.append(await factory.get_pair(ust_pair_symbol))
-                except InsufficientLiquidity:
-                    continue
-        assert ust_pairs, f"No UST pairs found for {token_symbol}"
-        try:
-            alte_token_pair = await factory.get_pair(pair_symbol)
-        except InsufficientLiquidity:
-            continue
-        list_steps = [ust_pairs, [alte_token_pair], [alte_ust_pair]]
-        routes.append(MultiRoutes(client, UST, list_steps))
-    return routes
-
-
 async def _pairs_from_factories(
     terraswap_factories: Sequence[terraswap.Factory],
     symbol_0: str,
@@ -344,7 +297,8 @@ async def _pairs_from_factories(
                     pairs.append(await factory.get_pair(pair_symbol))
                 except InsufficientLiquidity:
                     continue
-    assert pairs, f"No pair found for {symbol_0}-{symbol_1}"
+    if not pairs:
+        raise NoPairFound(f"No pair found for {symbol_0}-{symbol_1}")
     return pairs
 
 
