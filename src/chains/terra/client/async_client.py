@@ -72,7 +72,7 @@ class TerraClient(AsyncBlockchainClient):
         self.chain_id = chain_id
         self.fee_denom = fee_denom
         self.gas_prices = Coins(gas_prices)
-        self.gas_adjustment = Decimal(gas_adjustment)
+        self.gas_adjustment = gas_adjustment
         self.raise_on_syncing = raise_on_syncing
         self._broadcasters_status: dict[AsyncClient, bool] = {}
         self.active_broadcaster: AsyncClient | None = None

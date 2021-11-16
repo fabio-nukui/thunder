@@ -39,6 +39,23 @@ TERRA_POLL_INTERVAL = float(os.getenv("TERRA_POLL_INTERVAL", "0.001"))
 TERRA_GAS_ADJUSTMENT = Decimal(os.getenv("TERRA_GAS_ADJUSTMENT", "1.15"))
 TERRA_GAS_MULTIPLIER = Decimal(os.getenv("TERRA_GAS_MULTIPLIER", "1.17501"))
 
+# Osmosis
+OSMOSIS_CHAIN_ID = os.getenv("OSMOSIS_CHAIN_ID", "osmosis-1")
+OSMOSIS_LCD_URI = os.getenv("OSMOSIS_LCD_URI", "https://lcd-osmosis.keplr")
+OSMOSIS_RPC_HTTP_URI = os.getenv("OSMOSIS_RPC_HTTP_URI", "")
+OSMOSIS_RPC_WEBSOCKET_URI = os.getenv("OSMOSIS_RPC_WEBSOCKET_URI", "")
+
+OSMOSIS_USE_BROADCASTER = os.getenv("OSMOSIS_USE_BROADCASTER", "").lower() == "true"
+_OSMOSIS_BROADCASTER_URIS_STR = os.getenv("OSMOSIS_BROADCASTER_URIS", "")
+OSMOSIS_BROADCASTER_URIS = [s for s in _OSMOSIS_BROADCASTER_URIS_STR.split(",") if s]
+
+_OSMOSIS_BROADCAST_LCD_URIS_STR = os.getenv(
+    "OSMOSIS_BROADCAST_LCD_URIS", "https://lcd-osmosis.keplr"
+)
+OSMOSIS_BROADCAST_LCD_URIS = [s for s in _OSMOSIS_BROADCAST_LCD_URIS_STR.split(",") if s]
+
+OSMOSIS_GAS_ADJUSTMENT = Decimal(os.getenv("OSMOSIS_GAS_ADJUSTMENT", "1.15"))
+
 # Ethereum
 ETHEREUM_CHAIN_ID = int(os.getenv("ETHEREUM_CHAIN_ID", "1"))
 ETHEREUM_RPC_URI = os.getenv("ETHEREUM_RPC_URI", "http://localhost:8545")
