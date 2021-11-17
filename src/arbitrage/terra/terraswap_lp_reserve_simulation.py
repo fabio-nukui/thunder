@@ -58,7 +58,8 @@ class TerraswapLPReserveSimulationMixin:
             for msgs in list_msgs:
                 try:
                     changes = await pair.get_reserve_changes_from_msgs(msgs)
-                except MaxSpreadAssertion:
+                except MaxSpreadAssertion as e:
+                    log.debug(f"{pair}: {e!r}")
                     continue
                 except Exception:
                     log.exception(f"Error when decoding {msgs}")
