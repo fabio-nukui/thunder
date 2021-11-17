@@ -32,6 +32,7 @@ from chains.cosmos.terra import (
     TerraNativeToken,
     TerraToken,
     TerraTokenAmount,
+    anchor,
     nexus,
     terraswap,
 )
@@ -102,14 +103,17 @@ class ArbParams(TerraArbParams):
 
 
 async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
-    terraswap_factory, loop_factory = await asyncio.gather(
-        terraswap.TerraswapFactory.new(client), terraswap.LoopFactory.new(client)
+    terraswap_factory, loop_factory, anchor_market = await asyncio.gather(
+        terraswap.TerraswapFactory.new(client),
+        terraswap.LoopFactory.new(client),
+        anchor.Market.new(client),
     )
     nexus_factory = nexus.Factory(client)
     list_route_groups = await asyncio.gather(
         _get_ust_native_routes(client, loop_factory, terraswap_factory),
         _get_luna_native_routes(client, terraswap_factory),
         _get_psi_routes(client, nexus_factory, [terraswap_factory, loop_factory]),
+        _get_aust_routes(client, anchor_market, [terraswap_factory, loop_factory]),
         _get_ust_dex_3cycle_routes(client, [terraswap_factory, loop_factory]),
         _get_ust_loopdex_terraswap_2cycle_routes(client, loop_factory, terraswap_factory),
     )
@@ -222,6 +226,15 @@ async def _get_psi_routes(
             ]
         routes.append(MultiRoutes(client, UST, steps))
     return routes
+
+
+async def _get_aust_routes(
+    client: TerraClient,
+    anchor_market: anchor.Market,
+    factories: Sequence[terraswap.Factory],
+) -> list[MultiRoutes]:
+    aust_pairs = await _pairs_from_factories(factories, "UST", "aUST")
+    return [MultiRoutes(client, UST, [[anchor_market], aust_pairs])]
 
 
 async def _get_ust_dex_3cycle_routes(
