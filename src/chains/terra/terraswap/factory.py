@@ -28,11 +28,12 @@ log = logging.getLogger(__name__)
 with open("resources/addresses/terra/columbus-5/cw20_whitelist.json") as f:
     _CW20_WHITELIST: dict = json.load(f)
 
-_FEES = {
-    "terra154jt8ppucvvakvqa5fyfjdflsu6v83j4ckjfq3": Decimal("0.00300001"),  # LOOP-LOOPR
-    "terra1dw5j23l6nwge69z0enemutfmyc93c36aqnzjj5": Decimal("0.00300001"),  # LOOPR-UST
-    "terra1kh2g4fnhvqtnwwpqa84eywn72ve9vdkp5chhlx": Decimal("0.0030005"),  # ALTE-LUNA
-    "terra163pkeeuwxzr0yhndf8xd2jprm9hrtk59xf7nqf": Decimal("0.0030001"),  # Psi-UST
+_FEES: dict[str, Decimal] = {
+    # "terra154jt8ppucvvakvqa5fyfjdflsu6v83j4ckjfq3": Decimal("0.00300001"),  # ldx LOOP-LOOPR
+    # "terra1dw5j23l6nwge69z0enemutfmyc93c36aqnzjj5": Decimal("0.00300001"),  # ldx LOOPR-UST
+    # "terra1kh2g4fnhvqtnwwpqa84eywn72ve9vdkp5chhlx": Decimal("0.00300050"),  # tsw ALTE-LUNA
+    # "terra163pkeeuwxzr0yhndf8xd2jprm9hrtk59xf7nqf": Decimal("0.00300010"),  # tsw Psi-UST
+    # "terra14zhkur7l7ut7tx6kvj28fp5q982lrqns59mnp3": Decimal("0.00300010"),  # tsw Psi-nETH
 }
 
 

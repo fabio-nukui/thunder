@@ -417,12 +417,18 @@ class LiquidityPair(BaseTerraLiquidityPair):
         https://github.com/terraswap/terraswap/blob/v2.4.1/contracts/terraswap_pair/src/contract.rs#L538  # noqa: E501
         """
         reserve_in, reserve_out = await self._get_in_out_reserves(amount_in=amount_in)
+        if safety_margin:
+            res_in = reserve_in.int_amount
+            res_out = reserve_out.int_amount
+            ret_am = res_out - int(res_in * res_out / (res_in + amount_in.int_amount))
 
-        numerator = reserve_out.amount * amount_in.amount
-        denominator = reserve_in.amount + amount_in.amount
-        amount_out_before_fees = reserve_out.token.to_amount(numerator / denominator)
+            amount_out_before_fees = reserve_out.token.to_amount(int_amount=ret_am)
+            amount_out_before_fees = amount_out_before_fees.safe_margin(safety_margin)
+        else:
+            numerator = reserve_out.amount * amount_in.amount
+            denominator = reserve_in.amount + amount_in.amount
+            amount_out_before_fees = reserve_out.token.to_amount(numerator / denominator)
 
-        amount_out_before_fees = amount_out_before_fees.safe_margin(safety_margin)
         self._assert_max_spread(
             amount_in.amount,
             amount_out_before_fees.amount,
@@ -507,7 +513,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
         amount_in: TerraTokenAmount,
         min_out: TerraTokenAmount,
     ) -> MsgExecuteContract:
-        belief_price = amount_in.amount / min_out.amount * (1 - self.fee_rate)
+        belief_price = Decimal(amount_in.int_amount / min_out.int_amount) * (1 - self.fee_rate)
         swap_msg = {"belief_price": f"{belief_price:.18f}", "max_spread": "0.0"}
         if isinstance(token_in := amount_in.token, CW20Token):
             contract = token_in.contract_addr

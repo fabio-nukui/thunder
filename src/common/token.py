@@ -5,7 +5,7 @@ from decimal import Decimal, getcontext
 from typing import Generic, Optional, TypeVar, Union, overload
 
 DecInput = Union[str, int, float, Decimal]
-ROUNDING_SAFETY_MARGIN = 10
+ROUNDING_SAFETY_MARGIN = 2
 
 getcontext().prec = 78  # To allow for calculations with up to 256 bits precision
 
