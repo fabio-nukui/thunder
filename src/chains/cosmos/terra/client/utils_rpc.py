@@ -29,6 +29,15 @@ async def _subscribe_rpc(
             return
 
 
+def _extract_height(data: dict) -> int:
+    try:
+        return int(data["result"]["data"]["value"]["header"]["height"])
+    except Exception as e:
+        raise Exception(
+            f"Could not parse websocket NewBlockHeader subscription ({e!r}): {data}"
+        )
+
+
 async def loop_latest_height(rpc_websocket_uri: str) -> AsyncIterable[int]:
     subscription_msg: SubscriptionMsg = {
         "jsonrpc": "2.0",
@@ -45,7 +54,7 @@ async def loop_latest_height(rpc_websocket_uri: str) -> AsyncIterable[int]:
                 while True:
                     task_get_header = asyncio.wait_for(client.recv(), MAX_TIME_WAIT_EVENTS)
                     response = json.loads(await task_get_header)
-                    yield int(response["result"]["data"]["value"]["header"]["height"])
+                    yield _extract_height(response)
         except websockets.exceptions.ConnectionClosed:
             log.debug(f"Websocket connection {rpc_websocket_uri} closed, reconnecting")
             subscription_msg["id"] += 1
@@ -61,4 +70,4 @@ async def wait_next_block_height(rpc_websocket_uri: str) -> int:
     async with websockets.client.connect(rpc_websocket_uri) as client:
         await _subscribe_rpc(client, subscription_msg)
         response = json.loads(await client.recv())
-        return int(response["result"]["data"]["value"]["header"]["height"])
+        return _extract_height(response)
