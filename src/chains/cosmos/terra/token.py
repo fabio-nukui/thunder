@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from abc import ABC, abstractmethod
 from decimal import Decimal
 from typing import TYPE_CHECKING, Optional, TypeVar, Union
@@ -14,6 +15,12 @@ if TYPE_CHECKING:
 
 
 _CW20TokenT = TypeVar("_CW20TokenT", bound="CW20Token")
+_CW20_WHITELIST_FILE = "resources/addresses/terra/{chain_id}/cw20_whitelist.json"
+
+
+def get_cw20_whitelist(chain_id: str) -> dict[str, AccAddress]:
+    with open(_CW20_WHITELIST_FILE.format(chain_id=chain_id)) as f:
+        return json.load(f)
 
 
 class TerraTokenAmount(TokenAmount):

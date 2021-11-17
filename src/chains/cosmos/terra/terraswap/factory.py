@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Iterable, Tuple, TypeVar
@@ -12,6 +11,7 @@ from terra_sdk.exceptions import LCDResponseError
 from chains.cosmos.terra.token import CW20Token, TerraNativeToken, TerraToken
 from exceptions import NotContract
 
+from ..token import get_cw20_whitelist
 from .liquidity_pair import (
     LiquidityPair,
     LPToken,
@@ -27,9 +27,6 @@ _FactoryT = TypeVar("_FactoryT", bound="Factory")
 
 log = logging.getLogger(__name__)
 
-with open("resources/addresses/terra/columbus-5/cw20_whitelist.json") as f:
-    _CW20_WHITELIST: dict = json.load(f)
-
 _FEES: dict[str, Decimal] = {
     # "terra154jt8ppucvvakvqa5fyfjdflsu6v83j4ckjfq3": Decimal("0.00300001"),  # ldx LOOP-LOOPR
     # "terra1dw5j23l6nwge69z0enemutfmyc93c36aqnzjj5": Decimal("0.00300001"),  # ldx LOOPR-UST
@@ -43,12 +40,12 @@ def _get_fee_rate(contract_addr: str) -> Decimal | None:
     return _FEES.get(contract_addr)
 
 
-def _check_cw20_whitelist(token: TerraToken) -> bool:
+def _check_cw20_whitelist(token: TerraToken, cw20_whitelist: dict[str, AccAddress]) -> bool:
     if not isinstance(token, CW20Token):
         return True
     if isinstance(token, LPToken):
-        return all(_check_cw20_whitelist(t) for t in token.pair_tokens)
-    return _CW20_WHITELIST.get(token.symbol) == token.contract_addr
+        return all(_check_cw20_whitelist(t, cw20_whitelist) for t in token.pair_tokens)
+    return cw20_whitelist.get(token.symbol) == token.contract_addr
 
 
 class Factory:
@@ -108,6 +105,7 @@ class Factory:
             addresses["router"] = router_address
         if assert_limit_order_address is not None:
             addresses["assert_limit_order"] = assert_limit_order_address
+        cw20_whitelist = get_cw20_whitelist(self.client.chain_id)
         for info in pair_infos:
             try:
                 if recursive:
@@ -126,7 +124,7 @@ class Factory:
                     f"status={e.response.status} {e.message}"
                 )
                 continue
-            if not all(_check_cw20_whitelist(token) for token in tokens):
+            if not all(_check_cw20_whitelist(token, cw20_whitelist) for token in tokens):
                 log.debug(f"Rejected {info['contract_addr']}: one of {tokens} not in whitelist")
                 continue
             pair_symbol = "-".join(token.repr_symbol for token in tokens)
