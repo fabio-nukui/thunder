@@ -1,3 +1,5 @@
+#! /usr/bin/env python
+
 import configparser
 from copy import copy
 from pathlib import Path
