@@ -64,7 +64,7 @@ class MarketApi(Api):
     async def get_tobin_taxes(self) -> dict[TerraNativeToken, Decimal]:
         response = await self.client.lcd.oracle.parameters()
         return {
-            TerraNativeToken(item["name"]): Decimal(item["tobin_tax"])
+            TerraNativeToken(item["name"]): Decimal(str(item["tobin_tax"]))
             for item in response["whitelist"]
         }
 
