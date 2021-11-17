@@ -100,11 +100,14 @@ class Factory:
         self,
         recursive: bool = True,
         router_address: str = None,
+        assert_limit_order_address: str = None,
     ) -> dict[str, str | dict[str, str]]:
         pair_infos = await self.fetch_all_pair_infos()
         addresses: dict[str, Any] = {"factory": self.contract_addr, "pairs": {}}
         if router_address is not None:
             addresses["router"] = router_address
+        if assert_limit_order_address is not None:
+            addresses["assert_limit_order"] = assert_limit_order_address
         for info in pair_infos:
             try:
                 if recursive:
