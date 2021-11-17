@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 
 _CW20TokenT = TypeVar("_CW20TokenT", bound="CW20Token")
-_CW20_WHITELIST_FILE = "resources/addresses/terra/{chain_id}/cw20_whitelist.json"
+_CW20_WHITELIST_FILE = "resources/addresses/cosmos/{chain_id}/cw20_whitelist.json"
 
 
 def get_cw20_whitelist(chain_id: str) -> dict[str, AccAddress]:

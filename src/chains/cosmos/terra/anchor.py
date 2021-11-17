@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from .client import TerraClient
     from .swap_utils import Operation
 
-ADDRESSES_FILE = "resources/addresses/terra/{chain_id}/anchor.json"
+ADDRESSES_FILE = "resources/addresses/cosmos/{chain_id}/anchor.json"
 
 
 class Market(BaseTerraLiquidityPair):

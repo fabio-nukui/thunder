@@ -11,7 +11,7 @@ from startup import setup
 log = logging.getLogger(__name__)
 
 
-_TERRASWAP_ADDRESSES_DIR = "resources/addresses/terra/{chain_id}/terraswap"
+_TERRASWAP_ADDRESSES_DIR = "resources/addresses/cosmos/{chain_id}/terraswap"
 _TERRASWAP_DEX_ROUTER = "terra19qx5xe6q9ll4w0890ux7lv2p4mf3csd4qvt3ex"
 _TERRASWAP_DEX_ASSERT_LIMIT_ORDER = "terra1vs9jr7pxuqwct3j29lez3pfetuu8xmq7tk3lzk"
 

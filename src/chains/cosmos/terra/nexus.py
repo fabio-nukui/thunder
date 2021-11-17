@@ -13,7 +13,7 @@ from .token import CW20Token, TerraTokenAmount
 if TYPE_CHECKING:
     from .client import TerraClient
 
-ADDRESSES_FILE = "resources/addresses/terra/{chain_id}/nexus.json"
+ADDRESSES_FILE = "resources/addresses/cosmos/{chain_id}/nexus.json"
 
 
 def _get_addresses(chain_id: str) -> dict[str, list[dict]]:

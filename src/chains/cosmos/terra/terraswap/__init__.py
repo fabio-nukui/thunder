@@ -25,7 +25,7 @@ __all__ = [
     "LoopFactory",
 ]
 
-ADDRESSES_FILE = "resources/addresses/terra/{chain_id}/terraswap/{name}.json"
+ADDRESSES_FILE = "resources/addresses/cosmos/{chain_id}/terraswap/{name}.json"
 
 
 def _get_addresses(chain_id: str, name: str) -> dict:
