@@ -102,13 +102,11 @@ class AnchorVault(BaseTerraLiquidityPair):
         return MsgExecuteContract(sender, self.n_token.contract_addr, execute_msg)
 
     async def simulate_reserve_change(
-        self,
-        amounts: tuple[TerraTokenAmount, TerraTokenAmount],
+        self, amounts: tuple[TerraTokenAmount, TerraTokenAmount]
     ) -> AnchorVault:
         return self
 
     async def get_reserve_changes_from_msg(
-        self,
-        msg: dict,
+        self, msg: dict
     ) -> tuple[TerraTokenAmount, TerraTokenAmount]:
         raise NotImplementedError
