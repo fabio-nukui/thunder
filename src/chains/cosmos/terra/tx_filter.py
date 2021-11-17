@@ -10,7 +10,7 @@ from terra_sdk.core import AccAddress
 
 from . import terraswap
 from .native_liquidity_pair import NativeLiquidityPair
-from .token import CW20Token, TerraNativeToken, TerraToken
+from .token import TerraCW20Token, TerraNativeToken, TerraToken
 
 log = logging.getLogger(__name__)
 
@@ -231,6 +231,6 @@ class FilterSwapTerraswap(Filter):
 
 
 def _get_token_id(token: TerraToken) -> str:
-    if isinstance(token, CW20Token):
+    if isinstance(token, TerraCW20Token):
         return token.contract_addr
     return token.denom

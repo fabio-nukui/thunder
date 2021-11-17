@@ -7,9 +7,10 @@ from typing import TYPE_CHECKING
 from terra_sdk.core import AccAddress, Coins
 from terra_sdk.core.wasm import MsgExecuteContract
 
+from ..token import get_cw20_whitelist
 from .denoms import UST
 from .native_liquidity_pair import BaseTerraLiquidityPair
-from .token import CW20Token, TerraTokenAmount, get_cw20_whitelist
+from .token import TerraCW20Token, TerraTokenAmount
 
 if TYPE_CHECKING:
     from .client import TerraClient
@@ -20,7 +21,7 @@ ADDRESSES_FILE = "resources/addresses/cosmos/{chain_id}/anchor.json"
 
 class Market(BaseTerraLiquidityPair):
     contract_addr: AccAddress
-    aUST: CW20Token
+    aUST: TerraCW20Token
 
     @classmethod
     async def new(cls, client: TerraClient):
@@ -31,7 +32,7 @@ class Market(BaseTerraLiquidityPair):
         self.contract_addr = addresses["market"]
 
         aust_addr = get_cw20_whitelist(client.chain_id)["aUST"]
-        self.aUST = await CW20Token.from_contract(aust_addr, client)
+        self.aUST = await TerraCW20Token.from_contract(aust_addr, client)
         self.tokens = (UST, self.aUST)
         self._stop_updates = False
 

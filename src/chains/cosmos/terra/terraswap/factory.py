@@ -8,10 +8,10 @@ from typing import TYPE_CHECKING, Any, Iterable, Tuple, TypeVar
 from terra_sdk.core import AccAddress
 from terra_sdk.exceptions import LCDResponseError
 
-from chains.cosmos.terra.token import CW20Token, TerraNativeToken, TerraToken
+from chains.cosmos.terra.token import TerraCW20Token, TerraNativeToken, TerraToken
 from exceptions import NotContract
 
-from ..token import get_cw20_whitelist
+from ...token import get_cw20_whitelist
 from .liquidity_pair import (
     LiquidityPair,
     LPToken,
@@ -41,7 +41,7 @@ def _get_fee_rate(contract_addr: str) -> Decimal | None:
 
 
 def _check_cw20_whitelist(token: TerraToken, cw20_whitelist: dict[str, AccAddress]) -> bool:
-    if not isinstance(token, CW20Token):
+    if not isinstance(token, TerraCW20Token):
         return True
     if isinstance(token, LPToken):
         return all(_check_cw20_whitelist(t, cw20_whitelist) for t in token.pair_tokens)

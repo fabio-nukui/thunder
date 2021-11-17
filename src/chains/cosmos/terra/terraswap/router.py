@@ -8,7 +8,7 @@ from terra_sdk.core import AccAddress, Coins
 from terra_sdk.core.wasm import MsgExecuteContract
 
 from ..client import TerraClient
-from ..token import CW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
+from ..token import TerraCW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
 from .liquidity_pair import LiquidityPair, RouterNativeLiquidityPair
 from .utils import Operation, token_to_data
 
@@ -121,7 +121,7 @@ class Router:
                 "operations": swap_operations,
             }
         }
-        if isinstance(amount_in.token, CW20Token):
+        if isinstance(amount_in.token, TerraCW20Token):
             contract = amount_in.token.contract_addr
             execute_msg = {
                 "send": {

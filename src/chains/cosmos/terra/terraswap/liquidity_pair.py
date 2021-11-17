@@ -19,7 +19,7 @@ from utils.cache import CacheGroup, lru_cache, ttl_cache
 
 from ..client import TerraClient
 from ..native_liquidity_pair import BaseTerraLiquidityPair, NativeLiquidityPair
-from ..token import CW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
+from ..token import TerraCW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
 from .utils import Operation, token_to_data
 
 if TYPE_CHECKING:
@@ -92,7 +92,7 @@ async def token_from_data(
                 )
             except NotTerraswapLPToken:
                 pass
-        return await CW20Token.from_contract(contract_addr, client)
+        return await TerraCW20Token.from_contract(contract_addr, client)
     raise TypeError(f"Unexpected data format: {asset_info}")
 
 
@@ -515,7 +515,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
     ) -> MsgExecuteContract:
         belief_price = Decimal(amount_in.int_amount / min_out.int_amount) * (1 - self.fee_rate)
         swap_msg = {"belief_price": f"{belief_price:.18f}", "max_spread": "0.0"}
-        if isinstance(token_in := amount_in.token, CW20Token):
+        if isinstance(token_in := amount_in.token, TerraCW20Token):
             contract = token_in.contract_addr
             execute_msg = {
                 "send": {
@@ -754,7 +754,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
         if msg["contract"] == self.contract_addr:
             amount_in, swap_msg = await self._parse_direct_pair_msg(msg)
         elif msg["contract"] in (
-            token.contract_addr for token in self.tokens if isinstance(token, CW20Token)
+            token.contract_addr for token in self.tokens if isinstance(token, TerraCW20Token)
         ):
             amount_in, swap_msg = await self._parse_cw20_send_msg(msg)
         else:
@@ -789,13 +789,13 @@ class LiquidityPair(BaseTerraLiquidityPair):
         else:
             send_msg = raw_send_msg
         swap_msg = send_msg[Action.swap] if send_msg else {}
-        token = await CW20Token.from_contract(msg["contract"], self.client)
+        token = await TerraCW20Token.from_contract(msg["contract"], self.client)
         amount_in = token.to_amount(int_amount=msg["execute_msg"]["send"]["amount"])
 
         return amount_in, swap_msg
 
 
-class LPToken(CW20Token):
+class LPToken(TerraCW20Token):
     pair_tokens: tuple[TerraToken, TerraToken]
 
     def __repr__(self) -> str:
@@ -805,7 +805,7 @@ class LPToken(CW20Token):
         return self.repr_symbol[1:-1]
 
     @classmethod
-    async def from_contract(
+    async def from_contract(  # type: ignore
         cls,
         contract_addr: AccAddress,
         client: TerraClient,

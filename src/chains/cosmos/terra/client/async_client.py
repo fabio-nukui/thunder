@@ -19,6 +19,7 @@ from terra_sdk.key.mnemonic import MnemonicKey
 import auth_secrets
 import configs
 import utils
+from chains.cosmos.client import CosmosClient
 from common.blockchain_client import AsyncBlockchainClient
 from exceptions import NotContract
 from utils.ahttp import AsyncClient
@@ -44,7 +45,7 @@ MAX_BROADCASTER_HEIGHT_DIFFERENCE = 2
 _pat_missing_contract = re.compile(r"contract terra1(\w+): not found")
 
 
-class TerraClient(AsyncBlockchainClient):
+class TerraClient(AsyncBlockchainClient, CosmosClient):
     def __init__(
         self,
         lcd_uri: str = configs.TERRA_LCD_URI,

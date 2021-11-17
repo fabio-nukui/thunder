@@ -8,7 +8,7 @@ from terra_sdk.core import AccAddress
 from terra_sdk.core.wasm import MsgExecuteContract
 
 from .native_liquidity_pair import BaseTerraLiquidityPair
-from .token import CW20Token, TerraTokenAmount
+from .token import TerraCW20Token, TerraTokenAmount
 
 if TYPE_CHECKING:
     from .client import TerraClient
@@ -36,8 +36,8 @@ class Factory:
 class AnchorVault(BaseTerraLiquidityPair):
     contract_addr: AccAddress
     client: TerraClient
-    b_token: CW20Token
-    n_token: CW20Token
+    b_token: TerraCW20Token
+    n_token: TerraCW20Token
 
     @classmethod
     async def new(
@@ -51,8 +51,8 @@ class AnchorVault(BaseTerraLiquidityPair):
         self.client = client
         data: dict = await client.contract_query(contract_addr, {"config": {}})
 
-        self.b_token = await CW20Token.from_contract(data["basset_token_addr"], client)
-        self.n_token = await CW20Token.from_contract(n_token_contract_addr, client)
+        self.b_token = await TerraCW20Token.from_contract(data["basset_token_addr"], client)
+        self.n_token = await TerraCW20Token.from_contract(n_token_contract_addr, client)
         self.tokens = self.b_token, self.n_token
         self._stop_updates = False
 
