@@ -51,6 +51,7 @@ log = logging.getLogger(__name__)
 
 MIN_RESERVED_AMOUNT = UST.to_amount(30)
 MIN_N_ARBITRAGES = 20
+ANCHOR_MARKET_GAS_ADJUSMENT = Decimal("1.35")
 
 
 class NoPairFound(Exception):
@@ -109,7 +110,7 @@ async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
         anchor.Market.new(client),
     )
     nexus_factory = nexus.Factory(client)
-    list_route_groups = await asyncio.gather(
+    list_route_groups: list[list[MultiRoutes]] = await asyncio.gather(
         _get_ust_native_routes(client, loop_factory, terraswap_factory),
         _get_luna_native_routes(client, terraswap_factory),
         _get_psi_routes(client, nexus_factory, [terraswap_factory, loop_factory]),
@@ -120,8 +121,13 @@ async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
     arbs: list[TerraCyclesArbitrage] = []
     for route_group in list_route_groups:
         for multi_routes in route_group:
+            gas_adjustment = (
+                ANCHOR_MARKET_GAS_ADJUSMENT if anchor_market in multi_routes.pairs else None
+            )
             try:
-                arbs.append(await TerraCyclesArbitrage.new(client, multi_routes))
+                arbs.append(
+                    await TerraCyclesArbitrage.new(client, multi_routes, gas_adjustment)
+                )
             except FeeEstimationError as e:
                 log.info(f"Error when initializing arbitrage with {multi_routes}: {e!r}")
     assert len(arbs) >= MIN_N_ARBITRAGES
@@ -317,6 +323,7 @@ async def _pairs_from_factories(
 
 class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbitrage):
     multi_routes: MultiRoutes
+    gas_adjustment: Decimal | None
     routes: list[SingleRoute]
     start_token: TerraNativeToken
     use_router: bool
@@ -331,6 +338,7 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
         cls,
         client: TerraClient,
         multi_routes: MultiRoutes,
+        gas_adjustment: Decimal = None,
     ) -> TerraCyclesArbitrage:
         """Arbitrage with UST as starting point and a cycle of liquidity pairs"""
         assert isinstance(multi_routes.tokens[0], TerraNativeToken) and multi_routes.is_cycle
@@ -339,6 +347,7 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
 
         self.multi_routes = multi_routes
         self.start_token = multi_routes.tokens[0]
+        self.gas_adjustment = gas_adjustment
         self.use_router = multi_routes.router_address is not None
 
         (
@@ -441,6 +450,7 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
         try:
             fee = await self.client.tx.estimate_fee(
                 msgs,
+                gas_adjustment=self.gas_adjustment,
                 use_fallback_estimate=self._simulating_reserve_changes,
                 estimated_gas_use=self.estimated_gas_use,
                 fee_denom=self.fee_denom,
