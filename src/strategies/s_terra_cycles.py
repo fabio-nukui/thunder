@@ -475,9 +475,8 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
         amount_in: TerraTokenAmount,
         route: SingleRoute,
         reverse: bool,
-        safety_round: bool = False,
     ) -> TerraTokenAmount:
-        amount_out = await route.get_swap_amount_out(amount_in, reverse, safety_round)
+        amount_out = await route.get_swap_amount_out(amount_in, reverse, safety_margin=False)
         return amount_out - amount_in
 
     async def _get_gross_profit_dec(
@@ -485,10 +484,9 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
         amount_in: Decimal,
         route: SingleRoute,
         reverse: bool,
-        safety_round: bool = False,
     ) -> Decimal:
         token_amount = self.start_token.to_amount(amount_in)
-        return (await self._get_gross_profit(token_amount, route, reverse, safety_round)).amount
+        return (await self._get_gross_profit(token_amount, route, reverse)).amount
 
     def _check_repeats(
         self,
