@@ -17,10 +17,10 @@ from terra_sdk.core.tx import Tx
 from terra_sdk.exceptions import LCDResponseError
 
 import configs
-from chains.terra.token import TerraNativeToken, TerraTokenAmount
 from exceptions import FeeEstimationError, TxAlreadyBroadcasted
 from utils.cache import CacheGroup, ttl_cache
 
+from ..token import TerraNativeToken, TerraTokenAmount
 from .base_api import Api
 
 log = logging.getLogger(__name__)

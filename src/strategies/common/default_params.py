@@ -1,4 +1,4 @@
-from chains.terra import UST
+from chains.cosmos.terra import UST
 
 MAX_SINGLE_ARBITRAGE_AMOUNT = UST.to_amount(50_000)
 MAX_N_REPEATS = 20

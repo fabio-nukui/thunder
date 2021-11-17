@@ -5,8 +5,8 @@ from contextlib import asynccontextmanager
 from typing import Callable, Iterable, Sequence
 
 import utils
-from chains.terra import BaseTerraLiquidityPair, TerraTokenAmount
-from chains.terra.swap_utils import SingleRoute
+from chains.cosmos.terra import BaseTerraLiquidityPair, TerraTokenAmount
+from chains.cosmos.terra.swap_utils import SingleRoute
 from exceptions import MaxSpreadAssertion
 
 log = logging.getLogger(__name__)

@@ -20,7 +20,7 @@ from arbitrage.terra import (
     TerraswapLPReserveSimulationMixin,
     run_strategy,
 )
-from chains.terra import (
+from chains.cosmos.terra import (
     LUNA,
     UST,
     NativeLiquidityPair,
@@ -30,7 +30,7 @@ from chains.terra import (
     TerraTokenAmount,
     terraswap,
 )
-from chains.terra.tx_filter import Filter, FilterNativeSwap, FilterSwapTerraswap
+from chains.cosmos.terra.tx_filter import Filter, FilterNativeSwap, FilterSwapTerraswap
 from exceptions import FeeEstimationError, UnprofitableArbitrage
 
 from .common.default_params import MIN_PROFIT_UST, MIN_START_AMOUNT, OPTIMIZATION_TOLERANCE

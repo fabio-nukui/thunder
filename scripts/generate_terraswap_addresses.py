@@ -3,7 +3,7 @@ import json
 import logging
 import os
 
-from chains.terra import TerraClient, terraswap
+from chains.cosmos.terra import TerraClient, terraswap
 from startup import setup
 
 log = logging.getLogger(__name__)

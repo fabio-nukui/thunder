@@ -12,8 +12,8 @@ from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.exceptions import LCDResponseError
 
 import utils
-from chains.terra import TerraClient, TerraTokenAmount
-from chains.terra.tx_filter import Filter
+from chains.cosmos.terra import TerraClient, TerraTokenAmount
+from chains.cosmos.terra.tx_filter import Filter
 from exceptions import BlockchainNewState, IsBusy
 
 from ..repeated_tx_arbitrage import (

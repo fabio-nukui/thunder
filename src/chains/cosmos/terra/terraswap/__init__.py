@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
 from terra_sdk.core import AccAddress
 
-from ..client import TerraClient
 from .factory import Factory
 from .liquidity_pair import Action, LiquidityPair, RouterNativeLiquidityPair
 from .router import Router, RouterLiquidityPair, RouteStep, RouteStepNative, RouteStepTerraswap
+
+if TYPE_CHECKING:
+    from ..client import TerraClient
 
 __all__ = [
     "Action",

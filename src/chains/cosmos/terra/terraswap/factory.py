@@ -4,15 +4,14 @@ import asyncio
 import json
 import logging
 from decimal import Decimal
-from typing import Any, Iterable, Tuple, TypeVar
+from typing import TYPE_CHECKING, Any, Iterable, Tuple, TypeVar
 
 from terra_sdk.core import AccAddress
 from terra_sdk.exceptions import LCDResponseError
 
-from chains.terra.token import CW20Token, TerraNativeToken, TerraToken
+from chains.cosmos.terra.token import CW20Token, TerraNativeToken, TerraToken
 from exceptions import NotContract
 
-from ..client import TerraClient
 from .liquidity_pair import (
     LiquidityPair,
     LPToken,
@@ -20,6 +19,9 @@ from .liquidity_pair import (
     pair_tokens_from_data,
 )
 from .router import Router, RouterLiquidityPair
+
+if TYPE_CHECKING:
+    from ..client import TerraClient
 
 _FactoryT = TypeVar("_FactoryT", bound="Factory")
 

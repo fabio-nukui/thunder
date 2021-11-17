@@ -6,8 +6,8 @@ import traceback
 
 from quart import Quart, Response, request
 
-from chains.terra import TerraClient
-from chains.terra.client.api_broadcaster import BroadcasterPayload, BroadcasterResponse
+from chains import TerraClient
+from chains.cosmos.terra.client.api_broadcaster import BroadcasterPayload, BroadcasterResponse
 from startup import setup
 
 app = Quart(__name__)

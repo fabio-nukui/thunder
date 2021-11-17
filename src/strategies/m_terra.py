@@ -2,7 +2,7 @@ import asyncio
 from typing import Sequence
 
 from arbitrage.terra import TerraRepeatedTxArbitrage, run_strategy
-from chains.terra import TerraClient
+from chains.cosmos.terra import TerraClient
 
 from . import s_lp_tower, s_terra_cycles
 

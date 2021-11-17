@@ -23,7 +23,7 @@ from arbitrage.terra import (
     TerraswapLPReserveSimulationMixin,
     run_strategy,
 )
-from chains.terra import (
+from chains.cosmos.terra import (
     LUNA,
     UST,
     BaseTerraLiquidityPair,
@@ -35,8 +35,8 @@ from chains.terra import (
     nexus,
     terraswap,
 )
-from chains.terra.swap_utils import MultiRoutes, SingleRoute
-from chains.terra.tx_filter import Filter, FilterNativeSwap, FilterSwapTerraswap
+from chains.cosmos.terra.swap_utils import MultiRoutes, SingleRoute
+from chains.cosmos.terra.tx_filter import Filter, FilterNativeSwap, FilterSwapTerraswap
 from exceptions import FeeEstimationError, InsufficientLiquidity, UnprofitableArbitrage
 from strategies.common.default_params import (
     MAX_N_REPEATS,
