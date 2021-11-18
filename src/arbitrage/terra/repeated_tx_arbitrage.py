@@ -84,7 +84,8 @@ class TerraRepeatedTxArbitrage(RepeatedTxArbitrage[TerraClient], ABC):
         try:
             info = await self.client.lcd.tx.tx_info(tx_hash)
         except LCDResponseError as e:
-            if e.response.status == 404:
+            status_code = e.response.status
+            if status_code == 404 or status_code == 400 and "not found" in e.message:
                 if tx_inclusion_delay >= MAX_BLOCKS_WAIT_RECEIPT:
                     return ArbResult(TxStatus.not_found)
                 raise IsBusy
