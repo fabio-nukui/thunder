@@ -2,7 +2,7 @@ from terra_sdk.core import AccAddress, AccPubKey, ValAddress, ValPubKey
 from terra_sdk.key.key import get_bech
 from terra_sdk.key.mnemonic import MnemonicKey as TerraMnemonicKey
 
-OSMO_COIN_TYPE = 222
+OSMO_COIN_TYPE = 118
 
 
 class MnemonicKey(TerraMnemonicKey):

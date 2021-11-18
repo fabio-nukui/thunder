@@ -41,7 +41,7 @@ TERRA_GAS_MULTIPLIER = Decimal(os.getenv("TERRA_GAS_MULTIPLIER", "1.17501"))
 
 # Osmosis
 OSMOSIS_CHAIN_ID = os.getenv("OSMOSIS_CHAIN_ID", "osmosis-1")
-OSMOSIS_LCD_URI = os.getenv("OSMOSIS_LCD_URI", "https://lcd-osmosis.keplr")
+OSMOSIS_LCD_URI = os.getenv("OSMOSIS_LCD_URI", "https://lcd-osmosis.keplr.app")
 OSMOSIS_RPC_HTTP_URI = os.getenv("OSMOSIS_RPC_HTTP_URI", "")
 OSMOSIS_RPC_WEBSOCKET_URI = os.getenv("OSMOSIS_RPC_WEBSOCKET_URI", "")
 
@@ -50,10 +50,12 @@ _OSMOSIS_BROADCASTER_URIS_STR = os.getenv("OSMOSIS_BROADCASTER_URIS", "")
 OSMOSIS_BROADCASTER_URIS = [s for s in _OSMOSIS_BROADCASTER_URIS_STR.split(",") if s]
 
 _OSMOSIS_BROADCAST_LCD_URIS_STR = os.getenv(
-    "OSMOSIS_BROADCAST_LCD_URIS", "https://lcd-osmosis.keplr"
+    "OSMOSIS_BROADCAST_LCD_URIS", "https://lcd-osmosis.keplr.app"
 )
 OSMOSIS_BROADCAST_LCD_URIS = [s for s in _OSMOSIS_BROADCAST_LCD_URIS_STR.split(",") if s]
 
+OSMOSIS_CACHE_TTL = float(os.getenv("OSMOSIS_CACHE_TTL", "5.0"))
+OSMOSIS_POLL_INTERVAL = float(os.getenv("OSMOSIS_POLL_INTERVAL", "0.001"))
 OSMOSIS_GAS_ADJUSTMENT = Decimal(os.getenv("OSMOSIS_GAS_ADJUSTMENT", "1.15"))
 
 # Ethereum

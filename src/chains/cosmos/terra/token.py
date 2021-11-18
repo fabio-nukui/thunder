@@ -32,12 +32,12 @@ class BaseTerraToken(Token[TerraTokenAmount]):
 
 class TerraNativeToken(BaseTerraToken, CosmosNativeToken[TerraTokenAmount]):
     def __init__(self, denom: str):
-        self.denom = denom
-        self.symbol = "LUNA" if denom == "uluna" else denom[1:-1].upper() + "T"
+        symbol = "LUNA" if denom == "uluna" else denom[1:-1].upper() + "T"
         if denom[0] == "u":
-            self.decimals = 6
+            decimals = 6
         else:
             raise NotImplementedError("TerraNativeToken only implemented for micro (µ) demons")
+        super().__init__(denom, decimals, symbol)
 
 
 class TerraCW20Token(BaseTerraToken, CW20Token[TerraTokenAmount]):

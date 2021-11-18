@@ -3,14 +3,14 @@ import logging
 
 import aiohttp
 from aiohttp.client_exceptions import ServerDisconnectedError
-from terra_sdk.client.lcd import AsyncLCDClient
+from terra_sdk.client.lcd import AsyncLCDClient as TerraAsyncLCDClient
 
 log = logging.getLogger(__name__)
 
 DEFAULT_MAX_CONCURRENT_REQUESTS = 20
 
 
-class AsyncLCDClient2(AsyncLCDClient):
+class AsyncLCDClient(TerraAsyncLCDClient):
     def __init__(
         self,
         *args,

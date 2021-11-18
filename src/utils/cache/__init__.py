@@ -23,6 +23,7 @@ class CacheGroup(Enum):
     DEFAULT = "default"
     BSC = "bsc"
     ETHEREUM = "ethereum"
+    OSMOSIS = "osmosis"
     TERRA = "terra"
 
 
@@ -30,6 +31,7 @@ CACHE_GROUPS_TTL = {
     CacheGroup.DEFAULT: configs.DEFAULT_CACHE_TTL,
     CacheGroup.BSC: configs.BSC_CACHE_TTL,
     CacheGroup.ETHEREUM: configs.ETHEREUM_CACHE_TTL,
+    CacheGroup.OSMOSIS: configs.OSMOSIS_CACHE_TTL,
     CacheGroup.TERRA: configs.TERRA_CACHE_TTL,
 }
 
@@ -85,6 +87,7 @@ def clear_caches(
     ttl_treshold: Optional[int | float] = None,
     clear_all: bool = False,
 ):
+    log.debug(f"clear_caches({group=}, {ttl_treshold=}, {clear_all=})")
     ttl_treshold = CACHE_GROUPS_TTL[group] if ttl_treshold is None else ttl_treshold
     if group == CacheGroup.ALL:
         caches_clear = [cache for list_caches in _caches.values() for cache in list_caches]

@@ -65,7 +65,7 @@ class AsyncBlockchainClient(BlockchainClient, ABC):
 
     @abstractmethod
     async def close(self):
-        pass
+        ...
 
     async def start(self):
         if self.raise_on_syncing and await self.is_syncing():
