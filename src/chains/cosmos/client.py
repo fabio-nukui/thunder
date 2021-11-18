@@ -29,14 +29,29 @@ _PAT_MISSING_CONTRACT = re.compile(r"contract (\w+): not found")
 
 
 class CosmosClient(AsyncBlockchainClient, ABC):
-    address: AccAddress
-    lcd_uri: str
-    gas_prices: Coins | None
-    gas_adjustment: Decimal
     key: MnemonicKey
-    lcd: AsyncLCDClient
-    chain_id: str
-    signer: SignerOptions
+
+    def __init__(
+        self,
+        lcd_uri: str,
+        rpc_http_uri: str,
+        rpc_websocket_uri: str,
+        fee_denom: str,
+        gas_prices: Coins.Input | None,
+        gas_adjustment: Decimal,
+        chain_id: str,
+        *args,
+        **kwargs,
+    ):
+        self.lcd_uri = lcd_uri
+        self.rpc_http_uri = rpc_http_uri
+        self.rpc_websocket_uri = rpc_websocket_uri
+
+        self.fee_denom = fee_denom
+        self.gas_prices = Coins(gas_prices)
+        self.gas_adjustment = gas_adjustment
+        self.chain_id = chain_id
+        super().__init__(*args, **kwargs)
 
     def __repr__(self) -> str:
         return (
@@ -129,11 +144,25 @@ class CosmosClient(AsyncBlockchainClient, ABC):
 
 class BroadcasterMixin:
     height: int
-    broadcaster_uris: list[str]
-    broadcast_lcd_uris: list[str]
-    broadcast_lcd_clients: list[AsyncClient]
-    _broadcaster_clients: list[AsyncClient]
-    _broadcasters_status: dict[AsyncClient, bool]
+
+    def __init__(
+        self,
+        use_broadcaster: bool,
+        broadcaster_uris: list[str],
+        broadcast_lcd_uris: list[str],
+        *args,
+        **kwargs,
+    ):
+        self.use_broadcaster = use_broadcaster
+        self.broadcaster_uris = broadcaster_uris
+        self.broadcast_lcd_uris = broadcast_lcd_uris
+
+        self._broadcaster_clients: list[AsyncClient] = []
+        self._broadcasters_status: dict[AsyncClient, bool] = {}
+        self.broadcast_lcd_clients: list[AsyncClient] = []
+        self.active_broadcaster: AsyncClient | None = None
+
+        super().__init__(*args, **kwargs)  # type: ignore
 
     async def _init_broadcaster_clients(self):
         await self._fix_broadcaster_urls()

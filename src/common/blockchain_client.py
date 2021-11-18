@@ -40,12 +40,10 @@ _AsyncBlockchainClientT = TypeVar("_AsyncBlockchainClientT", bound="AsyncBlockch
 
 
 class AsyncBlockchainClient(BlockchainClient, ABC):
-    raise_on_syncing: bool
-    started: bool = False
-
-    @abstractmethod
     def __init__(self, raise_on_syncing: bool):
-        ...
+        self.raise_on_syncing = raise_on_syncing
+        self.started = False
+        self.height = 0
 
     @classmethod
     async def new(

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-from typing import Union
+from typing import TYPE_CHECKING, Union
 
 from terra_sdk.core import Coin
 
 from common.token import Token
 
 from ..token import CosmosNativeToken, CosmosTokenAmount, CW20Token
+
+if TYPE_CHECKING:
+    from .client import OsmosisClient
 
 
 class OsmosisTokenAmount(CosmosTokenAmount):
@@ -31,8 +34,15 @@ class BaseOsmosisToken(Token[OsmosisTokenAmount]):
 
 
 class OsmosisNativeToken(BaseOsmosisToken, CosmosNativeToken[OsmosisTokenAmount]):
-    def __init__(self, denom: str):
-        super().__init__(denom, decimals=6)
+    def __init__(self, denom: str, client: OsmosisClient = None):
+        if denom.startswith("ibc/"):
+            if client is not None:
+                raise NotImplementedError
+            else:
+                symbol = denom
+            super().__init__(denom, decimals=6, symbol=symbol)
+        else:
+            super().__init__(denom, decimals=6)
 
 
 class OsmosisCW20Token(BaseOsmosisToken, CW20Token[OsmosisTokenAmount]):

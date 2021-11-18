@@ -18,9 +18,10 @@ log = logging.getLogger(__name__)
 
 _CONTRACT_QUERY_CACHE_SIZE = 10_000
 _CONTRACT_INFO_CACHE_TTL = 86400  # Contract info should not change; 24h ttl
+_NATIVE_OSMO_DENOM = "uosmo"
 
 
-class OsmosisClient(CosmosClient, BroadcasterMixin):
+class OsmosisClient(BroadcasterMixin, CosmosClient):
     def __init__(
         self,
         lcd_uri: str = configs.OSMOSIS_LCD_URI,
@@ -30,26 +31,29 @@ class OsmosisClient(CosmosClient, BroadcasterMixin):
         broadcaster_uris: list[str] = configs.OSMOSIS_BROADCASTER_URIS,
         broadcast_lcd_uris: list[str] = configs.OSMOSIS_BROADCAST_LCD_URIS,
         chain_id: str = configs.OSMOSIS_CHAIN_ID,
+        fee_denom: str = _NATIVE_OSMO_DENOM,
         gas_prices: Coins.Input = None,
         gas_adjustment: Decimal = configs.OSMOSIS_GAS_ADJUSTMENT,
         raise_on_syncing: bool = configs.RAISE_ON_SYNCING,
         hd_wallet: dict = None,
         hd_wallet_index: int = 0,
     ):
-        self.lcd_uri = lcd_uri
-        self.rpc_http_uri = rpc_http_uri
-        self.rpc_websocket_uri = rpc_websocket_uri
-        self.use_broadcaster = use_broadcaster
-        self.broadcaster_uris = broadcaster_uris
-        self.broadcast_lcd_uris = broadcast_lcd_uris
-        self.chain_id = chain_id
-        self.gas_prices = Coins(gas_prices)
-        self.gas_adjustment = gas_adjustment
-        self.raise_on_syncing = raise_on_syncing
+        super().__init__(
+            lcd_uri=lcd_uri,
+            rpc_http_uri=rpc_http_uri,
+            rpc_websocket_uri=rpc_websocket_uri,
+            use_broadcaster=use_broadcaster,
+            broadcaster_uris=broadcaster_uris,
+            broadcast_lcd_uris=broadcast_lcd_uris,
+            chain_id=chain_id,
+            fee_denom=fee_denom,
+            gas_prices=gas_prices,
+            gas_adjustment=gas_adjustment,
+            raise_on_syncing=raise_on_syncing,
+        )
 
         hd_wallet = auth_secrets.hd_wallet() if hd_wallet is None else hd_wallet
         self.key = MnemonicKey(hd_wallet["mnemonic"], hd_wallet["account"], hd_wallet_index)
-        self.height = 0
 
     async def start(self):
         self.lcd_http_client = utils.ahttp.AsyncClient(base_url=self.lcd_uri)
@@ -100,7 +104,9 @@ class OsmosisClient(CosmosClient, BroadcasterMixin):
         address: AccAddress = None,
     ) -> list[OsmosisTokenAmount]:
         address = self.address if address is None else address
-        coins_balance, _ = await self.lcd.bank.balance(address)
+        coins_balance, pagination = await self.lcd.bank.balance(address)
+        if pagination["next_key"] is not None:
+            raise NotImplementedError("get_bank() not implemented for paginated results")
         return [
             OsmosisTokenAmount.from_coin(c)
             for c in coins_balance.to_list()
