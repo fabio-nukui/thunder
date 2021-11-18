@@ -21,6 +21,7 @@ from ..denoms import UST
 from ..token import TerraTokenAmount
 from . import utils_rpc
 from .api_broadcaster import BroadcasterApi
+from .api_ibc import IbcApi
 from .api_market import MarketApi
 from .api_mempool import MempoolApi
 from .api_oracle import OracleApi
@@ -71,6 +72,7 @@ class TerraClient(BroadcasterMixin, CosmosClient):
         self.key = MnemonicKey(hd_wallet["mnemonic"], hd_wallet["account"], hd_wallet_index)
 
         self.broadcaster = BroadcasterApi(self)
+        self.ibc = IbcApi(self)
         self.market = MarketApi(self)
         self.mempool = MempoolApi(self)
         self.oracle = OracleApi(self)
