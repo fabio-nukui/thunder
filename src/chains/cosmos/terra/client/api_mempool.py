@@ -92,10 +92,7 @@ class MempoolCacheManager:
 
         tasks = asyncio.as_completed([task_wait_next_block, task_mempool_txs])
         event = await next(tasks)
-        if event == UpdateEvent.new_block:
-            task_mempool_txs.cancel()
-            return self.height, []
-        elif new_block_only:
+        if new_block_only and event != UpdateEvent.new_block:
             await task_wait_next_block
         else:
             task_wait_next_block.cancel()
