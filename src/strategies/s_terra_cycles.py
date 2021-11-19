@@ -115,8 +115,8 @@ async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
         _get_luna_native_routes(client, terraswap_factory),
         _get_psi_routes(client, nexus_factory, [terraswap_factory, loop_factory]),
         _get_aust_routes(client, anchor_market, [terraswap_factory, loop_factory]),
-        _get_ust_dex_3cycle_routes(client, [terraswap_factory, loop_factory]),
         _get_ust_loopdex_terraswap_2cycle_routes(client, loop_factory, terraswap_factory),
+        _get_ust_dex_3cycle_routes(client, [terraswap_factory, loop_factory]),
     )
     arbs: list[TerraCyclesArbitrage] = []
     for route_group in list_route_groups:
@@ -270,7 +270,19 @@ async def _get_ust_dex_3cycle_routes(
         except NoPairFound:
             continue
         routes.append(MultiRoutes(client, UST, [ust_first_pairs, pairs, ust_second_pairs]))
-    return routes
+
+    return _reorder_routes(routes)
+
+
+def _reorder_routes(routes: list[MultiRoutes]) -> list[MultiRoutes]:
+    alte_routes = []
+    non_alte_routes = []
+    for r in routes:
+        if any(t.symbol == "ALTE" for p in r.pairs for t in p.tokens):
+            alte_routes.append(r)
+        else:
+            non_alte_routes.append(r)
+    return non_alte_routes + alte_routes
 
 
 async def _get_ust_loopdex_terraswap_2cycle_routes(
