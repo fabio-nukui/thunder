@@ -82,6 +82,8 @@ class TxApi(Api):
                     continue
                 if not use_fallback_estimate:
                     raise e
+                if "spread assertion" in e.message:
+                    raise FeeEstimationError(e.message)
                 if estimated_gas_use is None:
                     raise FeeEstimationError(
                         "Could not use fallback fee estimation without estimated_gas_use", e
