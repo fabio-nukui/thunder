@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Literal, Sequence, TypedDict
+import math
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Sequence, TypedDict, TypeVar
 
 from terra_sdk.core.broadcast import SyncTxBroadcastResult
 from terra_sdk.core.fee import Fee
@@ -16,6 +17,9 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
+BROADCASTER_CACHE_BLOCKS = 2
+_MsgType = TypeVar("_MsgType", dict, list)
+
 
 class BroadcasterPayload(TypedDict):
     height: int
@@ -28,6 +32,30 @@ class BroadcasterPayload(TypedDict):
 class BroadcasterResponse(TypedDict):
     result: Literal["broadcasted"] | Literal["repeated_tx"] | Literal["new_block"]
     data: list[tuple[float, dict]]
+
+
+class BroadcastCacheKey(NamedTuple):
+    msgs: list[dict]
+    n_repeat: int
+
+
+def _msg_to_key(msg: _MsgType) -> _MsgType:
+    if isinstance(msg, dict):
+        return {k: _round_msg_values(v) for k, v in msg.items() if k != "msg"}  # type: ignore # https://githubmemory.com/repo/microsoft/pyright/issues/2428 # noqa: E501
+    return [_round_msg_values(v) for v in msg]  # type: ignore
+
+
+def _round_msg_values(value: Any) -> Any:
+    if isinstance(value, (dict, list)):
+        return _msg_to_key(value)  # type: ignore # https://githubmemory.com/repo/microsoft/pyright/issues/2428 # noqa: E501
+    if isinstance(value, str):
+        try:
+            return math.floor(math.log10(float(value)))
+        except ValueError:
+            return value
+    if isinstance(value, (int, float)):
+        return math.floor(math.log10(value))
+    return value
 
 
 def _get_pools(msgs: list[dict]) -> set[str]:
@@ -50,6 +78,7 @@ class BroadcasterApi(Api):
     def __init__(self, client: "TerraClient"):
         super().__init__(client)
         self._height: int = 0
+        self._broadcaster_cache: dict[int, list[BroadcastCacheKey]] = {}
         self._current_pools: set[str] = set()
 
     async def post(
@@ -87,7 +116,7 @@ class BroadcasterApi(Api):
             return {"result": "new_block", "data": []}
 
         tx_pools = _get_pools(payload["msgs"])
-        if self._current_pools & tx_pools:
+        if self._current_pools & tx_pools or self._is_repeated_tx(payload):
             return {"result": "repeated_tx", "data": []}
         self._current_pools |= tx_pools
 
@@ -106,3 +135,18 @@ class BroadcasterApi(Api):
             "result": "broadcasted",
             "data": [(timestamp, result.to_data()) for timestamp, result in res],
         }
+
+    def _is_repeated_tx(self, payload: BroadcasterPayload) -> bool:
+        self._broadcaster_cache = {  # Drop old values
+            height: val
+            for height, val in self._broadcaster_cache.items()
+            if payload["height"] - height <= BROADCASTER_CACHE_BLOCKS
+        }
+        msg_keys = [_msg_to_key(msg) for msg in payload["msgs"]]
+        key = BroadcastCacheKey(msg_keys, payload["n_repeat"])
+        if any(key in values for values in self._broadcaster_cache.values()):
+            return True
+        if payload["height"] not in self._broadcaster_cache:
+            self._broadcaster_cache[payload["height"]] = []
+        self._broadcaster_cache[payload["height"]].append(key)
+        return False
