@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import logging
-import math
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Sequence, TypedDict, TypeVar
+from typing import TYPE_CHECKING, Literal, Sequence, TypedDict
 
 from terra_sdk.core.broadcast import SyncTxBroadcastResult
 from terra_sdk.core.fee import Fee
@@ -16,9 +15,6 @@ if TYPE_CHECKING:
     from .async_client import TerraClient
 
 log = logging.getLogger(__name__)
-
-BROADCASTER_CACHE_BLOCKS = 3
-_MsgType = TypeVar("_MsgType", dict, list)
 
 
 class BroadcasterPayload(TypedDict):
@@ -34,34 +30,27 @@ class BroadcasterResponse(TypedDict):
     data: list[tuple[float, dict]]
 
 
-class BroadcastCacheKey(NamedTuple):
-    msgs: list[dict]
-    n_repeat: int
-
-
-def _msg_to_key(msg: _MsgType) -> _MsgType:
-    if isinstance(msg, dict):
-        return {k: _round_msg_values(v) for k, v in msg.items() if k != "msg"}  # type: ignore # https://githubmemory.com/repo/microsoft/pyright/issues/2428 # noqa: E501
-    return [_round_msg_values(v) for v in msg]  # type: ignore
-
-
-def _round_msg_values(value: Any) -> Any:
-    if isinstance(value, (dict, list)):
-        return _msg_to_key(value)  # type: ignore # https://githubmemory.com/repo/microsoft/pyright/issues/2428 # noqa: E501
-    if isinstance(value, str):
-        try:
-            return math.floor(math.log10(float(value)))
-        except ValueError:
-            return value
-    if isinstance(value, (int, float)):
-        return math.floor(math.log10(value))
-    return value
+def _extract_signature(msgs: list[dict]) -> set[str]:
+    signature = set()
+    for msg in msgs:
+        type_ = msg["@type"] if "@type" in msg else msg["type"]
+        if "MsgExecuteContract" not in type_:
+            continue
+        execute_msg = msg["value"]["execute_msg"]
+        if "swap" in execute_msg:  # direct swap
+            signature.add(msg["value"]["contract"])
+        if "send" in execute_msg:  # CW20 send swap
+            signature.add(execute_msg["send"]["contract"])
+        if "execute_swap_operations" in execute_msg:  # router swap
+            signature.add(str(execute_msg["execute_swap_operations"]["operations"]))
+    return signature
 
 
 class BroadcasterApi(Api):
     def __init__(self, client: "TerraClient"):
         super().__init__(client)
-        self._broadcaster_cache: dict[int, list[BroadcastCacheKey]] = {}
+        self._height: int = 0
+        self._broadcasted_signatures: set[str] = set()
 
     async def post(
         self,
@@ -89,8 +78,15 @@ class BroadcasterApi(Api):
 
     async def broadcast(self, payload: BroadcasterPayload) -> BroadcasterResponse:
         assert not self.client.use_broadcaster
-        if self._is_repeated_tx(payload):
+        if payload["height"] > self._height:
+            self._height = payload["height"]
+            self._broadcasted_signatures = set()
+
+        msg_signature = _extract_signature(payload["msgs"])
+        if self._broadcasted_signatures & msg_signature:
             return {"result": "repeated_tx", "data": []}
+        self._broadcasted_signatures |= msg_signature
+
         msgs = [Msg.from_data(d) for d in payload["msgs"]]
         n_repeat = payload["n_repeat"]
         fee = Fee.from_data(payload["fee"]) if payload["fee"] is not None else None
@@ -104,18 +100,3 @@ class BroadcasterApi(Api):
             "result": "broadcasted",
             "data": [(timestamp, result.to_data()) for timestamp, result in res],
         }
-
-    def _is_repeated_tx(self, payload: BroadcasterPayload) -> bool:
-        self._broadcaster_cache = {  # Drop old values
-            height: val
-            for height, val in self._broadcaster_cache.items()
-            if payload["height"] - height <= BROADCASTER_CACHE_BLOCKS
-        }
-        msg_keys = [_msg_to_key(msg) for msg in payload["msgs"]]
-        key = BroadcastCacheKey(msg_keys, payload["n_repeat"])
-        if any(key in values for values in self._broadcaster_cache.values()):
-            return True
-        if payload["height"] not in self._broadcaster_cache:
-            self._broadcaster_cache[payload["height"]] = []
-        self._broadcaster_cache[payload["height"]].append(key)
-        return False
