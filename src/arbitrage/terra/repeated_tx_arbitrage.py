@@ -21,7 +21,6 @@ from ..repeated_tx_arbitrage import (
     ArbTx,
     BaseArbParams,
     RepeatedTxArbitrage,
-    State,
     TxStatus,
 )
 
@@ -131,10 +130,6 @@ async def run_strategy(
 ):
     log.info(f"Running strategy with {len(arb_routes)=} and {len(mempool_filters)=}")
     start_height = client.height
-    routes_by_key = {
-        key: [arb_route for arb_route in arb_routes if key in arb_route.filter_keys]
-        for key in mempool_filters
-    }
     async for height, mempool in client.mempool.iter_height_mempool(mempool_filters):
         if log_time:
             start = time.perf_counter()
@@ -151,26 +146,13 @@ async def run_strategy(
                 k: list_msgs for k, list_msgs in mempool.items() if k in arb_route.filter_keys
             }
             if height > arb_route.last_run_height or mempool_route:
-                tasks.append(arb_route.run(height, mempool_route, hold_broadcast=True))
+                tasks.append(arb_route.run(height, mempool_route))
         await asyncio.gather(*tasks)
-        broadcast_tasks: dict[TerraRepeatedTxArbitrage, Awaitable] = {}
-        for key, routes in routes_by_key.items():
-            ready_arbs = [r for r in routes if r.state == State.ready_to_broadcast]
-            if not ready_arbs:
-                continue
-            log.info(f"{key=} has {len(routes)} possible arbitrages")
-            best_route = max(ready_arbs, key=lambda x: x.data.params.est_net_profit_usd)  # type: ignore # noqa: E501
-            if best_route not in broadcast_tasks:
-                broadcast_tasks[best_route] = best_route.run(height)
-        await asyncio.gather(*broadcast_tasks.values())
-        for route in arb_routes:
-            if route.state == State.ready_to_broadcast:
-                route.reset()
         if max_n_blocks is not None and (n_blocks := height - start_height) >= max_n_blocks:
             break
         if log_time:
             total_time_ms = (time.perf_counter() - start) * 1000  # type: ignore
-            stats = f"{total_time_ms:.1f}ms; {len(tasks)=}, {len(broadcast_tasks)=}"
+            stats = f"{total_time_ms:.1f}ms; {len(tasks)=}"
             if is_new_block:
                 log.debug(f"Processed block: {height=} in {stats}")
             else:
