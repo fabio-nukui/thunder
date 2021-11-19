@@ -7,7 +7,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any, Generic, Optional, TypeVar
 
-import utils
+import configs
 from common import BlockchainClient, TokenAmount
 from exceptions import (
     BlockchainNewState,
@@ -17,6 +17,7 @@ from exceptions import (
     TxAlreadyBroadcasted,
     UnprofitableArbitrage,
 )
+from utils.logger import AsyncReformatterLogger, ReformatterLogger
 
 _BlockchainClientT = TypeVar("_BlockchainClientT", bound=BlockchainClient)
 
@@ -122,7 +123,8 @@ class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
         self.last_run_height = 0
 
         self.data = ArbitrageData()
-        self.log = utils.logger.ReformatedLogger(__name__, formater=self._log_formatter)
+        logger_cls = AsyncReformatterLogger if configs.ASYNC_LOG else ReformatterLogger
+        self.log = logger_cls(__name__, formatter=self._log_formatter, apply_root_configs=True)
         self.log.debug("Initialized")
 
     def _log_formatter(self, msg: Any) -> str:

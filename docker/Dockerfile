@@ -24,6 +24,7 @@ RUN useradd -m -s /bin/bash -N -u $UID $USER && \
 USER $USER
 
 RUN conda install --quiet --yes \
+        'aiofiles==0.7.0' \
         'boto3==1.18.63' \
         'cachetools==4.2.4' \
         'httpx==0.20.0' \
@@ -96,6 +97,7 @@ RUN conda install --quiet --yes \
         'line_profiler=3.3.1' \
         'mypy==0.910' \
         'pytest==6.2.5' \
+        'types-aiofiles' \
         'types-cachetools' \
         'types-PyYAML' && \
     conda clean --all -f -y  && \

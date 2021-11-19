@@ -4,7 +4,6 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Callable, Iterable, Sequence
 
-import utils
 from chains.cosmos.terra import BaseTerraLiquidityPair, TerraTokenAmount
 from chains.cosmos.terra.swap_utils import SingleRoute
 from exceptions import MaxSpreadAssertion
@@ -16,7 +15,7 @@ PairsCls = Callable[[Iterable[BaseTerraLiquidityPair]], Sequence[BaseTerraLiquid
 
 
 class TerraswapLPReserveSimulationMixin:
-    log: utils.logger.ReformatedLogger
+    log: logging.Logger
 
     def __init__(
         self,

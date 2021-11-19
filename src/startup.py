@@ -6,6 +6,7 @@ import warnings
 import yaml
 
 import configs
+import utils.logger
 
 
 def setup_warnings():
@@ -27,6 +28,8 @@ def setup_logger():
     if not configs.LOG_STDOUT:
         del dict_config["handlers"]["console"]
         dict_config["root"]["handlers"].remove("console")
+    if configs.ASYNC_LOG:
+        dict_config["handlers"]["logfile"]["class"] = "utils.logger.AsyncRotatingFileHandler"
 
     dict_config["loggers"]["utils.cache"] = {"level": configs.CACHE_LOG_LEVEL}
     for handler in dict_config["handlers"].values():
@@ -36,6 +39,8 @@ def setup_logger():
 
     os.makedirs("logs", exist_ok=True)
     logging.config.dictConfig(dict_config)
+    if configs.ASYNC_LOG:
+        utils.logger.set_default_logger(utils.logger.AsyncLogger)
 
 
 def setup_ipython():
