@@ -36,9 +36,9 @@ def _extract_signature(msgs: list[dict]) -> set[str]:
         type_ = msg["@type"] if "@type" in msg else msg["type"]
         if "MsgExecuteContract" not in type_:
             continue
-        execute_msg = msg["value"]["execute_msg"]
+        execute_msg = msg["execute_msg"]
         if "swap" in execute_msg:  # direct swap
-            signature.add(msg["value"]["contract"])
+            signature.add(msg["contract"])
         if "send" in execute_msg:  # CW20 send swap
             signature.add(execute_msg["send"]["contract"])
         if "execute_swap_operations" in execute_msg:  # router swap
