@@ -18,12 +18,13 @@ class AsyncLCDClient(TerraAsyncLCDClient):
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
-        self._requests_semaphore = asyncio.Semaphore(max_concurrent_requests)
+        self._semaphore = asyncio.Semaphore(max_concurrent_requests)
         self._reconnect_lock = asyncio.Lock()
 
     async def _get(self, *args, **kwargs):
         try:
-            async with self._requests_semaphore:
+            async with self._semaphore:
+                log.debug(f"LCD semaphore: {self._semaphore._value}, {args=}")
                 return await super()._get(*args, **kwargs)
         except (ServerDisconnectedError, RuntimeError):
             await self._reconnect_session()
@@ -31,7 +32,8 @@ class AsyncLCDClient(TerraAsyncLCDClient):
 
     async def _post(self, *args, **kwargs):
         try:
-            async with self._requests_semaphore:
+            async with self._semaphore:
+                log.debug(f"LCD semaphore: {self._semaphore._value}, {args=}")
                 return await super()._post(*args, **kwargs)
         except (ServerDisconnectedError, RuntimeError):
             await self._reconnect_session()

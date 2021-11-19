@@ -12,7 +12,7 @@ from utils.cache import CacheGroup, ttl_cache
 
 from ...client import BroadcasterMixin, CosmosClient
 from ..mnemonic_key import MnemonicKey
-from ..token import OsmosisTokenAmount
+from ..token import OsmosisNativeToken, OsmosisTokenAmount
 
 log = logging.getLogger(__name__)
 
@@ -98,20 +98,25 @@ class OsmosisClient(BroadcasterMixin, CosmosClient):
         return await super().contract_info(address)
 
     @ttl_cache(CacheGroup.OSMOSIS)
-    async def get_bank(
+    async def get_bank_denom(
         self,
-        denoms: list[str] = None,
+        denom: str,
         address: AccAddress = None,
-    ) -> list[OsmosisTokenAmount]:
+    ) -> OsmosisTokenAmount:
+        bank = await self.get_bank(address)
+        for amount in bank:
+            assert isinstance(amount.token, OsmosisNativeToken)
+            if amount.token.denom == denom:
+                return amount
+        return OsmosisNativeToken(denom).to_amount(0)
+
+    @ttl_cache(CacheGroup.OSMOSIS)
+    async def get_bank(self, address: AccAddress = None) -> list[OsmosisTokenAmount]:
         address = self.address if address is None else address
         coins_balance, pagination = await self.lcd.bank.balance(address)
         if pagination["next_key"] is not None:
             raise NotImplementedError("get_bank() not implemented for paginated results")
-        return [
-            OsmosisTokenAmount.from_coin(c)
-            for c in coins_balance.to_list()
-            if denoms is None or c.denom in denoms
-        ]
+        return [OsmosisTokenAmount.from_coin(c) for c in coins_balance.to_list()]
 
     @ttl_cache(CacheGroup.OSMOSIS)
     async def get_account_data(self, address: AccAddress = None) -> BaseAccount:

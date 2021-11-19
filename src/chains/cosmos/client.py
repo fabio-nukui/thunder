@@ -16,6 +16,7 @@ from terra_sdk.exceptions import LCDResponseError
 from terra_sdk.key.mnemonic import MnemonicKey
 
 import utils
+from chains.cosmos.token import CosmosTokenAmount
 from common.blockchain_client import AsyncBlockchainClient
 from exceptions import NotContract
 from utils.ahttp import AsyncClient
@@ -75,11 +76,11 @@ class CosmosClient(AsyncBlockchainClient, ABC):
             raise
 
     @abstractmethod
-    async def get_bank(
-        self,
-        denoms: list[str] = None,
-        address: AccAddress = None,
-    ) -> list:
+    async def get_bank_denom(self, denom: str, address: AccAddress = None) -> CosmosTokenAmount:
+        ...
+
+    @abstractmethod
+    async def get_bank(self, address: AccAddress = None) -> list[CosmosTokenAmount]:
         ...
 
     async def is_syncing(self) -> bool:

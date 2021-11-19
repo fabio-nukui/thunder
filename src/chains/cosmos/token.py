@@ -81,10 +81,7 @@ class CosmosNativeToken(BaseCosmosToken, Generic[_CosmosTokenAmountT]):
         client: CosmosClient,
         address: AccAddress = None,
     ) -> _CosmosTokenAmountT:
-        balances = await client.get_bank([self.denom], address)
-        if not balances:
-            return self.to_amount(0)
-        return balances[0]  # type: ignore
+        return await client.get_bank_denom(self.denom, address)  # type: ignore
 
 
 class CW20Token(BaseCosmosToken, Generic[_CosmosTokenAmountT]):

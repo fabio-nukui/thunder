@@ -18,7 +18,7 @@ from utils.cache import CacheGroup, ttl_cache
 
 from ...client import BroadcasterMixin, CosmosClient
 from ..denoms import UST
-from ..token import TerraTokenAmount
+from ..token import TerraNativeToken, TerraTokenAmount
 from . import utils_rpc
 from .api_broadcaster import BroadcasterApi
 from .api_ibc import IbcApi
@@ -127,20 +127,21 @@ class TerraClient(BroadcasterMixin, CosmosClient):
         return await super().contract_info(address)
 
     @ttl_cache(CacheGroup.TERRA)
-    async def get_bank(
-        self,
-        denoms: list[str] = None,
-        address: AccAddress = None,
-    ) -> list[TerraTokenAmount]:
+    async def get_bank_denom(self, denom: str, address: AccAddress = None) -> TerraTokenAmount:
+        bank = await self.get_bank(address)
+        for amount in bank:
+            assert isinstance(amount.token, TerraNativeToken)
+            if amount.token.denom == denom:
+                return amount
+        return TerraNativeToken(denom).to_amount(0)
+
+    @ttl_cache(CacheGroup.TERRA)
+    async def get_bank(self, address: AccAddress = None) -> list[TerraTokenAmount]:
         address = self.address if address is None else address
         coins_balance, pagination = await self.lcd.bank.balance(address)
         if pagination["next_key"] is not None:
             raise NotImplementedError("get_bank() not implemented for paginated results")
-        return [
-            TerraTokenAmount.from_coin(c)
-            for c in coins_balance.to_list()
-            if denoms is None or c.denom in denoms
-        ]
+        return [TerraTokenAmount.from_coin(c) for c in coins_balance.to_list()]
 
     @ttl_cache(CacheGroup.TERRA)
     async def get_account_data(self, address: AccAddress = None) -> BaseAccount:
