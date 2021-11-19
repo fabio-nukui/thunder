@@ -7,7 +7,7 @@ from terra_sdk.core.broadcast import SyncTxBroadcastResult
 from terra_sdk.core.fee import Fee
 from terra_sdk.core.msg import Msg
 
-from exceptions import TxAlreadyBroadcasted
+from exceptions import BlockchainNewState, TxAlreadyBroadcasted
 
 from .base_api import Api
 
@@ -26,7 +26,7 @@ class BroadcasterPayload(TypedDict):
 
 
 class BroadcasterResponse(TypedDict):
-    result: Literal["broadcasted"] | Literal["repeated_tx"]
+    result: Literal["broadcasted"] | Literal["repeated_tx"] | Literal["new_block"]
     data: list[tuple[float, dict]]
 
 
@@ -72,6 +72,8 @@ class BroadcasterApi(Api):
         data: BroadcasterResponse = res.json()
         if data["result"] == "repeated_tx":
             raise TxAlreadyBroadcasted("Tx broadcasted by other host")
+        if data["result"] == "new_block":
+            raise BlockchainNewState("Broadcaster on newer block")
         return [
             (timestamp, SyncTxBroadcastResult(**result)) for timestamp, result in data["data"]
         ]
@@ -81,6 +83,8 @@ class BroadcasterApi(Api):
         if payload["height"] > self._height:
             self._height = payload["height"]
             self._broadcasted_signatures = set()
+        elif payload["height"] < self._height:
+            return {"result": "new_block", "data": []}
 
         msg_signature = _extract_signature(payload["msgs"])
         if self._broadcasted_signatures & msg_signature:
@@ -96,6 +100,8 @@ class BroadcasterApi(Api):
             res = await self.client.tx.execute_multi_msgs(msgs, n_repeat, fee, fee_denom)
         except TxAlreadyBroadcasted:
             return {"result": "repeated_tx", "data": []}
+        except BlockchainNewState:
+            return {"result": "new_block", "data": []}
         return {
             "result": "broadcasted",
             "data": [(timestamp, result.to_data()) for timestamp, result in res],
