@@ -94,6 +94,7 @@ class TxApi(Api):
                         native_amount = TerraTokenAmount.from_coin(coins_send.to_list()[0])
                     else:
                         raise FeeEstimationError("Could not get native_amount from msg", e)
+                log.debug(f"Trying fallback fee estimation({e!r})")
                 return await self._fallback_fee_estimation(
                     estimated_gas_use, native_amount, fee_denom, gas_adjustment
                 )
