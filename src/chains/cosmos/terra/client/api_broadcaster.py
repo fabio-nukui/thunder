@@ -30,7 +30,7 @@ class BroadcasterResponse(TypedDict):
     data: list[tuple[float, dict]]
 
 
-def _extract_signature(msgs: list[dict]) -> set[str]:
+def _get_pools(msgs: list[dict]) -> set[str]:
     signature = set()
     for msg in msgs:
         type_ = msg["@type"] if "@type" in msg else msg["type"]
@@ -50,7 +50,7 @@ class BroadcasterApi(Api):
     def __init__(self, client: "TerraClient"):
         super().__init__(client)
         self._height: int = 0
-        self._broadcasted_signatures: set[str] = set()
+        self._current_pools: set[str] = set()
 
     async def post(
         self,
@@ -82,14 +82,14 @@ class BroadcasterApi(Api):
         assert not self.client.use_broadcaster
         if payload["height"] > self._height:
             self._height = payload["height"]
-            self._broadcasted_signatures = set()
+            self._current_pools = set()
         elif payload["height"] < self._height:
             return {"result": "new_block", "data": []}
 
-        msg_signature = _extract_signature(payload["msgs"])
-        if self._broadcasted_signatures & msg_signature:
+        tx_pools = _get_pools(payload["msgs"])
+        if self._current_pools & tx_pools:
             return {"result": "repeated_tx", "data": []}
-        self._broadcasted_signatures |= msg_signature
+        self._current_pools |= tx_pools
 
         msgs = [Msg.from_data(d) for d in payload["msgs"]]
         n_repeat = payload["n_repeat"]
