@@ -176,7 +176,7 @@ class AsyncFileHandler(AsyncHandler):
 
             await self._stream.write(self.format(record) + "\n")
             await self._stream.flush()
-        except RuntimeError:  # event loop probably closed, using fallback sync mode
+        except (RuntimeError, asyncio.CancelledError):
             self.emit(record)
 
 
@@ -202,7 +202,8 @@ class AsyncRotatingFileHandler(AsyncFileHandler):
                     await self.do_rollover()
         except RuntimeError:  # event loop probably closed, skip rollover
             pass
-        await super().async_emit(record)
+        finally:
+            await super().async_emit(record)
 
     async def should_rollover(self) -> bool:
         if self._stream is None or self.maxBytes is None:
