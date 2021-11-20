@@ -3,6 +3,7 @@ import importlib
 import logging
 import signal
 from functools import partial
+from types import ModuleType
 
 import configs
 import utils
@@ -14,13 +15,11 @@ log = logging.getLogger(__name__)
 GIT_COMMIT = open("git_commit").read().strip()
 
 
-async def run_strategy(strategy_name: str):
-    log.info(f"Running on git commit {GIT_COMMIT}")
-    strategy = importlib.import_module(f"strategies.{strategy_name}")
+async def run_strategy(strategy_module: ModuleType):
     while True:
         try:
-            log.info(f"Starting strategy {strategy_name}")
-            await strategy.run()  # type: ignore
+            log.info(f"Starting strategy {strategy_module}")
+            await strategy_module.run()  # type: ignore
         except NodeSyncing as e:
             log.info(f"Node syncing to blockchain, latest height={e.latest_height}")
             log.info("Restarting strategy in 60 seconds")
@@ -45,17 +44,24 @@ def handle_exception(loop: asyncio.AbstractEventLoop, context: dict):
     loop.create_task(shutdown(loop))
 
 
-def main():
-    setup()
+def get_event_loop() -> asyncio.AbstractEventLoop:
     loop = asyncio.get_event_loop()
     signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
     for sig in signals:
         handler = partial(loop.create_task, shutdown(loop, sig))
         loop.add_signal_handler(sig, handler)
     loop.set_exception_handler(handle_exception)
+    return loop
 
+
+def main():
+    setup()
+    log.info(f"Running on git commit {GIT_COMMIT}")
+    strategy_module = importlib.import_module(f"strategies.{configs.STRATEGY}")
+
+    loop = get_event_loop()
     try:
-        loop.create_task(run_strategy(configs.STRATEGY))
+        loop.create_task(run_strategy(strategy_module))
         loop.run_forever()
     finally:
         loop.close()
