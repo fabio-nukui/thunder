@@ -63,7 +63,7 @@ class AsyncLogger(logging.Logger):
         while c:
             for handler in c.handlers:
                 if record.levelno >= handler.level:
-                    if isinstance(handler, AsyncHandler):
+                    if isinstance(handler, AsyncHandler) and not self._loop.is_closed():
                         self._loop.create_task(handler.async_handle(record))
                     else:
                         handler.handle(record)
@@ -109,9 +109,6 @@ class AsyncHandler(logging.Handler, ABC):
         super().__init__(level=level)
         self.loop = asyncio.get_event_loop() if loop is None else loop
 
-    def handle(self, record: logging.LogRecord) -> bool:
-        return self.loop.run_until_complete(self.async_handle(record))
-
     async def async_handle(self, record: logging.LogRecord) -> bool:
         if rv := self.filter(record):
             self.acquire()
@@ -145,15 +142,18 @@ class AsyncFileHandler(AsyncHandler):
         self._initialization_lock = asyncio.Lock()
 
     def close(self):
-        self.loop.run_until_complete(self.aclose())
+        try:
+            self.loop.run_until_complete(self.close_stream())
+        except RuntimeError:  # event loop probable closed
+            pass
+        super().close()
 
-    async def aclose(self):
+    async def close_stream(self):
         if self._stream is None:
             return
         await self._stream.flush()
         await self._stream.close()
         self._stream = None
-        super().close()
 
     async def _get_stream(self) -> AsyncTextIOWrapper:
         return await aiofiles.open(
@@ -163,13 +163,21 @@ class AsyncFileHandler(AsyncHandler):
             loop=self.loop,
         )
 
-    async def async_emit(self, record: logging.LogRecord):
-        async with self._initialization_lock:
-            if self._stream is None:
-                self._stream = await self._get_stream()
+    def emit(self, record: logging.LogRecord):
+        print(f"Fallback emit: {self.format(record)}")
+        with open(self.file_path, self.mode, encoding=self.encoding) as f:
+            f.write(self.format(record) + "\n")
 
-        await self._stream.write(self.format(record) + "\n")
-        await self._stream.flush()
+    async def async_emit(self, record: logging.LogRecord):
+        try:
+            async with self._initialization_lock:
+                if self._stream is None:
+                    self._stream = await self._get_stream()
+
+            await self._stream.write(self.format(record) + "\n")
+            await self._stream.flush()
+        except RuntimeError:  # event loop probably closed, using fallback sync mode
+            self.emit(record)
 
 
 class AsyncRotatingFileHandler(AsyncFileHandler):
@@ -188,9 +196,12 @@ class AsyncRotatingFileHandler(AsyncFileHandler):
         self._rollover_lock = asyncio.Lock()
 
     async def async_emit(self, record: logging.LogRecord):
-        if await self.should_rollover():
-            async with self._rollover_lock:
-                await self.do_rollover()
+        try:
+            if await self.should_rollover():
+                async with self._rollover_lock:
+                    await self.do_rollover()
+        except RuntimeError:  # event loop probably closed, skip rollover
+            pass
         await super().async_emit(record)
 
     async def should_rollover(self) -> bool:
