@@ -13,6 +13,7 @@ from typing import Sequence
 
 from terra_sdk.core.auth import TxInfo
 from terra_sdk.core.fee import Fee
+from terra_sdk.core.tx import Tx
 from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.exceptions import LCDResponseError
 
@@ -409,7 +410,7 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
     async def _get_arbitrage_params(
         self,
         height: int,
-        filtered_mempool: dict[BaseTerraLiquidityPair, list[list[dict]]] = None,
+        filtered_mempool: dict[BaseTerraLiquidityPair, list[Tx]] = None,
     ) -> ArbParams:
         initial_balance = await self.start_token.get_balance(self.client)
 

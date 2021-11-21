@@ -106,7 +106,7 @@ class TxApi(Api):
         raise Exception("Should never reach")
 
     async def _check_msgs_in_mempool(self, msgs: Sequence[Msg]):
-        mempool = await self.client.mempool.fetch_mempool_msgs()
+        mempool = await self.client.mempool.fetch_mempool_txs()
         data = [msg.to_data() for msg in msgs]
         if data in mempool:
             raise TxAlreadyBroadcasted("Tx in mempool")

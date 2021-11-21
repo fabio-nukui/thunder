@@ -138,8 +138,7 @@ async def run_strategy(
             utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)
             asyncio.create_task(client.update_active_broadcaster())
         if mempool:
-            n_msgs = sum(len(list_msgs) for list_msgs in mempool.values())
-            log.debug(f"New mempool txs: {n_msgs=}")
+            log.debug(f"New mempool txs: n_txs={len(mempool)}")
         tasks: list[Awaitable] = []
         for arb_route in arb_routes:
             mempool_route = {
@@ -156,5 +155,5 @@ async def run_strategy(
             if is_new_block:
                 log.debug(f"Processed block: {height=} in {stats}")
             else:
-                log.debug(f"Processed mempool txs: {n_msgs=} in {stats}")
+                log.debug(f"Processed mempool txs: n_txs={len(mempool)} in {stats}")
     log.info(f"Stopped execution after {n_blocks=}")

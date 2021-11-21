@@ -7,6 +7,7 @@ from functools import reduce
 from typing import TYPE_CHECKING, TypeVar
 
 from terra_sdk.core import AccAddress
+from terra_sdk.core.tx import Tx
 
 from exceptions import MaxSpreadAssertion
 
@@ -68,17 +69,17 @@ class BaseTerraLiquidityPair(ABC):
     async def get_reserve_changes_from_msg(self, msg: dict) -> AmountTuple:
         ...
 
-    async def get_reserve_changes_from_msgs(self, msgs: list[dict]) -> AmountTuple:
+    async def get_reserve_changes_from_tx(self, tx: Tx) -> AmountTuple:
         changes: list[AmountTuple] = []
         errors = []
-        for msg in msgs:
+        for msg in tx.body.messages:
             try:
-                change = await self.get_reserve_changes_from_msg(msg["value"])
+                change = await self.get_reserve_changes_from_msg(msg.to_data())
                 changes.append(self.fix_amounts_order(change))
             except MaxSpreadAssertion:
                 raise
             except Exception as e:
-                if len(msgs) == 1:
+                if len(tx.body.messages) == 1:
                     raise e
                 errors.append(e)
         if not changes:

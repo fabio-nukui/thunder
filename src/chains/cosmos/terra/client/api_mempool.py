@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import logging
 from enum import Enum, auto
 from typing import TYPE_CHECKING, AsyncIterable, Mapping, TypeVar
 
-import httpx
+from terra_sdk.core.tx import Tx
 
 import configs
 import utils
@@ -41,7 +42,7 @@ class MempoolCacheManager:
         self.client = client
 
         self._height = 0
-        self._txs_cache: dict[str, dict] = {}
+        self._txs_cache: dict[str, Tx | None] = {}
         self._read_txs: set[str] = set()
 
     @property
@@ -71,13 +72,13 @@ class MempoolCacheManager:
         height: int,
         filters: Mapping[_T, Filter],
         new_block_only: bool = False,
-    ) -> tuple[int, dict[_T, list[list[dict]]]]:
+    ) -> tuple[int, dict[_T, list[Tx]]]:
         while True:
             new_height, mempool = await self.get_new_height_mempool(height, new_block_only)
             filtered_mempool = {
-                key: list_msgs
+                key: list_tx
                 for key, filter_ in filters.items()
-                if (list_msgs := [msgs for msgs in mempool if filter_.match_msgs(msgs)])
+                if (list_tx := [tx for tx in mempool if filter_.match_tx(tx)])
             }
             if new_height > height or filtered_mempool:
                 return new_height, filtered_mempool
@@ -86,7 +87,7 @@ class MempoolCacheManager:
         self,
         height: int,
         new_block_only: bool,
-    ) -> tuple[int, list[list[dict]]]:
+    ) -> tuple[int, list[Tx]]:
         task_wait_next_block = asyncio.create_task(self._wait_next_block(height))
         task_mempool_txs = asyncio.create_task(self._update_mempool_txs(wait_for_changes=True))
 
@@ -97,11 +98,13 @@ class MempoolCacheManager:
         else:
             task_wait_next_block.cancel()
 
-        unread_txs_msgs = [
-            tx["msg"] for key, tx in self._txs_cache.items() if key not in self._read_txs
+        unread_txs = [
+            tx
+            for key, tx in self._txs_cache.items()
+            if key not in self._read_txs and tx is not None
         ]
         self._read_txs = set(self._txs_cache)
-        return self.height, unread_txs_msgs
+        return self.height, unread_txs
 
     async def _wait_next_block(self, min_height: int) -> UpdateEvent:
         while True:
@@ -125,39 +128,26 @@ class MempoolCacheManager:
             self._txs_cache = {}
             self._read_txs = set()
 
-        tasks = {
-            raw_tx: self._decode_tx(raw_tx)
-            for raw_tx in raw_txs
-            if raw_tx not in self._txs_cache
-        }
-        try:
-            txs = await asyncio.gather(*tasks.values())
-        except Exception as e:
-            e.args = (*e.args, f"{len(tasks)=}")
-            raise e
-        self._txs_cache.update({raw_tx: tx for raw_tx, tx in zip(tasks, txs) if tx})
+        self._txs_cache.update(
+            {
+                raw_tx: self._decode_tx(raw_tx)
+                for raw_tx in raw_txs
+                if raw_tx not in self._txs_cache
+            }
+        )
         return UpdateEvent.mempool
 
-    async def fetch_mempool_txs(self) -> dict[str, dict]:
+    async def fetch_mempool_txs(self) -> list[Tx]:
         await self._update_mempool_txs(wait_for_changes=False)
-        return self._txs_cache
+        return list(tx for tx in self._txs_cache.values() if tx is not None)
 
     @ttl_cache(CacheGroup.TERRA, maxsize=DECODER_CACHE_SIZE, ttl=DECODER_CACHE_TTL)
-    async def _decode_tx(self, raw_tx: str) -> dict:
+    def _decode_tx(self, raw_tx: str) -> Tx | None:
         try:
-            response = await self.client.lcd_http_client.post(
-                "txs/decode",
-                json={"tx": raw_tx},
-                timeout=DECODE_TX_TIMEOUT,
-                follow_redirects=True,
-                n_tries=1,
-                supress_logs=True,
-            )
-        except httpx.HTTPError as e:
-            log.debug(f"Decode error ({e!r}) {len(raw_tx)=}: {raw_tx=}")
-            return {}
-        else:
-            return response.json()["result"]
+            return Tx.from_proto_bytes(base64.b64decode(raw_tx))
+        except Exception as e:
+            log.warning(f"Decode error ({e!r}) {len(raw_tx)=}: {raw_tx=}")
+            return None
 
 
 class MempoolApi(Api):
@@ -165,9 +155,8 @@ class MempoolApi(Api):
         super().__init__(client)
         self._cache_manager = MempoolCacheManager(client)
 
-    async def fetch_mempool_msgs(self) -> list[list[dict]]:
-        txs = await self._cache_manager.fetch_mempool_txs()
-        return [tx["msg"] for tx in txs.values()]
+    async def fetch_mempool_txs(self) -> list[Tx]:
+        return await self._cache_manager.fetch_mempool_txs()
 
     def start(self):
         self._cache_manager.start()
@@ -175,13 +164,13 @@ class MempoolApi(Api):
     def stop(self):
         self._cache_manager.stop()
 
-    async def get_height_mempool(self, height: int) -> tuple[int, list[list[dict]]]:
+    async def get_height_mempool(self, height: int) -> tuple[int, list[Tx]]:
         return await self._cache_manager.get_new_height_mempool(height, new_block_only=False)
 
     async def iter_height_mempool(
         self,
         filters: Mapping[_T, Filter],
-    ) -> AsyncIterable[tuple[int, dict[_T, list[list[dict]]]]]:
+    ) -> AsyncIterable[tuple[int, dict[_T, list[Tx]]]]:
         while True:
             last_height, mempool = await self._cache_manager.filter_new_height_mempool(
                 self.client.height, filters, new_block_only=False

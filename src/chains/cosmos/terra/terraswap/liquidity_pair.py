@@ -11,6 +11,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, NamedTuple
 
 from terra_sdk.core import AccAddress, Coins
+from terra_sdk.core.tx import Tx
 from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.exceptions import LCDResponseError
 
@@ -220,17 +221,18 @@ class RouterNativeLiquidityPair(NativeLiquidityPair):
         self.router_address = router_address
         self.assert_limit_order_address = assert_limit_order_address
 
-    async def get_reserve_changes_from_msgs(self, msgs: list[dict]) -> AmountTuple:
-        changes = await super().get_reserve_changes_from_msgs(msgs)
+    async def get_reserve_changes_from_tx(self, tx: Tx) -> AmountTuple:
+        changes = await super().get_reserve_changes_from_tx(tx)
         if (
             self.assert_limit_order_address is not None
-            and msgs[0]["value"].get("contract") == self.assert_limit_order_address
+            and isinstance(msg := tx.body.messages[0], MsgExecuteContract)
+            and msg.contract == self.assert_limit_order_address
         ):
-            await self._assert_limit_order_min_out(msgs)
+            await self._assert_limit_order_min_out(msg)
         return changes
 
-    async def _assert_limit_order_min_out(self, msgs: list[dict]):
-        order = msgs[0]["value"]["execute_msg"]["assert_limit_order"]
+    async def _assert_limit_order_min_out(self, msg: MsgExecuteContract):
+        order = msg.execute_msg["assert_limit_order"]
         if not (min_receive := order.get("minimum_receive")):
             return
         token_in = TerraNativeToken(order["offer_coin"]["denom"])

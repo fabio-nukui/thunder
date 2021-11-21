@@ -10,6 +10,7 @@ from typing import Any, NamedTuple
 
 from terra_sdk.core.auth import TxInfo
 from terra_sdk.core.fee import Fee
+from terra_sdk.core.tx import Tx
 from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.exceptions import LCDResponseError
 
@@ -152,7 +153,7 @@ class LPTowerArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbitra
     async def _get_arbitrage_params(
         self,
         height: int,
-        filtered_mempool: dict[Any, list[list[dict]]] = None,
+        filtered_mempool: dict[Any, list[Tx]] = None,
     ) -> ArbParams:
         async with self._simulate_reserve_changes(filtered_mempool):
             prices = await self._get_prices()

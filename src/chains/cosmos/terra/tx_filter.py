@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from typing import Iterable
 
 from terra_sdk.core import AccAddress
+from terra_sdk.core.tx import Tx
 
 from . import terraswap
 from .native_liquidity_pair import NativeLiquidityPair
@@ -21,15 +22,9 @@ def _decode_msg(raw_msg: str | dict, always_base64: bool) -> dict:
     return json.loads(base64.b64decode(raw_msg))
 
 
-def _get_type_value(msg: dict) -> tuple[str, dict]:
-    if "_serialized_on_wire" in msg:
-        return msg["@type"], msg
-    return msg["type"], msg["value"]
-
-
 class Filter(ABC):
     @abstractmethod
-    def match_msgs(self, msgs: list[dict]) -> bool:
+    def match_tx(self, tx: Tx) -> bool:
         ...
 
     def __repr__(self) -> str:
@@ -57,8 +52,8 @@ class FilterAll(Filter):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.filters})"
 
-    def match_msgs(self, msgs: list[dict]) -> bool:
-        return all(filter_.match_msgs(msgs) for filter_ in self.filters)
+    def match_tx(self, tx: Tx) -> bool:
+        return all(filter_.match_tx(tx) for filter_ in self.filters)
 
 
 class FilterAny(Filter):
@@ -68,8 +63,8 @@ class FilterAny(Filter):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.filters})"
 
-    def match_msgs(self, msgs: list[dict]) -> bool:
-        return any(filter_.match_msgs(msgs) for filter_ in self.filters)
+    def match_tx(self, tx: Tx) -> bool:
+        return any(filter_.match_tx(tx) for filter_ in self.filters)
 
 
 class FilterMsgsLength(Filter):
@@ -79,8 +74,8 @@ class FilterMsgsLength(Filter):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(length={self.length})"
 
-    def match_msgs(self, msgs: list[dict]) -> bool:
-        return len(msgs) == self.length
+    def match_tx(self, tx: Tx) -> bool:
+        return len(tx.body.messages) == self.length
 
 
 class FilterFirstActionPairSwap(Filter):
@@ -97,13 +92,14 @@ class FilterFirstActionPairSwap(Filter):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(action={self.action}, pairs={self.pairs})"
 
-    def match_msgs(self, msgs: list[dict]) -> bool:
+    def match_tx(self, tx: Tx) -> bool:
         if not self.pairs:
             return False
 
-        type_, value = _get_type_value(msgs[0])
-        if not type_.endswith("MsgExecuteContract"):
+        msg = tx.body.messages[0]
+        if not msg.type_url.endswith("MsgExecuteContract"):
             return False
+        value = msg.to_data()
 
         for pair in self.pairs:
             for token in pair.tokens:
@@ -131,14 +127,14 @@ class FilterNativeSwap(Filter):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(denoms={self.denoms})"
 
-    def match_msgs(self, msgs: list[dict]) -> bool:
+    def match_tx(self, tx: Tx) -> bool:
         if not self.denoms:
             return False
 
-        for msg in msgs:
-            type_, value = _get_type_value(msg)
-            if not type_.endswith("MsgSwap"):
+        for msg in tx.body.messages:
+            if not msg.type_url.endswith("MsgSwap"):
                 continue
+            value = msg.to_data()
             for denom_pair in self.denoms:
                 if {value["offer_coin"]["denom"], value["ask_denom"]} == denom_pair:
                     return True
@@ -166,14 +162,14 @@ class FilterFirstActionRouterSwap(Filter):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(pairs={self.pairs})"
 
-    def match_msgs(self, msgs: list[dict]) -> bool:
+    def match_tx(self, tx: Tx) -> bool:
         if not self.pairs or not self.router_addresses:
             return False
 
-        type_, value = _get_type_value(msgs[0])
-        if not type_.endswith("MsgExecuteContract"):
+        msg = tx.body.messages[0]
+        if not msg.type_url.endswith("MsgExecuteContract"):
             return False
-
+        value = msg.to_data()
         action = "execute_swap_operations"
         operations: list[dict[str, dict]]
         if (
@@ -207,7 +203,7 @@ class FilterFirstActionRouterSwap(Filter):
                 if any(pair_id == ids for ids in self._pair_ids):
                     return True
         except (KeyError, AttributeError, ValueError):
-            log.debug("Unexpected msg format", extra={"data": msgs[0]})
+            log.debug("Unexpected msg format", extra={"data": msg})
         return False
 
 
@@ -229,8 +225,8 @@ class FilterSwapTerraswap(Filter):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(pairs={self.pairs})"
 
-    def match_msgs(self, msgs: list[dict]) -> bool:
-        return self._filter.match_msgs(msgs)
+    def match_tx(self, tx: Tx) -> bool:
+        return self._filter.match_tx(tx)
 
 
 def _get_token_id(token: TerraToken) -> str:

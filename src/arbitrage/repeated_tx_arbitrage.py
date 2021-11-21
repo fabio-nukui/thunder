@@ -7,6 +7,8 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any, Generic, Optional, TypeVar
 
+from terra_sdk.core.tx import Tx
+
 import configs
 from common import BlockchainClient, TokenAmount
 from exceptions import (
@@ -150,7 +152,7 @@ class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
     async def run(
         self,
         height: int,
-        filtered_mempool: dict[Any, list[list[dict]]] = None,
+        filtered_mempool: dict[Any, list[Tx]] = None,
         hold_broadcast: bool = False,
     ):
         if height > self.last_run_height:
@@ -218,7 +220,7 @@ class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
     async def _get_arbitrage_params(
         self,
         height: int,
-        filtered_mempool: dict[Any, list[list[dict]]] = None,
+        filtered_mempool: dict[Any, list[Tx]] = None,
     ) -> BaseArbParams:
         ...
 

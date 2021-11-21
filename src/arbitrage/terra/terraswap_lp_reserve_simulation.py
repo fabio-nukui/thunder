@@ -4,6 +4,8 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Callable, Iterable, Sequence
 
+from terra_sdk.core.tx import Tx
+
 from chains.cosmos.terra import BaseTerraLiquidityPair, TerraTokenAmount
 from chains.cosmos.terra.swap_utils import SingleRoute
 from exceptions import MaxSpreadAssertion
@@ -48,20 +50,20 @@ class TerraswapLPReserveSimulationMixin:
     @asynccontextmanager
     async def _simulate_reserve_changes(
         self,
-        filtered_mempool: dict[BaseTerraLiquidityPair, list[list[dict]]] = None,
+        filtered_mempool: dict[BaseTerraLiquidityPair, list[Tx]] = None,
     ):
         if not filtered_mempool:
             yield self.pairs
             return
-        for pair, list_msgs in filtered_mempool.items():
-            for msgs in list_msgs:
+        for pair, list_txs in filtered_mempool.items():
+            for tx in list_txs:
                 try:
-                    changes = await pair.get_reserve_changes_from_msgs(msgs)
+                    changes = await pair.get_reserve_changes_from_tx(tx)
                 except MaxSpreadAssertion as e:
                     log.debug(f"{pair}: {e!r}")
                     continue
                 except Exception:
-                    log.exception(f"Error when decoding {msgs}")
+                    log.exception(f"Error when decoding {tx}")
                     continue
                 self._mempool_reserve_changes[pair] = (
                     self._mempool_reserve_changes[pair][0] + changes[0],
