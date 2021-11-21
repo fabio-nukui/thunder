@@ -21,6 +21,12 @@ def _decode_msg(raw_msg: str | dict, always_base64: bool) -> dict:
     return json.loads(base64.b64decode(raw_msg))
 
 
+def _get_type_value(msg: dict) -> tuple[str, dict]:
+    if "_serialized_on_wire" in msg:
+        return msg["@type"], msg
+    return msg["type"], msg["value"]
+
+
 class Filter(ABC):
     @abstractmethod
     def match_msgs(self, msgs: list[dict]) -> bool:
@@ -95,10 +101,9 @@ class FilterFirstActionPairSwap(Filter):
         if not self.pairs:
             return False
 
-        msg = msgs[0]
-        if "MsgExecuteContract" not in msg["type"]:
+        type_, value = _get_type_value(msgs[0])
+        if not type_.endswith("MsgExecuteContract"):
             return False
-        value = msg["value"]
 
         for pair in self.pairs:
             for token in pair.tokens:
@@ -131,10 +136,9 @@ class FilterNativeSwap(Filter):
             return False
 
         for msg in msgs:
-            if "MsgSwap" not in msg["type"]:
+            type_, value = _get_type_value(msg)
+            if not type_.endswith("MsgSwap"):
                 continue
-            value = msg["value"]
-
             for denom_pair in self.denoms:
                 if {value["offer_coin"]["denom"], value["ask_denom"]} == denom_pair:
                     return True
@@ -166,10 +170,9 @@ class FilterFirstActionRouterSwap(Filter):
         if not self.pairs or not self.router_addresses:
             return False
 
-        msg = msgs[0]
-        if "MsgExecuteContract" not in msg["type"]:
+        type_, value = _get_type_value(msgs[0])
+        if not type_.endswith("MsgExecuteContract"):
             return False
-        value = msg["value"]
 
         action = "execute_swap_operations"
         operations: list[dict[str, dict]]
@@ -204,7 +207,7 @@ class FilterFirstActionRouterSwap(Filter):
                 if any(pair_id == ids for ids in self._pair_ids):
                     return True
         except (KeyError, AttributeError, ValueError):
-            log.debug("Unexpected msg format", extra={"data": msg})
+            log.debug("Unexpected msg format", extra={"data": msgs[0]})
         return False
 
 
