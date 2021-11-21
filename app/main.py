@@ -42,7 +42,7 @@ async def shutdown(loop: asyncio.AbstractEventLoop, signal: signal.Signals = Non
 def handle_exception(loop: asyncio.AbstractEventLoop, context: dict):
     msg = context.get("exception", context["message"])
     log.error(f"Unexpected exception: {msg!r}")
-    loop.create_task(shutdown(loop))
+    loop.create_task(shutdown(loop)).result()
 
 
 def get_event_loop() -> asyncio.AbstractEventLoop:
