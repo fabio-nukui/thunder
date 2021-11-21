@@ -154,10 +154,7 @@ class MempoolCacheManager:
                 supress_logs=True,
             )
         except httpx.HTTPError as e:
-            if isinstance(e, httpx.HTTPStatusError) and "not support" in e.response.text:
-                # Non legacy-compatible txs
-                return {}
-            log.debug(f"Decode error {len(raw_tx)=}: {raw_tx=}")
+            log.debug(f"Decode error ({e!r}) {len(raw_tx)=}: {raw_tx=}")
             return {}
         else:
             return response.json()["result"]

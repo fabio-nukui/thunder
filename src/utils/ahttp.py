@@ -145,6 +145,10 @@ async def _send_request(
     """httpx request with default retries.
     inspired by https://www.peterbe.com/plog/best-practice-with-retries-with-requests"""
     errors: list[Exception] = []
+    if n_tries == 1:
+        res = await client.request(method, url, **kwargs)
+        res.raise_for_status()
+        return res
     for i in range(n_tries):
         try:
             res = await client.request(method, url, **kwargs)
