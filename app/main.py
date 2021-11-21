@@ -2,6 +2,7 @@ import asyncio
 import importlib
 import logging
 import signal
+import sys
 from functools import partial
 from types import ModuleType
 
@@ -66,6 +67,7 @@ def main():
     finally:
         loop.close()
         log.info("Successfully shutdown")
+        sys.exit()
 
 
 if __name__ == "__main__":
