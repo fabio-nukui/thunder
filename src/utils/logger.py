@@ -114,6 +114,8 @@ class AsyncHandler(logging.Handler, ABC):
             self.acquire()
             try:
                 await self.async_emit(record)
+            except (RuntimeError, asyncio.CancelledError):
+                self.emit(record)
             except Exception:
                 self.handleError(record)
             finally:
@@ -142,11 +144,14 @@ class AsyncFileHandler(AsyncHandler):
         self._initialization_lock = asyncio.Lock()
 
     def close(self):
+        self.sync_close_stream()
+        super().close()
+
+    def sync_close_stream(self):
         try:
             self.loop.run_until_complete(self.close_stream())
         except RuntimeError:  # event loop probable closed
             pass
-        super().close()
 
     async def close_stream(self):
         if self._stream is None:
@@ -165,19 +170,18 @@ class AsyncFileHandler(AsyncHandler):
 
     def emit(self, record: logging.LogRecord):
         print(f"Fallback emit: {self.format(record)}")
+        if self._stream is not None:
+            self.sync_close_stream()
         with open(self.file_path, self.mode, encoding=self.encoding) as f:
             f.write(self.format(record) + "\n")
 
     async def async_emit(self, record: logging.LogRecord):
-        try:
-            async with self._initialization_lock:
-                if self._stream is None:
-                    self._stream = await self._get_stream()
+        async with self._initialization_lock:
+            if self._stream is None:
+                self._stream = await self._get_stream()
 
-            await self._stream.write(self.format(record) + "\n")
-            await self._stream.flush()
-        except (RuntimeError, asyncio.CancelledError):
-            self.emit(record)
+        await self._stream.write(self.format(record) + "\n")
+        await self._stream.flush()
 
 
 class AsyncRotatingFileHandler(AsyncFileHandler):
@@ -196,17 +200,13 @@ class AsyncRotatingFileHandler(AsyncFileHandler):
         self._rollover_lock = asyncio.Lock()
 
     async def async_emit(self, record: logging.LogRecord):
-        try:
-            if await self.should_rollover():
-                async with self._rollover_lock:
-                    await self.do_rollover()
-        except RuntimeError:  # event loop probably closed, skip rollover
-            pass
-        finally:
-            await super().async_emit(record)
+        if await self.should_rollover():
+            async with self._rollover_lock:
+                await self.do_rollover()
+        await super().async_emit(record)
 
     async def should_rollover(self) -> bool:
-        if self._stream is None or self.maxBytes is None:
+        if self._stream is None or self._stream.closed or self.maxBytes is None:
             return False
         return await self._stream.tell() >= self.maxBytes
 

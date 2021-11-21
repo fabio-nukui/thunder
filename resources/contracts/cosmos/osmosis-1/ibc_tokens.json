@@ -1,0 +1,482 @@
+[
+  {
+    "denom_hash": "003A5C66EB401A47E94B8085690985421C140411900A95F194271C6C716902BA",
+    "base_denom": "uluna",
+    "path": "transfer/channel-48"
+  },
+  {
+    "denom_hash": "0629E628EA118F587C93777345B624E8A489E7971FBBA4E2DE9A42B7B61A3AF7",
+    "base_denom": "uakt",
+    "path": "transfer/channel-0/transfer/channel-95"
+  },
+  {
+    "denom_hash": "0927C519BFAF5F57DAF6357CFE25CCC4C8956245F9C8B5A1F161CFCFB8A51851",
+    "base_denom": "umed",
+    "path": "transfer/channel-74"
+  },
+  {
+    "denom_hash": "0EF15DF2F02480ADE0BB6E85D9EBB5DAEA2836D3860E9F97F9AADE4F57A31AA0",
+    "base_denom": "uluna",
+    "path": "transfer/channel-72"
+  },
+  {
+    "denom_hash": "0FD5103C7353F0C68F33B60ED7F99B3B5DF90CA947263FFC85BB5A9BEE3060E5",
+    "base_denom": "udvpn",
+    "path": "transfer/channel-12"
+  },
+  {
+    "denom_hash": "12CA68F29F6F32B6265384F436C1703CADA3828EF51FA35066A46787911E1B56",
+    "base_denom": "uatom",
+    "path": "transfer/channel-76"
+  },
+  {
+    "denom_hash": "1480B8FD20AD5FCAE81EA87584D269547DD4D436843C1D20F15E00EB64743EF4",
+    "base_denom": "uakt",
+    "path": "transfer/channel-1"
+  },
+  {
+    "denom_hash": "1482A1DD94CEE26261241D5DF7CC3430D5694CA0AAEEA7D3AE93F6B76FDB14CF",
+    "base_denom": "pool32DD066BE949E5FDCC7DC09EBB67C7301D0CA957C2EF56A39B37430165447DAC",
+    "path": "transfer/channel-0"
+  },
+  {
+    "denom_hash": "156AAF60BB330F06D4DB515FEA6D3D14A5379C2201C79A73AE242CC27591246C",
+    "base_denom": "cusdt",
+    "path": "transfer/channel-47"
+  },
+  {
+    "denom_hash": "1733402CBEA1D9D9D13DEA1EF1A76A116B51F5FF252A4DBBE6240DBFF8758EFC",
+    "base_denom": "enok",
+    "path": "transfer/channel-37"
+  },
+  {
+    "denom_hash": "1BC5AE276CEBAF1837F985B1A750FD35932F1AC0EC8411CAD1EE9D643BF4855B",
+    "base_denom": "cwscrt",
+    "path": "transfer/channel-47"
+  },
+  {
+    "denom_hash": "1D07F27D2BD5E288D02DDC1A748DCE2CFC8D4D797BD2AA4C4B8C64754AFBB71A",
+    "base_denom": "uakt",
+    "path": "transfer/channel-0/transfer/channel-184"
+  },
+  {
+    "denom_hash": "1DC495FCEFDA068A3820F903EDBD78B942FBD204D7E93D3BA2B432E9669D1A59",
+    "base_denom": "ungm",
+    "path": "transfer/channel-37"
+  },
+  {
+    "denom_hash": "1DCC8A6CB5689018431323953344A9F6CC4D0BFB261E88C9F7777372C10CD076",
+    "base_denom": "uregen",
+    "path": "transfer/channel-8"
+  },
+  {
+    "denom_hash": "1E47D255CD1DBF9E975A8B4A188A5F977B7C7F74E5485ECF544D3B659490CFDA",
+    "base_denom": "uakt",
+    "path": "transfer/channel-47/transfer/channel-2"
+  },
+  {
+    "denom_hash": "204A582244FC241613DBB50B04D1D454116C58C4AF7866C186AA0D6EEAD42780",
+    "base_denom": "ukrw",
+    "path": "transfer/channel-72"
+  },
+  {
+    "denom_hash": "262CA88DF3BCAF4B6272D459CBCB519629C9482FFE68772C5703BA87F648000E",
+    "base_denom": "uatom",
+    "path": "transfer/channel-5/transfer/channel-9/transfer/channel-141/transfer/channel-5/transfer/channel-9"
+  },
+  {
+    "denom_hash": "27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2",
+    "base_denom": "uatom",
+    "path": "transfer/channel-0"
+  },
+  {
+    "denom_hash": "29D9B9AE5A00E86C81C017AC40575913DE64FFE0402A002471B04DF01FC0E9B5",
+    "base_denom": "umed",
+    "path": "transfer/channel-55"
+  },
+  {
+    "denom_hash": "2D7F3CA8279445B0D73DCA59D2C50D7ED31BFA9CB365DFC755F474A329B4F566",
+    "base_denom": "xust",
+    "path": "transfer/channel-47"
+  },
+  {
+    "denom_hash": "2F50C5281A464D0C0CCD19C23C049D690F1E9DE927A80B5D9AC69ECF50DBEB27",
+    "base_denom": "basecro",
+    "path": "transfer/channel-0/transfer/channel-109"
+  },
+  {
+    "denom_hash": "3A78C81560B5F00416686A00D70F87F95BFA3622642C1268B2DE2F1B6A01F613",
+    "base_denom": "xaave",
+    "path": "transfer/channel-32"
+  },
+  {
+    "denom_hash": "3B7EE5A86CB8CC652F69BBCE4F09BEF40510D545B5271D9B96F2CA5A417B49BF",
+    "base_denom": "basecro",
+    "path": "transfer/channel-0/transfer/channel-187"
+  },
+  {
+    "denom_hash": "3C242464B20DE2DD4CD093D411EFF460B67F32A091C552CE3FC6EB6682334E6C",
+    "base_denom": "xrowan",
+    "path": "transfer/channel-47"
+  },
+  {
+    "denom_hash": "3CA8ED7089DE8E2D73D702976F98A914B5256D5085EE2B5B83D63C0385800E18",
+    "base_denom": "uluna",
+    "path": "transfer/channel-0/transfer/channel-192/transfer/channel-18"
+  },
+  {
+    "denom_hash": "3CC5D5870BF004AB935C43CCBDFD167CB702C7C55E11171876D1FDE0657E476A",
+    "base_denom": "umed",
+    "path": "transfer/channel-52"
+  },
+  {
+    "denom_hash": "3D5D50CFA086097911BD4A90333F72278381EB37E77A5193E46DD1121359C8CD",
+    "base_denom": "uatom",
+    "path": "transfer/channel-5/transfer/channel-9/transfer/channel-141/transfer/channel-5/transfer/channel-9/transfer/channel-141/transfer/channel-5/transfer/channel-9"
+  },
+  {
+    "denom_hash": "46B44899322F3CD854D2D46DEEF881958467CDD4B3B10086DA49296BBED94BED",
+    "base_denom": "ujuno",
+    "path": "transfer/channel-42"
+  },
+  {
+    "denom_hash": "4E5444C35610CC76FC94E7F7886B93121175C28262DDFDDE6F84E82BF2425452",
+    "base_denom": "ubtsg",
+    "path": "transfer/channel-73"
+  },
+  {
+    "denom_hash": "4E87E8734606510A2280BC8DA199C8C5BEC3E9B18976FB34107806C5C3430576",
+    "base_denom": "ubcna",
+    "path": "transfer/channel-41"
+  },
+  {
+    "denom_hash": "52B1AA623B34EB78FD767CEA69E8D7FA6C9CFE1FBF49C5406268FD325E2CC2AC",
+    "base_denom": "uiov",
+    "path": "transfer/channel-15"
+  },
+  {
+    "denom_hash": "53DC95CFB7189A169AA9105B267106349E1EDB884CFA8B423FCEFDB51F8BD07E",
+    "base_denom": "ujuno",
+    "path": "transfer/channel-0/transfer/channel-192/transfer/channel-14"
+  },
+  {
+    "denom_hash": "55917C55B43953E6D744203A66B47AEE8E84B1BE827C3B000E26BB1F28BDD81C",
+    "base_denom": "umed",
+    "path": "transfer/channel-60"
+  },
+  {
+    "denom_hash": "5973C068568365FFF40DEDCF1A1CB7582B6116B731CD31A12231AE25E20B871F",
+    "base_denom": "eeur",
+    "path": "transfer/channel-37"
+  },
+  {
+    "denom_hash": "5C027618DA2038EBD73A4D33E94F319EAD510785B8A88F06CBD5680D25EC09B3",
+    "base_denom": "uiris",
+    "path": "transfer/channel-17"
+  },
+  {
+    "denom_hash": "5F39126E011984C9853954A23870ED58FC4CC268259AD8F39AC48B3B59DBCAD1",
+    "base_denom": "ungm",
+    "path": "transfer/channel-47/transfer/channel-19"
+  },
+  {
+    "denom_hash": "5FB047AD1445F86C93D9CC5363204EF407551C26F8983C4C80CADF03BC2B7C6A",
+    "base_denom": "ungm",
+    "path": "transfer/channel-0/transfer/channel-202"
+  },
+  {
+    "denom_hash": "632D09C1324B38144BD3B8879EC56303496798209341138900F338CCDBADD970",
+    "base_denom": "uxprt",
+    "path": "transfer/channel-0/transfer/channel-190"
+  },
+  {
+    "denom_hash": "6339E2C174B60EEB93ED58C4F81DECAFDA32C6656719D5B93AB7D2157466B046",
+    "base_denom": "pool2B9C24833CAA268C9081EC251693A724E8D343FC25A841FF00FD37B047BA4DEA",
+    "path": "transfer/channel-0"
+  },
+  {
+    "denom_hash": "64A62D2D370F2C08C11513E7582FFCABC60754A84254907FD96AC6D9118347CB",
+    "base_denom": "ujuno",
+    "path": "transfer/channel-47/transfer/channel-14"
+  },
+  {
+    "denom_hash": "655BCEF3CDEBE32863FF281DBBE3B06160339E9897DC9C9C9821932A5F8BA6F8",
+    "base_denom": "utick",
+    "path": "transfer/channel-39"
+  },
+  {
+    "denom_hash": "686B4FE801A81ED9B46CC2E24FF3A7EA2E6A1E1A2A4D73BD7F2BC2866007AB0A",
+    "base_denom": "esek",
+    "path": "transfer/channel-37"
+  },
+  {
+    "denom_hash": "6AD6D63B70C00DE0BE56771E1118649EA989BE98754E2F8CD6E234F457946D0B",
+    "base_denom": "umed",
+    "path": "transfer/channel-45"
+  },
+  {
+    "denom_hash": "737BA149DE0967CA64C7A6FFCF5026EC7C6210F4BA1A3B1429E4FEBDEB4940F2",
+    "base_denom": "edkk",
+    "path": "transfer/channel-37"
+  },
+  {
+    "denom_hash": "75D3634612087F3A9F71CE8ECF44E31F2A3992D60A2BFB8F22FF89619AFE08EB",
+    "base_denom": "uiris",
+    "path": "transfer/channel-0/transfer/channel-91"
+  },
+  {
+    "denom_hash": "79DD10784082A513FA5A9675BC872891340BD9D14B6D1BB3120D4C17D8BE6013",
+    "base_denom": "xbtsg",
+    "path": "transfer/channel-0/transfer/channel-192"
+  },
+  {
+    "denom_hash": "7C4D60AA95E5A7558B0A364860979CA34B7FF8AAF255B87AF9E879374470CEC0",
+    "base_denom": "uiris",
+    "path": "transfer/channel-6"
+  },
+  {
+    "denom_hash": "81844CA896A4C233B331A468123AF2AACDC580DE294C5528A6E3F661A136795C",
+    "base_denom": "uatom",
+    "path": "transfer/channel-6/transfer/channel-0"
+  },
+  {
+    "denom_hash": "82C09AD5CCA03E85BD00A837DB9032A2ED069E4A9C9544E1BF00679CF823160D",
+    "base_denom": "uiov",
+    "path": "transfer/channel-35"
+  },
+  {
+    "denom_hash": "8674564773E79439AE63DF40BABAC11E5986ADCF35F8F892B9C16618C69B614B",
+    "base_denom": "eeur",
+    "path": "transfer/channel-47/transfer/channel-19"
+  },
+  {
+    "denom_hash": "95C9DBA947EF31F79732DF74A4C90584E282BF1BC286DEBECBCAF92B204D9DEB",
+    "base_denom": "basecro",
+    "path": "transfer/channel-5/transfer/channel-9/transfer/channel-141/transfer/channel-5/transfer/channel-9/transfer/channel-141/transfer/channel-5"
+  },
+  {
+    "denom_hash": "963C2E3AD9772A9225F173E95815EFA8E64A7F9402A1902198624221D0FF51DB",
+    "base_denom": "uluna",
+    "path": "transfer/channel-47/transfer/channel-18"
+  },
+  {
+    "denom_hash": "9712DBB13B9631EDFA9BF61B55F1B2D290B2ADB67E3A4EB3A875F3B6081B3B84",
+    "base_denom": "udvpn",
+    "path": "transfer/channel-2"
+  },
+  {
+    "denom_hash": "987C17B11ABC2B20019178ACE62929FE9840202CE79498E29FE8E5CB02B7C0A4",
+    "base_denom": "ustars",
+    "path": "transfer/channel-75"
+  },
+  {
+    "denom_hash": "9989AD6CCA39D1131523DB0617B50F6442081162294B4795E26746292467B525",
+    "base_denom": "nanolike",
+    "path": "transfer/channel-53"
+  },
+  {
+    "denom_hash": "9AF1F718095B2AA1003F004A1DF857722A37D9B54C82EB234C7F5B191A57D481",
+    "base_denom": "xiotx",
+    "path": "transfer/channel-47"
+  },
+  {
+    "denom_hash": "9BC783D73D46226BC948F34BC9136C081B89144E646DB5E4C1E8A6A4E777DC1B",
+    "base_denom": "echf",
+    "path": "transfer/channel-37"
+  },
+  {
+    "denom_hash": "9C8E9CB8CCA8ADB645607543E2B6126FBA8897E3354BF1A9168CCD7EAE79F81A",
+    "base_denom": "utick",
+    "path": "transfer/channel-27"
+  },
+  {
+    "denom_hash": "A0CC0CF735BFB30E730C70019D4218A1244FF383503FF7579C9201AB93CA9293",
+    "base_denom": "uxprt",
+    "path": "transfer/channel-4"
+  },
+  {
+    "denom_hash": "A373D5C42C0E1245C45CF829F8DCAD486B4B0D41E11B22F5C0C1EEC62BFB4A74",
+    "base_denom": "xmatic",
+    "path": "transfer/channel-47"
+  },
+  {
+    "denom_hash": "A774188B0C835803FC0C5897AD8761EBBDE2D228A4E9528EFA87AE81F7F090A4",
+    "base_denom": "uluna",
+    "path": "transfer/channel-70"
+  },
+  {
+    "denom_hash": "A91B70554A510310B2A068979C8E7A9B433EF689E82A9321922D8A1B845B95F5",
+    "base_denom": "poolDFB8434D5A80B4EAFA94B6878BD5B85265AC6C5D37204AB899B1C3C52543DA7E",
+    "path": "transfer/channel-0"
+  },
+  {
+    "denom_hash": "A9E3F44DA3EB68FD30665FDA5643C2EB19DD87E0E34712D659D58C3DAF9B411C",
+    "base_denom": "uakt",
+    "path": "transfer/channel-1/transfer/channel-5/transfer/channel-141/transfer/channel-1"
+  },
+  {
+    "denom_hash": "AA6020D1452F49244FE6C655C06DAFC1F8E11BDCA5090F2D91EDBE16BEF93300",
+    "base_denom": "xbtsg",
+    "path": "transfer/channel-47"
+  },
+  {
+    "denom_hash": "AA86CE47A648804E4B95A693958245DA0EB31BD1DB006D9962B9C84CF2C109D3",
+    "base_denom": "uatom",
+    "path": "transfer/channel-5/transfer/channel-9/transfer/channel-141/transfer/channel-5/transfer/channel-9/transfer/channel-141/transfer/channel-5/transfer/channel-9/transfer/channel-141/transfer/channel-5/transfer/channel-9"
+  },
+  {
+    "denom_hash": "ACBD2CEFAC2CC3ED6EEAF67BBDFDF168F1E4EDA159DFE1CA6B4A57A9CAF4DA11",
+    "base_denom": "uatom",
+    "path": "transfer/channel-2/transfer/channel-12"
+  },
+  {
+    "denom_hash": "AEF13DBB4820B4818F1EB60B11F8D8CBD1D3770C03499835ECE2C7ECE86517D4",
+    "base_denom": "uatom",
+    "path": "transfer/channel-1/transfer/channel-17"
+  },
+  {
+    "denom_hash": "B538674E3091987E4AABF264899829CBB209EB5EFF89500213F5335F1BCED307",
+    "base_denom": "cusdc",
+    "path": "transfer/channel-47"
+  },
+  {
+    "denom_hash": "B547DC9B897E7C3AA5B824696110B8E3D2C31E3ED3F02FF363DCBAD82457E07E",
+    "base_denom": "uxki",
+    "path": "transfer/channel-77"
+  },
+  {
+    "denom_hash": "B5DC82337AED2660F16F0378318A6C7B6A575D469626F33B5C43CD281F4F9BCE",
+    "base_denom": "ujuno",
+    "path": "transfer/channel-0/transfer/channel-207"
+  },
+  {
+    "denom_hash": "B78380E9A729CF134E5CC6B55B33777D663FE6EE4DCCB602C1764CDFF16F645D",
+    "base_denom": "basecro",
+    "path": "transfer/channel-5/transfer/channel-9/transfer/channel-187"
+  },
+  {
+    "denom_hash": "BD1CB688D6F386DA5AF36F1FA2D3031DA58BE5EA215EBC196F933CE3A5EF9F6F",
+    "base_denom": "uixo",
+    "path": "transfer/channel-47/transfer/channel-15"
+  },
+  {
+    "denom_hash": "BE1BB42D4BE3C30D50B68D7C41DB4DFCE9678E8EF8C539F6E6A9345048894FCC",
+    "base_denom": "uusd",
+    "path": "transfer/channel-72"
+  },
+  {
+    "denom_hash": "BE70B926C545221CBB7AA4630769986FC88A8F78B8BC63177CC065280A77A754",
+    "base_denom": "uregen",
+    "path": "transfer/channel-0/transfer/channel-185"
+  },
+  {
+    "denom_hash": "C8E4FECD7CEF3E76F7754C22CD35E13865932A1A86EAB0A08FE89A2145F7FCFB",
+    "base_denom": "basecro",
+    "path": "transfer/channel-5/transfer/channel-9/transfer/channel-141/transfer/channel-5"
+  },
+  {
+    "denom_hash": "C98F2B4934E977BC245AE2F0B245B3C158B37A27235DD834E1706647AACBF029",
+    "base_denom": "uixo",
+    "path": "transfer/channel-0/transfer/channel-204"
+  },
+  {
+    "denom_hash": "CA3C4CE1743BA32CFCE1EA7AD59B3A02799BD146861878432F9CCEAEBB174172",
+    "base_denom": "pool4BFAFC499776D30A4FA0D6033135F00CC4EFC770D19A74CAD37433B579F77FC0",
+    "path": "transfer/channel-0"
+  },
+  {
+    "denom_hash": "CD942F878C80FBE9DEAB8F8E57F592C7252D06335F193635AF002ACBD69139CC",
+    "base_denom": "utick",
+    "path": "transfer/channel-28"
+  },
+  {
+    "denom_hash": "D3AB66B4DFD321A44766E7BE55FFB0D1EA3F441EF56541514BCFA226614AA995",
+    "base_denom": "udvpn",
+    "path": "transfer/channel-0/transfer/channel-186"
+  },
+  {
+    "denom_hash": "D6266971E62372984B01FB08446BAC7784B8FCDC229CEFBBDE04BBFC01FD1C83",
+    "base_denom": "uband",
+    "path": "transfer/channel-81"
+  },
+  {
+    "denom_hash": "D761B2710146771C2E144DFBF33A357EE8E2AF64854676200AA9239A38D20F27",
+    "base_denom": "uatom",
+    "path": "transfer/channel-47/transfer/channel-0"
+  },
+  {
+    "denom_hash": "D805F1DA50D31B96E4282C1D4181EDDFB1A44A598BFF5666F4B43E4B8BEA95A5",
+    "base_denom": "ubcna",
+    "path": "transfer/channel-51"
+  },
+  {
+    "denom_hash": "DE7BB0DB69B3F36332B9D8626B0E2DA815111C5E77D0FC2FBFD1F77406DF90EE",
+    "base_denom": "uxprt",
+    "path": "transfer/channel-47/transfer/channel-7"
+  },
+  {
+    "denom_hash": "DF04F2844C0DAB242A43FCA1A29B79CAF822176BF5CC2A1426FD00639104FCC7",
+    "base_denom": "udvpn",
+    "path": "transfer/channel-47/transfer/channel-1"
+  },
+  {
+    "denom_hash": "DF51B901BE8433D1DDEC0F11F4CF359E34C7A7D81CB80119D235BC30441DD424",
+    "base_denom": "poolD639A99414646D7136C65C6845D0EB3456EDD3D6C2C43050D3FA3A24995B0E75",
+    "path": "transfer/channel-0"
+  },
+  {
+    "denom_hash": "E289C0FDD34DCB13BC447AABD03D54A2A131612E3DD29BF38A6EC8DBBB6BFB2B",
+    "base_denom": "xant",
+    "path": "transfer/channel-32"
+  },
+  {
+    "denom_hash": "E2A356F4F26960F49A1E7A3B91EAED52AF5899CF953C1AC6140F281810931BFD",
+    "base_denom": "uregen",
+    "path": "transfer/channel-0/transfer/channel-139"
+  },
+  {
+    "denom_hash": "E680E844EC301A6FFF5560F5FD54A166B8C3A99ACF9141C18977274EC482A3FB",
+    "base_denom": "uxprt",
+    "path": "transfer/channel-4/transfer/channel-24/transfer/channel-141/transfer/channel-4"
+  },
+  {
+    "denom_hash": "E6931F78057F7CC5DA0FD6CEF82FF39373A6E0452BF1FD76910B93292CF356C1",
+    "base_denom": "basecro",
+    "path": "transfer/channel-5"
+  },
+  {
+    "denom_hash": "ED0B14BB35A8B29B7524D6E6ED01EEF8EAA2A5B7E560D4FECEFAED33CA52A0D3",
+    "base_denom": "uatom",
+    "path": "transfer/channel-5/transfer/channel-9"
+  },
+  {
+    "denom_hash": "EF9B097B0BF0E1CD55CEF1095DDE5518A201C99B8A8E82C183F8433E343C2A9E",
+    "base_denom": "uiris",
+    "path": "transfer/channel-0/transfer/channel-182"
+  },
+  {
+    "denom_hash": "F3FF7A84A73B62921538642F9797C423D2B4C4ACB3C7FCFFCE7F12AA69909C4B",
+    "base_denom": "uixo",
+    "path": "transfer/channel-38"
+  },
+  {
+    "denom_hash": "F475BB4E2CD8ED8F5E807282E5D8AE76E789AA40F599C36F7442AC594F10BE07",
+    "base_denom": "uxprt",
+    "path": "transfer/channel-0/transfer/channel-190/transfer/channel-6/transfer/channel-0/transfer/channel-190"
+  },
+  {
+    "denom_hash": "F5D29CF217CDF3CBD587A6DE5CB82AC0D85066B6CF18E84854E824413EAFC108",
+    "base_denom": "uusd",
+    "path": "transfer/channel-47/transfer/channel-18"
+  },
+  {
+    "denom_hash": "F8DDA5E6836FA8AA707F1786824EE8869759A0FD3F146831BD01720684189484",
+    "base_denom": "uosmo",
+    "path": "transfer/channel-23/transfer/channel-141"
+  },
+  {
+    "denom_hash": "FD6D80F3BB5C9FC85FD389B331D0AA11D9DCFCFAD017D399D2588277DE97D736",
+    "base_denom": "xband",
+    "path": "transfer/channel-47"
+  }
+]
