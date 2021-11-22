@@ -2,7 +2,6 @@ import asyncio
 import importlib
 import logging
 import signal
-import sys
 from functools import partial
 from types import ModuleType
 
@@ -42,11 +41,7 @@ async def shutdown(loop: asyncio.AbstractEventLoop, signal: signal.Signals = Non
 def handle_exception(loop: asyncio.AbstractEventLoop, context: dict):
     msg = context.get("exception", context["message"])
     log.error(f"Unexpected exception: {msg!r}")
-    task = loop.create_task(shutdown(loop))
-    try:
-        task.result()
-    except Exception:
-        return
+    asyncio.create_task(shutdown(loop))
 
 
 def get_event_loop() -> asyncio.AbstractEventLoop:
@@ -71,7 +66,6 @@ def main():
     finally:
         loop.close()
         log.info("Successfully shutdown")
-        sys.exit()
 
 
 if __name__ == "__main__":
