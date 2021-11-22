@@ -150,7 +150,7 @@ class AsyncFileHandler(AsyncHandler):
     def sync_close_stream(self):
         try:
             self.loop.run_until_complete(self.close_stream())
-        except RuntimeError:  # event loop probable closed
+        except RuntimeError:  # event loop probably closed
             pass
 
     async def close_stream(self):
@@ -200,8 +200,8 @@ class AsyncRotatingFileHandler(AsyncFileHandler):
         self._rollover_lock = asyncio.Lock()
 
     async def async_emit(self, record: logging.LogRecord):
-        if await self.should_rollover():
-            async with self._rollover_lock:
+        async with self._rollover_lock:
+            if await self.should_rollover():
                 await self.do_rollover()
         await super().async_emit(record)
 
