@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from collections import Counter
 from dataclasses import dataclass
@@ -9,7 +10,6 @@ from typing import Any, Generic, Optional, TypeVar
 
 from terra_sdk.core.tx import Tx
 
-import configs
 from common import BlockchainClient, TokenAmount
 from exceptions import (
     BlockchainNewState,
@@ -19,7 +19,7 @@ from exceptions import (
     TxAlreadyBroadcasted,
     UnprofitableArbitrage,
 )
-from utils.logger import AsyncReformatterLogger, ReformatterLogger
+from utils.logger import ReformatterLogger
 
 _BlockchainClientT = TypeVar("_BlockchainClientT", bound=BlockchainClient)
 
@@ -119,14 +119,19 @@ class ArbitrageData:
 
 
 class RepeatedTxArbitrage(Generic[_BlockchainClientT], ABC):
+    log: logging.Logger
+
     def __init__(self, client: _BlockchainClientT, broadcast_kwargs: dict = None):
         self.client = client
         self.broadcast_kwargs = broadcast_kwargs or {}
         self.last_run_height = 0
 
         self.data = ArbitrageData()
-        logger_cls = AsyncReformatterLogger if configs.ASYNC_LOG else ReformatterLogger
-        self.log = logger_cls(__name__, formatter=self._log_formatter, apply_root_configs=True)
+        self.log = ReformatterLogger(
+            __name__,
+            formatter=self._log_formatter,
+            apply_root_configs=True,
+        )
         self.log.debug("Initialized")
 
     def _log_formatter(self, msg: Any) -> str:

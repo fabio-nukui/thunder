@@ -4,7 +4,6 @@ import asyncio
 import json
 import logging
 import os
-import sys
 from abc import ABC, abstractmethod
 from typing import Callable
 
@@ -19,24 +18,6 @@ class ExtraDataFormatter(logging.Formatter):
         return super().format(record)
 
 
-def set_default_logger(logger_cls: type[logging.Logger]):
-    logging.root.manager.setLoggerClass(logger_cls)
-    for name, logger in logging.root.manager.loggerDict.items():
-        if isinstance(logger, logger_cls):
-            continue
-        if isinstance(logger, logging.Logger):
-            new_logger = logger_cls(name, logger.level)
-            for handler in logger.handlers:
-                new_logger.addHandler(handler)
-            for filter in logger.filters:
-                new_logger.addFilter(filter)
-            new_logger.manager = logging.root.manager
-            logging.root.manager.loggerDict[name] = new_logger
-            logging.root.manager._fixupParents(new_logger)  # type: ignore
-            if name in sys.modules and getattr(sys.modules[name], "log", None) is logger:
-                setattr(sys.modules[name], "log", new_logger)
-
-
 def _apply_root_configs(logger: logging.Logger):
     for handler in logging.root.handlers:
         logger.addHandler(handler)
@@ -44,47 +25,6 @@ def _apply_root_configs(logger: logging.Logger):
         logger.addFilter(filter_)
     if logger.level == logging.NOTSET:
         logger.level = logging.root.level
-
-
-class AsyncLogger(logging.Logger):
-    def __init__(
-        self,
-        name: str,
-        level: int | str = logging.NOTSET,
-        apply_root_configs: bool = False,
-    ):
-        super().__init__(name, level)
-        self._loop = asyncio.get_event_loop()
-        if apply_root_configs:
-            _apply_root_configs(self)
-
-    def callHandlers(self, record: logging.LogRecord):
-        c: logging.Logger | None = self
-        while c:
-            for handler in c.handlers:
-                if record.levelno >= handler.level:
-                    if isinstance(handler, AsyncHandler) and not self._loop.is_closed():
-                        self._loop.create_task(handler.async_handle(record))
-                    else:
-                        handler.handle(record)
-            if not c.propagate:
-                return
-            c = c.parent
-
-
-class AsyncReformatterLogger(AsyncLogger):
-    def __init__(
-        self,
-        name: str,
-        level: int | str = logging.NOTSET,
-        formatter: Callable = lambda x: x,
-        apply_root_configs: bool = False,
-    ):
-        super().__init__(name, level, apply_root_configs)
-        self._formatter = formatter
-
-    def _log(self, level, msg, *args, **kwargs):
-        super()._log(level, self._formatter(msg), *args, **kwargs)
 
 
 class ReformatterLogger(logging.Logger):
@@ -109,18 +49,25 @@ class AsyncHandler(logging.Handler, ABC):
         super().__init__(level=level)
         self.loop = asyncio.get_event_loop() if loop is None else loop
 
-    async def async_handle(self, record: logging.LogRecord) -> bool:
+    def handle(self, record: logging.LogRecord) -> bool:
         if rv := self.filter(record):
             self.acquire()
             try:
-                await self.async_emit(record)
-            except (RuntimeError, asyncio.CancelledError):
-                self.emit(record)
-            except Exception:
-                self.handleError(record)
+                if getattr(record, "_sync", False) or self.loop.is_closed():
+                    self.emit(record)
+                else:
+                    self.loop.create_task(self._emit(record))
             finally:
                 self.release()
         return rv
+
+    async def _emit(self, record: logging.LogRecord):
+        try:
+            await self.async_emit(record)
+        except (RuntimeError, asyncio.CancelledError):
+            self.emit(record)
+        except Exception:
+            self.handleError(record)
 
     @abstractmethod
     async def async_emit(self, record: logging.LogRecord):
@@ -148,10 +95,8 @@ class AsyncFileHandler(AsyncHandler):
         super().close()
 
     def sync_close_stream(self):
-        try:
-            self.loop.run_until_complete(self.close_stream())
-        except RuntimeError:  # event loop probably closed
-            pass
+        if not self.loop.is_closed():
+            self.loop.create_task(self.close_stream())
 
     async def close_stream(self):
         if self._stream is None:
@@ -169,11 +114,13 @@ class AsyncFileHandler(AsyncHandler):
         )
 
     def emit(self, record: logging.LogRecord):
-        print(f"Fallback emit: {self.format(record)}")
-        if self._stream is not None:
-            self.sync_close_stream()
-        with open(self.file_path, self.mode, encoding=self.encoding) as f:
-            f.write(self.format(record) + "\n")
+        try:
+            if self._stream is not None:
+                self.sync_close_stream()
+            with open(self.file_path, self.mode, encoding=self.encoding) as f:
+                f.write(self.format(record) + "\n")
+        except Exception:
+            self.handleError(record)
 
     async def async_emit(self, record: logging.LogRecord):
         async with self._initialization_lock:

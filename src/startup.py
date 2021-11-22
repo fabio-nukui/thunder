@@ -6,7 +6,6 @@ import warnings
 import yaml
 
 import configs
-import utils.logger
 
 
 def setup_warnings():
@@ -39,8 +38,6 @@ def setup_logger():
 
     os.makedirs("logs", exist_ok=True)
     logging.config.dictConfig(dict_config)
-    if configs.ASYNC_LOG:
-        utils.logger.set_default_logger(utils.logger.AsyncLogger)
 
 
 def setup_ipython():

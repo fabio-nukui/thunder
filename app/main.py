@@ -33,15 +33,16 @@ async def run_strategy(strategy_module: ModuleType):
 
 async def shutdown(loop: asyncio.AbstractEventLoop, signal: signal.Signals = None):
     if signal:
-        log.info(f"Received exit signal {signal.name}")
-    log.info("Shutting down")
+        log.info(f"Received exit signal {signal.name}", extra={"_sync": True})
+    log.info("Shutting down", extra={"_sync": True})
     await utils.async_.stop_loop(loop)
 
 
 def handle_exception(loop: asyncio.AbstractEventLoop, context: dict):
     msg = context.get("exception", context["message"])
-    log.error(f"Unexpected exception: {msg!r}")
-    asyncio.create_task(shutdown(loop))
+    log.error(f"Unexpected exception: {msg!r}", extra={"_sync": True})
+    if not loop.is_closed():
+        loop.create_task(shutdown(loop))
 
 
 def get_event_loop() -> asyncio.AbstractEventLoop:
@@ -65,7 +66,7 @@ def main():
         loop.run_forever()
     finally:
         loop.close()
-        log.info("Successfully shutdown")
+        log.info("Successfully shutdown", extra={"_sync": True})
 
 
 if __name__ == "__main__":
