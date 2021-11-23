@@ -2,6 +2,7 @@ import asyncio
 import logging
 from decimal import Decimal
 
+import grpclib.client
 from terra_sdk.core import AccAddress, Coins
 from terra_sdk.core.auth.data import BaseAccount
 
@@ -27,6 +28,7 @@ class OsmosisClient(BroadcasterMixin, CosmosClient):
         lcd_uri: str = configs.OSMOSIS_LCD_URI,
         rpc_http_uri: str = configs.OSMOSIS_RPC_HTTP_URI,
         rpc_websocket_uri: str = configs.OSMOSIS_RPC_WEBSOCKET_URI,
+        grpc_uri: str = configs.OSMOSIS_GRPC_URI,
         use_broadcaster: bool = configs.OSMOSIS_USE_BROADCASTER,
         broadcaster_uris: list[str] = configs.OSMOSIS_BROADCASTER_URIS,
         broadcast_lcd_uris: list[str] = configs.OSMOSIS_BROADCAST_LCD_URIS,
@@ -42,6 +44,7 @@ class OsmosisClient(BroadcasterMixin, CosmosClient):
             lcd_uri=lcd_uri,
             rpc_http_uri=rpc_http_uri,
             rpc_websocket_uri=rpc_websocket_uri,
+            grpc_uri=grpc_uri,
             use_broadcaster=use_broadcaster,
             broadcaster_uris=broadcaster_uris,
             broadcast_lcd_uris=broadcast_lcd_uris,
@@ -58,6 +61,8 @@ class OsmosisClient(BroadcasterMixin, CosmosClient):
     async def start(self):
         self.lcd_http_client = utils.ahttp.AsyncClient(base_url=self.lcd_uri)
         self.rpc_http_client = utils.ahttp.AsyncClient(base_url=self.rpc_http_uri)
+        grpc_url, grpc_port = self.grpc_uri.split(":")
+        self.grpc_channel = grpclib.client.Channel(grpc_url, int(grpc_port))
 
         await asyncio.gather(self._init_lcd_signer(), self._init_broadcaster_clients())
         await self._check_connections()

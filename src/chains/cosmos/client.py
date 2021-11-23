@@ -37,6 +37,7 @@ class CosmosClient(AsyncBlockchainClient, ABC):
         lcd_uri: str,
         rpc_http_uri: str,
         rpc_websocket_uri: str,
+        grpc_uri: str,
         fee_denom: str,
         gas_prices: Coins.Input | None,
         gas_adjustment: Decimal,
@@ -47,6 +48,7 @@ class CosmosClient(AsyncBlockchainClient, ABC):
         self.lcd_uri = lcd_uri
         self.rpc_http_uri = rpc_http_uri
         self.rpc_websocket_uri = rpc_websocket_uri
+        self.grpc_uri = grpc_uri
 
         self.fee_denom = fee_denom
         self.gas_prices = Coins(gas_prices)

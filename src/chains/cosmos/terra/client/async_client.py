@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import json
 import logging
 from collections import defaultdict
 from decimal import Decimal
 from typing import AsyncIterable
 
+import grpclib.client
+import terra_proto.terra.wasm.v1beta1 as terra_wasm_pb
+from grpclib.const import Status as GRPCStatus
+from grpclib.exceptions import GRPCError
 from terra_sdk.core import AccAddress, Coins
 from terra_sdk.core.auth import TxLog
 from terra_sdk.core.auth.data import BaseAccount
@@ -14,6 +20,7 @@ from terra_sdk.key.mnemonic import MnemonicKey
 import auth_secrets
 import configs
 import utils
+from exceptions import NotContract
 from utils.cache import CacheGroup, ttl_cache
 
 from ...client import BroadcasterMixin, CosmosClient
@@ -42,6 +49,7 @@ class TerraClient(BroadcasterMixin, CosmosClient):
         fcd_uri: str = configs.TERRA_FCD_URI,
         rpc_http_uri: str = configs.TERRA_RPC_HTTP_URI,
         rpc_websocket_uri: str = configs.TERRA_RPC_WEBSOCKET_URI,
+        grpc_uri: str = configs.TERRA_GRPC_URI,
         use_broadcaster: bool = configs.TERRA_USE_BROADCASTER,
         broadcaster_uris: list[str] = configs.TERRA_BROADCASTER_URIS,
         broadcast_lcd_uris: list[str] = configs.TERRA_BROADCAST_LCD_URIS,
@@ -57,6 +65,7 @@ class TerraClient(BroadcasterMixin, CosmosClient):
             lcd_uri=lcd_uri,
             rpc_http_uri=rpc_http_uri,
             rpc_websocket_uri=rpc_websocket_uri,
+            grpc_uri=grpc_uri,
             use_broadcaster=use_broadcaster,
             broadcaster_uris=broadcaster_uris,
             broadcast_lcd_uris=broadcast_lcd_uris,
@@ -83,6 +92,9 @@ class TerraClient(BroadcasterMixin, CosmosClient):
         self.lcd_http_client = utils.ahttp.AsyncClient(base_url=self.lcd_uri)
         self.fcd_client = utils.ahttp.AsyncClient(base_url=self.fcd_uri)
         self.rpc_http_client = utils.ahttp.AsyncClient(base_url=self.rpc_http_uri)
+        grpc_url, grpc_port = self.grpc_uri.split(":")
+        self.grpc_channel = grpclib.client.Channel(grpc_url, int(grpc_port))
+        self.grpc_query_stub = terra_wasm_pb.QueryStub(self.grpc_channel)
 
         await asyncio.gather(self._init_lcd_signer(), self._init_broadcaster_clients())
         await self._check_connections()
@@ -110,6 +122,7 @@ class TerraClient(BroadcasterMixin, CosmosClient):
     async def close(self):
         log.debug(f"Closing {self=}")
         self.mempool.stop()
+        self.grpc_channel.close()
         await asyncio.gather(
             self.lcd_http_client.aclose(),
             self.fcd_client.aclose(),
@@ -120,11 +133,30 @@ class TerraClient(BroadcasterMixin, CosmosClient):
 
     @ttl_cache(CacheGroup.TERRA, _CONTRACT_QUERY_CACHE_SIZE)
     async def contract_query(self, contract_addr: AccAddress, query_msg: dict) -> dict:
-        return await super().contract_query(contract_addr, query_msg)
+        try:
+            res = await self.grpc_query_stub.contract_store(
+                contract_address=contract_addr, query_msg=json.dumps(query_msg).encode("utf-8")
+            )
+        except GRPCError as e:
+            if e.status == GRPCStatus.NOT_FOUND:
+                raise NotContract
+            raise
+        return json.loads(res.query_result)
 
     @ttl_cache(CacheGroup.TERRA, _CONTRACT_QUERY_CACHE_SIZE, _CONTRACT_INFO_CACHE_TTL)
     async def contract_info(self, address: AccAddress) -> dict:
-        return await super().contract_info(address)
+        try:
+            res = await self.grpc_query_stub.contract_info(contract_address=address)
+        except GRPCError as e:
+            if e.status == GRPCStatus.NOT_FOUND:
+                raise NotContract
+            raise
+        data = res.contract_info.to_dict()
+        return {
+            "code_id": int(data.pop("codeId")),
+            "init_msg": json.loads(base64.b64decode(data.pop("initMsg"))),
+            **data,
+        }
 
     @ttl_cache(CacheGroup.TERRA)
     async def get_bank_denom(self, denom: str, address: AccAddress = None) -> TerraTokenAmount:
