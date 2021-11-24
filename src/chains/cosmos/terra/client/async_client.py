@@ -161,8 +161,8 @@ class TerraClient(BroadcasterMixin, CosmosClient):
         }
 
     @ttl_cache(CacheGroup.TERRA)
-    async def get_bank_denom(self, denom: str, address: AccAddress = None) -> TerraTokenAmount:
-        bank = await self.get_bank(address)
+    async def get_balance(self, denom: str, address: AccAddress = None) -> TerraTokenAmount:
+        bank = await self.get_all_balances(address)
         for amount in bank:
             assert isinstance(amount.token, TerraNativeToken)
             if amount.token.denom == denom:
@@ -170,11 +170,11 @@ class TerraClient(BroadcasterMixin, CosmosClient):
         return TerraNativeToken(denom).to_amount(0)
 
     @ttl_cache(CacheGroup.TERRA)
-    async def get_bank(self, address: AccAddress = None) -> list[TerraTokenAmount]:
+    async def get_all_balances(self, address: AccAddress = None) -> list[TerraTokenAmount]:
         address = self.address if address is None else address
         res = await self.grpc_bank_stub.all_balances(address=address)
         if res.pagination.next_key:
-            raise NotImplementedError("get_bank() not implemented for paginated results")
+            raise NotImplementedError("not implemented for paginated results")
         return [TerraNativeToken(c.denom).to_amount(int_amount=c.amount) for c in res.balances]
 
     @ttl_cache(CacheGroup.TERRA)

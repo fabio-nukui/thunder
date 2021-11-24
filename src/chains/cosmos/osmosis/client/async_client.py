@@ -103,12 +103,8 @@ class OsmosisClient(BroadcasterMixin, CosmosClient):
         return await super().contract_info(address)
 
     @ttl_cache(CacheGroup.OSMOSIS)
-    async def get_bank_denom(
-        self,
-        denom: str,
-        address: AccAddress = None,
-    ) -> OsmosisTokenAmount:
-        bank = await self.get_bank(address)
+    async def get_balance(self, denom: str, address: AccAddress = None) -> OsmosisTokenAmount:
+        bank = await self.get_all_balances(address)
         for amount in bank:
             assert isinstance(amount.token, OsmosisNativeToken)
             if amount.token.denom == denom:
@@ -116,11 +112,11 @@ class OsmosisClient(BroadcasterMixin, CosmosClient):
         return OsmosisNativeToken(denom).to_amount(0)
 
     @ttl_cache(CacheGroup.OSMOSIS)
-    async def get_bank(self, address: AccAddress = None) -> list[OsmosisTokenAmount]:
+    async def get_all_balances(self, address: AccAddress = None) -> list[OsmosisTokenAmount]:
         address = self.address if address is None else address
         coins_balance, pagination = await self.lcd.bank.balance(address)
         if pagination["next_key"] is not None:
-            raise NotImplementedError("get_bank() not implemented for paginated results")
+            raise NotImplementedError("not implemented for paginated results")
         return [OsmosisTokenAmount.from_coin(c) for c in coins_balance.to_list()]
 
     @ttl_cache(CacheGroup.OSMOSIS)

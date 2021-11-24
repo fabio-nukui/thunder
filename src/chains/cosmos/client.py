@@ -78,11 +78,11 @@ class CosmosClient(AsyncBlockchainClient, ABC):
             raise
 
     @abstractmethod
-    async def get_bank_denom(self, denom: str, address: AccAddress = None) -> CosmosTokenAmount:
+    async def get_balance(self, denom: str, address: AccAddress = None) -> CosmosTokenAmount:
         ...
 
     @abstractmethod
-    async def get_bank(self, address: AccAddress = None) -> list[CosmosTokenAmount]:
+    async def get_all_balances(self, address: AccAddress = None) -> list[CosmosTokenAmount]:
         ...
 
     async def is_syncing(self) -> bool:
