@@ -10,6 +10,8 @@ from typing import AsyncIterable
 
 import grpclib.client
 import terra_proto.cosmos.bank.v1beta1 as cosmos_bank_pb
+import terra_proto.terra.market.v1beta1 as terra_market_pb
+import terra_proto.terra.oracle.v1beta1 as terra_oracle_pb
 import terra_proto.terra.wasm.v1beta1 as terra_wasm_pb
 from grpclib.const import Status as GRPCStatus
 from grpclib.exceptions import GRPCError
@@ -93,10 +95,14 @@ class TerraClient(BroadcasterMixin, CosmosClient):
         self.lcd_http_client = utils.ahttp.AsyncClient(base_url=self.lcd_uri)
         self.fcd_client = utils.ahttp.AsyncClient(base_url=self.fcd_uri)
         self.rpc_http_client = utils.ahttp.AsyncClient(base_url=self.rpc_http_uri)
+
         grpc_url, grpc_port = self.grpc_uri.split(":")
         self.grpc_channel = grpclib.client.Channel(grpc_url, int(grpc_port))
-        self.grpc_wasm = terra_wasm_pb.QueryStub(self.grpc_channel)
+
         self.grpc_bank = cosmos_bank_pb.QueryStub(self.grpc_channel)
+        self.grpc_market = terra_market_pb.QueryStub(self.grpc_channel)
+        self.grpc_oracle = terra_oracle_pb.QueryStub(self.grpc_channel)
+        self.grpc_wasm = terra_wasm_pb.QueryStub(self.grpc_channel)
 
         await asyncio.gather(self._init_lcd_signer(), self._init_broadcaster_clients())
         await self._check_connections()

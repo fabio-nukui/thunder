@@ -8,15 +8,16 @@ from ..denoms import LUNA
 from ..token import TerraNativeToken
 from .base_api import Api
 
-MAX_PRECISION = 18
+PRECISION = 18
 
 
 class OracleApi(Api):
     @ttl_cache(CacheGroup.TERRA, maxsize=1)
     async def get_exchange_rates(self) -> dict[TerraNativeToken, Decimal]:
-        oracle_rates = await self.client.lcd.oracle.exchange_rates()
+        res = await self.client.grpc_oracle.exchange_rates()
         rates = {
-            TerraNativeToken(c.denom): Decimal(str(c.amount)) for c in oracle_rates.to_list()
+            TerraNativeToken(c.denom): Decimal(c.amount) / 10 ** PRECISION
+            for c in res.exchange_rates
         }
         rates[LUNA] = Decimal(1)
         return rates
@@ -31,4 +32,4 @@ class OracleApi(Api):
         if isinstance(to_coin, str):
             to_coin = TerraNativeToken(to_coin)
         exchange_rates = await self.get_exchange_rates()
-        return round(exchange_rates[to_coin] / exchange_rates[from_coin], MAX_PRECISION)
+        return round(exchange_rates[to_coin] / exchange_rates[from_coin], PRECISION)

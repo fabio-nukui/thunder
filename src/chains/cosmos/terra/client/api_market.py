@@ -9,6 +9,7 @@ from ..token import TerraNativeToken, TerraTokenAmount
 from .base_api import Api
 
 MARKET_PARAMETERS_TTL = 3600
+PRECISION = 18
 
 
 class MarketApi(Api):
@@ -50,10 +51,9 @@ class MarketApi(Api):
         See https://docs.terra.money/Reference/Terra-core/Module-specifications/spec-market.html#market-making-algorithm  # noqa: E501
         """
         base_bool = SDT.decimalize(await self.get_market_parameter("base_pool"))
-        terra_pool_delta = (
-            SDT.decimalize(str(await self.client.lcd.market.terra_pool_delta()))
-            + terra_pool_delta_change
-        )
+        res = await self.client.grpc_market.terra_pool_delta()
+        pool_delta = int(res.terra_pool_delta.decode("ascii")) / 10 ** PRECISION
+        terra_pool_delta = SDT.decimalize(pool_delta) + terra_pool_delta_change
 
         pool_terra = base_bool + terra_pool_delta
         pool_luna = base_bool ** 2 / pool_terra
