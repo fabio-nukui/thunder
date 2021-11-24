@@ -9,6 +9,7 @@ from decimal import Decimal
 from typing import AsyncIterable
 
 import grpclib.client
+import terra_proto.cosmos.bank.v1beta1 as cosmos_bank_pb
 import terra_proto.terra.wasm.v1beta1 as terra_wasm_pb
 from grpclib.const import Status as GRPCStatus
 from grpclib.exceptions import GRPCError
@@ -94,7 +95,8 @@ class TerraClient(BroadcasterMixin, CosmosClient):
         self.rpc_http_client = utils.ahttp.AsyncClient(base_url=self.rpc_http_uri)
         grpc_url, grpc_port = self.grpc_uri.split(":")
         self.grpc_channel = grpclib.client.Channel(grpc_url, int(grpc_port))
-        self.grpc_query_stub = terra_wasm_pb.QueryStub(self.grpc_channel)
+        self.grpc_wasm_stub = terra_wasm_pb.QueryStub(self.grpc_channel)
+        self.grpc_bank_stub = cosmos_bank_pb.QueryStub(self.grpc_channel)
 
         await asyncio.gather(self._init_lcd_signer(), self._init_broadcaster_clients())
         await self._check_connections()
@@ -134,7 +136,7 @@ class TerraClient(BroadcasterMixin, CosmosClient):
     @ttl_cache(CacheGroup.TERRA, _CONTRACT_QUERY_CACHE_SIZE)
     async def contract_query(self, contract_addr: AccAddress, query_msg: dict) -> dict:
         try:
-            res = await self.grpc_query_stub.contract_store(
+            res = await self.grpc_wasm_stub.contract_store(
                 contract_address=contract_addr, query_msg=json.dumps(query_msg).encode("utf-8")
             )
         except GRPCError as e:
@@ -146,7 +148,7 @@ class TerraClient(BroadcasterMixin, CosmosClient):
     @ttl_cache(CacheGroup.TERRA, _CONTRACT_QUERY_CACHE_SIZE, _CONTRACT_INFO_CACHE_TTL)
     async def contract_info(self, address: AccAddress) -> dict:
         try:
-            res = await self.grpc_query_stub.contract_info(contract_address=address)
+            res = await self.grpc_wasm_stub.contract_info(contract_address=address)
         except GRPCError as e:
             if e.status == GRPCStatus.NOT_FOUND:
                 raise NotContract
@@ -170,10 +172,10 @@ class TerraClient(BroadcasterMixin, CosmosClient):
     @ttl_cache(CacheGroup.TERRA)
     async def get_bank(self, address: AccAddress = None) -> list[TerraTokenAmount]:
         address = self.address if address is None else address
-        coins_balance, pagination = await self.lcd.bank.balance(address)
-        if pagination["next_key"] is not None:
+        res = await self.grpc_bank_stub.all_balances(address=address)
+        if res.pagination.next_key:
             raise NotImplementedError("get_bank() not implemented for paginated results")
-        return [TerraTokenAmount.from_coin(c) for c in coins_balance.to_list()]
+        return [TerraNativeToken(c.denom).to_amount(int_amount=c.amount) for c in res.balances]
 
     @ttl_cache(CacheGroup.TERRA)
     async def get_account_data(self, address: AccAddress = None) -> BaseAccount:
