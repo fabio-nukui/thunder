@@ -40,6 +40,7 @@ def main():
     supplies = loop.run_until_complete(get_bank_total())
     tasks = (get_denom_trace(s["denom"][4:]) for s in supplies if s["denom"].startswith("ibc/"))
     data = loop.run_until_complete(asyncio.gather(*tasks))
+    data = sorted(data, key=lambda x: x["denom_hash"])
     with open(RESULT_FILEPATH, "w") as f:
         json.dump(data, f, indent=2)
 

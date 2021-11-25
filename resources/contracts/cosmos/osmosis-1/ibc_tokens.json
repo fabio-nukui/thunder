@@ -15,6 +15,11 @@
     "path": "transfer/channel-74"
   },
   {
+    "denom_hash": "0954E1C28EB7AF5B72D24F3BC2B47BBB2FDF91BDDFD57B74B99E133AED40972A",
+    "base_denom": "uscrt",
+    "path": "transfer/channel-88"
+  },
+  {
     "denom_hash": "0EF15DF2F02480ADE0BB6E85D9EBB5DAEA2836D3860E9F97F9AADE4F57A31AA0",
     "base_denom": "uluna",
     "path": "transfer/channel-72"
@@ -45,9 +50,9 @@
     "path": "transfer/channel-47"
   },
   {
-    "denom_hash": "1733402CBEA1D9D9D13DEA1EF1A76A116B51F5FF252A4DBBE6240DBFF8758EFC",
-    "base_denom": "enok",
-    "path": "transfer/channel-37"
+    "denom_hash": "195710DDAA1CE56C1F68D87B9044343362C9BD05858053B89629CC5D30ABEE9D",
+    "base_denom": "umed",
+    "path": "transfer/channel-83"
   },
   {
     "denom_hash": "1BC5AE276CEBAF1837F985B1A750FD35932F1AC0EC8411CAD1EE9D643BF4855B",
@@ -78,6 +83,11 @@
     "denom_hash": "204A582244FC241613DBB50B04D1D454116C58C4AF7866C186AA0D6EEAD42780",
     "base_denom": "ukrw",
     "path": "transfer/channel-72"
+  },
+  {
+    "denom_hash": "24218A8263A96FA58CCFA85CCB49C11EAD968BE943DBC79671D0D56EA43D1BDE",
+    "base_denom": "uiris",
+    "path": "transfer/channel-47/transfer/channel-8"
   },
   {
     "denom_hash": "262CA88DF3BCAF4B6272D459CBCB519629C9482FFE68772C5703BA87F648000E",
@@ -115,6 +125,11 @@
     "path": "transfer/channel-0/transfer/channel-187"
   },
   {
+    "denom_hash": "3BCCC93AD5DF58D11A6F8A05FA8BC801CBA0BA61A981F57E91B8B598BF8061CB",
+    "base_denom": "umed",
+    "path": "transfer/channel-82"
+  },
+  {
     "denom_hash": "3C242464B20DE2DD4CD093D411EFF460B67F32A091C552CE3FC6EB6682334E6C",
     "base_denom": "xrowan",
     "path": "transfer/channel-47"
@@ -133,6 +148,11 @@
     "denom_hash": "3D5D50CFA086097911BD4A90333F72278381EB37E77A5193E46DD1121359C8CD",
     "base_denom": "uatom",
     "path": "transfer/channel-5/transfer/channel-9/transfer/channel-141/transfer/channel-5/transfer/channel-9/transfer/channel-141/transfer/channel-5/transfer/channel-9"
+  },
+  {
+    "denom_hash": "41DB89D47A23272FD13A5F4E324089F07215EAC18FF96D449EC142EDB106E595",
+    "base_denom": "uctk",
+    "path": "transfer/channel-100"
   },
   {
     "denom_hash": "46B44899322F3CD854D2D46DEEF881958467CDD4B3B10086DA49296BBED94BED",
@@ -280,11 +300,6 @@
     "path": "transfer/channel-47"
   },
   {
-    "denom_hash": "9BC783D73D46226BC948F34BC9136C081B89144E646DB5E4C1E8A6A4E777DC1B",
-    "base_denom": "echf",
-    "path": "transfer/channel-37"
-  },
-  {
     "denom_hash": "9C8E9CB8CCA8ADB645607543E2B6126FBA8897E3354BF1A9168CCD7EAE79F81A",
     "base_denom": "utick",
     "path": "transfer/channel-27"
@@ -303,6 +318,11 @@
     "denom_hash": "A774188B0C835803FC0C5897AD8761EBBDE2D228A4E9528EFA87AE81F7F090A4",
     "base_denom": "uluna",
     "path": "transfer/channel-70"
+  },
+  {
+    "denom_hash": "A78F05EE64DFEE02FBDBF960EA3EFB72613EF155F6B3EE6AE68870AC3B93A87C",
+    "base_denom": "ucmdx",
+    "path": "transfer/channel-101"
   },
   {
     "denom_hash": "A91B70554A510310B2A068979C8E7A9B433EF689E82A9321922D8A1B845B95F5",
@@ -350,9 +370,19 @@
     "path": "transfer/channel-0/transfer/channel-207"
   },
   {
+    "denom_hash": "B77449C3CD6BEF168A92FFE9A3B366C19FB997EE31FB2991835C75863689A620",
+    "base_denom": "uusd",
+    "path": "transfer/channel-5/transfer/channel-9/transfer/channel-192/transfer/channel-18"
+  },
+  {
     "denom_hash": "B78380E9A729CF134E5CC6B55B33777D663FE6EE4DCCB602C1764CDFF16F645D",
     "base_denom": "basecro",
     "path": "transfer/channel-5/transfer/channel-9/transfer/channel-187"
+  },
+  {
+    "denom_hash": "BC391EA2C4E17E2C43374D5AFD51DA33B8F6140DEE42F7CB47F20C59C267F40C",
+    "base_denom": "ungm",
+    "path": "transfer/channel-102"
   },
   {
     "denom_hash": "BD1CB688D6F386DA5AF36F1FA2D3031DA58BE5EA215EBC196F933CE3A5EF9F6F",
@@ -478,5 +508,10 @@
     "denom_hash": "FD6D80F3BB5C9FC85FD389B331D0AA11D9DCFCFAD017D399D2588277DE97D736",
     "base_denom": "xband",
     "path": "transfer/channel-47"
+  },
+  {
+    "denom_hash": "FE2CD1E6828EC0FAB8AF39BAC45BC25B965BA67CCBC50C13A14BD610B0D1E2C4",
+    "base_denom": "boot",
+    "path": "transfer/channel-95"
   }
 ]
