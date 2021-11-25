@@ -3,6 +3,8 @@ import logging
 from decimal import Decimal
 
 import grpclib.client
+import osmosis_proto.cosmos.bank.v1beta1 as cosmos_bank_pb
+import osmosis_proto.osmosis.gamm.v1beta1 as osmosis_gamm_pb
 from terra_sdk.core import AccAddress, Coins
 from terra_sdk.core.auth.data import BaseAccount
 
@@ -13,7 +15,7 @@ from utils.cache import CacheGroup, ttl_cache
 
 from ...client import BroadcasterMixin, CosmosClient
 from ..mnemonic_key import MnemonicKey
-from ..token import OsmosisNativeToken, OsmosisTokenAmount
+from ..token import OsmosisTokenAmount
 from .gamm_api import GammApi
 
 log = logging.getLogger(__name__)
@@ -64,8 +66,12 @@ class OsmosisClient(BroadcasterMixin, CosmosClient):
     async def start(self):
         self.lcd_http_client = utils.ahttp.AsyncClient(base_url=self.lcd_uri)
         self.rpc_http_client = utils.ahttp.AsyncClient(base_url=self.rpc_http_uri)
+
         grpc_url, grpc_port = self.grpc_uri.split(":")
         self.grpc_channel = grpclib.client.Channel(grpc_url, int(grpc_port))
+
+        self.grpc_gamm = osmosis_gamm_pb.QueryStub(self.grpc_channel)
+        self.grpc_bank = cosmos_bank_pb.QueryStub(self.grpc_channel)
 
         await asyncio.gather(self._init_lcd_signer(), self._init_broadcaster_clients())
         await self._check_connections()
@@ -107,20 +113,17 @@ class OsmosisClient(BroadcasterMixin, CosmosClient):
 
     @ttl_cache(CacheGroup.OSMOSIS)
     async def get_balance(self, denom: str, address: AccAddress = None) -> OsmosisTokenAmount:
-        bank = await self.get_all_balances(address)
-        for amount in bank:
-            assert isinstance(amount.token, OsmosisNativeToken)
-            if amount.token.denom == denom:
-                return amount
-        return OsmosisNativeToken(denom).to_amount(0)
+        address = self.address if address is None else address
+        res = await self.grpc_bank.balance(address=address, denom=denom)
+        return OsmosisTokenAmount.from_coin(res.balance, self)
 
     @ttl_cache(CacheGroup.OSMOSIS)
     async def get_all_balances(self, address: AccAddress = None) -> list[OsmosisTokenAmount]:
         address = self.address if address is None else address
-        coins_balance, pagination = await self.lcd.bank.balance(address)
-        if pagination["next_key"] is not None:
+        res = await self.grpc_bank.all_balances(address=address)
+        if res.pagination.next_key:
             raise NotImplementedError("not implemented for paginated results")
-        return [OsmosisTokenAmount.from_coin(c) for c in coins_balance.to_list()]
+        return [OsmosisTokenAmount.from_coin(c, self) for c in res.balances]
 
     @ttl_cache(CacheGroup.OSMOSIS)
     async def get_account_data(self, address: AccAddress = None) -> BaseAccount:
