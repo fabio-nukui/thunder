@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from decimal import Decimal, getcontext
+from decimal import ROUND_DOWN, Decimal, getcontext
 from typing import Generic, Optional, TypeVar, Union, overload
 
 DecInput = Union[str, int, float, Decimal]
 ROUNDING_SAFETY_MARGIN = 10
 
 getcontext().prec = 78  # To allow for calculations with up to 256 bits precision
+getcontext().rounding = ROUND_DOWN
 
 _MAX_DECIMALS_REPR = 8
 _MAX_DECIMALS_DATA = 18
