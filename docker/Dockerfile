@@ -38,7 +38,7 @@ RUN conda install --quiet --yes \
 
 RUN pip install --no-cache-dir \
         'python-binance==1.0.15' \
-        'https://github.com/fabio-nukui/osmosis.proto/releases/download/0.1.0/osmosis_proto-0.0.1-py3-none-any.whl' \
+        'https://github.com/fabio-nukui/osmosis.proto/releases/download/0.1.1/osmosis_proto-0.1.1-py3-none-any.whl' \
         'https://github.com/fabio-nukui/terra.py/releases/download/2.0.0b1/terra_sdk-2.0.0b1-py3-none-any.whl' && \
     fix-permissions $HOME $CONDA_DIR
 
