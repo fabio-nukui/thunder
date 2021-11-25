@@ -168,12 +168,9 @@ class TerraClient(BroadcasterMixin, CosmosClient):
 
     @ttl_cache(CacheGroup.TERRA)
     async def get_balance(self, denom: str, address: AccAddress = None) -> TerraTokenAmount:
-        bank = await self.get_all_balances(address)
-        for amount in bank:
-            assert isinstance(amount.token, TerraNativeToken)
-            if amount.token.denom == denom:
-                return amount
-        return TerraNativeToken(denom).to_amount(0)
+        address = self.address if address is None else address
+        res = await self.grpc_bank.balance(address=address, denom=denom)
+        return TerraNativeToken(res.balance.denom).to_amount(int_amount=res.balance.amount)
 
     @ttl_cache(CacheGroup.TERRA)
     async def get_all_balances(self, address: AccAddress = None) -> list[TerraTokenAmount]:
