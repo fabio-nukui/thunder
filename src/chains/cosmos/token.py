@@ -70,7 +70,10 @@ class CosmosNativeToken(BaseCosmosToken, Generic[_CosmosTokenAmountT]):
     def __init__(self, denom: str, decimals: int, symbol: str = None):
         self.denom = denom
         self.decimals = decimals
-        self.symbol = denom[1:].upper() if symbol is None else symbol
+        if symbol is not None:
+            self.symbol = symbol
+        else:
+            self.symbol = denom[1:].upper() if denom[0] == "u" else denom
 
     @property
     def _id(self) -> tuple:
