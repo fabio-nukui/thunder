@@ -14,6 +14,7 @@ from utils.cache import CacheGroup, ttl_cache
 from ...client import BroadcasterMixin, CosmosClient
 from ..mnemonic_key import MnemonicKey
 from ..token import OsmosisNativeToken, OsmosisTokenAmount
+from .gamm_api import GammApi
 
 log = logging.getLogger(__name__)
 
@@ -54,6 +55,8 @@ class OsmosisClient(BroadcasterMixin, CosmosClient):
             gas_adjustment=gas_adjustment,
             raise_on_syncing=raise_on_syncing,
         )
+
+        self.gamm = GammApi(self)
 
         hd_wallet = auth_secrets.hd_wallet() if hd_wallet is None else hd_wallet
         self.key = MnemonicKey(hd_wallet["mnemonic"], hd_wallet["account"], hd_wallet_index)

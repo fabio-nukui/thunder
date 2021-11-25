@@ -53,3 +53,7 @@ class IbcApi(Api):
         for d in channels_data:
             response[d["counterparty_chain_id"]].append(d["channel_id"])
         return dict(response)
+
+    async def get_chain_by_channel(self) -> dict[str, str]:
+        channels_data = await self.get_channels_data()
+        return {d["channel_id"]: d["counterparty_chain_id"] for d in channels_data}
