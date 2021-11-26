@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from terra_proto.terra.market.v1beta1 import QueryStub
+
 from utils.cache import CacheGroup, ttl_cache
 
 from ..denoms import LUNA, SDT
@@ -13,6 +15,9 @@ PRECISION = 18
 
 
 class MarketApi(Api):
+    def start(self):
+        self.grpc_query = QueryStub(self.client.grpc_channel)
+
     async def get_amount_out(
         self,
         offer_amount: TerraTokenAmount,
@@ -51,7 +56,7 @@ class MarketApi(Api):
         See https://docs.terra.money/Reference/Terra-core/Module-specifications/spec-market.html#market-making-algorithm  # noqa: E501
         """
         base_bool = SDT.decimalize(await self.get_market_parameter("base_pool"))
-        res = await self.client.grpc_market.terra_pool_delta()
+        res = await self.grpc_query.terra_pool_delta()
         pool_delta = int(res.terra_pool_delta.decode("ascii")) / 10 ** PRECISION
         terra_pool_delta = SDT.decimalize(pool_delta) + terra_pool_delta_change
 

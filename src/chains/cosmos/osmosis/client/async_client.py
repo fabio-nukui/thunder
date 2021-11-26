@@ -4,7 +4,6 @@ from decimal import Decimal
 
 import grpclib.client
 import osmosis_proto.cosmos.bank.v1beta1 as cosmos_bank_pb
-import osmosis_proto.osmosis.gamm.v1beta1 as osmosis_gamm_pb
 from terra_sdk.core import AccAddress, Coins
 from terra_sdk.core.auth.data import BaseAccount
 
@@ -70,8 +69,9 @@ class OsmosisClient(BroadcasterMixin, CosmosClient):
         grpc_url, grpc_port = self.grpc_uri.split(":")
         self.grpc_channel = grpclib.client.Channel(grpc_url, int(grpc_port))
 
-        self.grpc_gamm = osmosis_gamm_pb.QueryStub(self.grpc_channel)
         self.grpc_bank = cosmos_bank_pb.QueryStub(self.grpc_channel)
+
+        self.gamm.start()
 
         await asyncio.gather(self._init_lcd_signer(), self._init_broadcaster_clients())
         await self._check_connections()

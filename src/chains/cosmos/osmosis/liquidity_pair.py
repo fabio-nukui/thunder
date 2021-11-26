@@ -173,7 +173,7 @@ class GAMMLiquidityPool(BaseOsmosisLiquidityPool):
         token_out: OsmosisNativeToken,
     ) -> OsmosisTokenAmount:
         route = SwapAmountInRoute(self.pool_id, token_out.denom)
-        res = await self.client.grpc_gamm.estimate_swap_exact_amount_in(
+        res = await self.client.gamm.grpc_query.estimate_swap_exact_amount_in(
             sender=self.client.address,
             pool_id=self.pool_id,
             token_in=amount_in.to_str(),
