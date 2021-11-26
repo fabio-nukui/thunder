@@ -12,6 +12,7 @@ import configs
 from utils.cache import CacheGroup, ttl_cache
 
 from ...client import CosmosClient
+from ..denoms import OSMO
 from ..mnemonic_key import MnemonicKey
 from ..token import OsmosisTokenAmount
 from .api_tx import TxApi
@@ -21,7 +22,6 @@ log = logging.getLogger(__name__)
 
 _CONTRACT_QUERY_CACHE_SIZE = 10_000
 _CONTRACT_INFO_CACHE_TTL = 86400  # Contract info should not change; 24h ttl
-_NATIVE_OSMO_DENOM = "uosmo"
 
 
 class OsmosisClient(CosmosClient):
@@ -37,7 +37,7 @@ class OsmosisClient(CosmosClient):
         broadcaster_uris: list[str] = configs.OSMOSIS_BROADCASTER_URIS,
         broadcast_lcd_uris: list[str] = configs.OSMOSIS_BROADCAST_LCD_URIS,
         chain_id: str = configs.OSMOSIS_CHAIN_ID,
-        fee_denom: str = _NATIVE_OSMO_DENOM,
+        fee_denom: str = OSMO.denom,
         gas_prices: Coins.Input = None,
         gas_adjustment: Decimal = configs.OSMOSIS_GAS_ADJUSTMENT,
         raise_on_syncing: bool = configs.RAISE_ON_SYNCING,
@@ -69,7 +69,7 @@ class OsmosisClient(CosmosClient):
         await super().start()
 
         if not self.gas_prices:
-            self.lcd.gas_prices = Coins("0uosmo")
+            self.lcd.gas_prices = Coins(f"0{OSMO.denom}")
 
         self.grpc_bank = cosmos_bank_pb.QueryStub(self.grpc_channel)
         self.gamm.start()

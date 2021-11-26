@@ -8,6 +8,7 @@ from terra_sdk.core import Coins
 from terra_sdk.core.fee import Fee
 
 from ...client.api_tx import TxApi as CosmosTxApi
+from ..denoms import OSMO
 
 if TYPE_CHECKING:
     from .async_client import OsmosisClient  # noqa: F401
@@ -26,4 +27,4 @@ class TxApi(CosmosTxApi["OsmosisClient"]):
         **kwargs,
     ) -> Fee:
         gas_adjustment += _FALLBACK_EXTRA_GAS_ADJUSTMENT
-        return Fee(int(estimated_gas_use * gas_adjustment), Coins("uosmo0"))
+        return Fee(int(estimated_gas_use * gas_adjustment), Coins(f"0{OSMO.denom}"))
