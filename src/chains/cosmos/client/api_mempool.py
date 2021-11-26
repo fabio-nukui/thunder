@@ -12,19 +12,18 @@ import configs
 import utils
 from utils.cache import CacheGroup, ttl_cache
 
+from .. import utils_rpc
 from ..tx_filter import Filter
-from . import utils_rpc
 from .base_api import Api
 
 if TYPE_CHECKING:
-    from .async_client import TerraClient
+    from .async_client import CosmosClient
 
 log = logging.getLogger(__name__)
 
-DECODER_CACHE_SIZE = 2000
-DECODER_CACHE_TTL = 60
-DECODE_TX_TIMEOUT = 0.5
-MAX_RAW_TX_LENGTH = 3000
+_DECODER_CACHE_SIZE = 2000
+_DECODER_CACHE_TTL = 60
+_MAX_RAW_TX_LENGTH = 3000
 _T = TypeVar("_T")
 
 
@@ -38,7 +37,7 @@ class UpdateEvent(Enum):
 
 
 class MempoolCacheManager:
-    def __init__(self, client: TerraClient):
+    def __init__(self, client: CosmosClient):
         self.client = client
 
         self._height = 0
@@ -116,7 +115,7 @@ class MempoolCacheManager:
         while True:
             res = await self.client.rpc_http_client.get("unconfirmed_txs")
             raw_txs: set[str] = {
-                tx for tx in res.json()["result"]["txs"] if len(tx) < MAX_RAW_TX_LENGTH
+                tx for tx in res.json()["result"]["txs"] if len(tx) < _MAX_RAW_TX_LENGTH
             }
             set_cache = set(self._txs_cache)
             if not wait_for_changes or raw_txs != set_cache:
@@ -141,7 +140,7 @@ class MempoolCacheManager:
         await self._update_mempool_txs(wait_for_changes=False)
         return list(tx for tx in self._txs_cache.values() if tx is not None)
 
-    @ttl_cache(CacheGroup.TERRA, maxsize=DECODER_CACHE_SIZE, ttl=DECODER_CACHE_TTL)
+    @ttl_cache(CacheGroup.TERRA, maxsize=_DECODER_CACHE_SIZE, ttl=_DECODER_CACHE_TTL)
     def _decode_tx(self, raw_tx: str) -> Tx | None:
         try:
             return Tx.from_proto_bytes(base64.b64decode(raw_tx))
@@ -150,8 +149,8 @@ class MempoolCacheManager:
             return None
 
 
-class MempoolApi(Api):
-    def __init__(self, client: "TerraClient"):
+class MempoolApi(Api["CosmosClient"]):
+    def __init__(self, client: CosmosClient):
         super().__init__(client)
         self._cache_manager = MempoolCacheManager(client)
 

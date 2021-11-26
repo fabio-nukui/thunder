@@ -13,11 +13,11 @@ from exceptions import BlockchainNewState, TxAlreadyBroadcasted
 from .base_api import Api
 
 if TYPE_CHECKING:
-    from .async_client import TerraClient
+    from .async_client import CosmosClient
 
 log = logging.getLogger(__name__)
 
-BROADCASTER_CACHE_BLOCKS = 2
+_BROADCASTER_CACHE_BLOCKS = 2
 _MsgType = TypeVar("_MsgType", dict, list)
 
 
@@ -74,8 +74,8 @@ def _get_pools(msgs: list[dict]) -> set[str]:
     return signature
 
 
-class BroadcasterApi(Api):
-    def __init__(self, client: "TerraClient"):
+class BroadcasterApi(Api["CosmosClient"]):
+    def __init__(self, client: CosmosClient):
         super().__init__(client)
         self._height: int = 0
         self._broadcaster_cache: dict[int, list[BroadcastCacheKey]] = {}
@@ -140,7 +140,7 @@ class BroadcasterApi(Api):
         self._broadcaster_cache = {  # Drop old values
             height: val
             for height, val in self._broadcaster_cache.items()
-            if payload["height"] - height <= BROADCASTER_CACHE_BLOCKS
+            if payload["height"] - height <= _BROADCASTER_CACHE_BLOCKS
         }
         msg_keys = [_msg_to_key(msg) for msg in payload["msgs"]]
         key = BroadcastCacheKey(msg_keys, payload["n_repeat"])

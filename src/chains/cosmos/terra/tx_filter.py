@@ -3,12 +3,12 @@ from __future__ import annotations
 import base64
 import json
 import logging
-from abc import ABC, abstractmethod
 from typing import Iterable
 
 from terra_sdk.core import AccAddress
 from terra_sdk.core.tx import Tx
 
+from ..tx_filter import Filter, FilterMsgsLength
 from . import terraswap
 from .native_liquidity_pair import NativeLiquidityPair
 from .token import TerraCW20Token, TerraNativeToken, TerraToken
@@ -20,62 +20,6 @@ def _decode_msg(raw_msg: str | dict, always_base64: bool) -> dict:
     if isinstance(raw_msg, dict):
         return {} if always_base64 else raw_msg
     return json.loads(base64.b64decode(raw_msg))
-
-
-class Filter(ABC):
-    @abstractmethod
-    def match_tx(self, tx: Tx) -> bool:
-        ...
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}"
-
-    def __and__(self: Filter, other) -> FilterAll:
-        if not isinstance(other, Filter):
-            return NotImplemented
-        self_filters = self.filters if isinstance(self, FilterAll) else [self]
-        other_filters = other.filters if isinstance(other, FilterAll) else [other]
-        return FilterAll(self_filters + other_filters)
-
-    def __or__(self: Filter, other) -> FilterAny:
-        if not isinstance(other, Filter):
-            return NotImplemented
-        self_filters = self.filters if isinstance(self, FilterAny) else [self]
-        other_filters = other.filters if isinstance(other, FilterAny) else [other]
-        return FilterAny(self_filters + other_filters)
-
-
-class FilterAll(Filter):
-    def __init__(self, filters: list[Filter]):
-        self.filters = filters
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self.filters})"
-
-    def match_tx(self, tx: Tx) -> bool:
-        return all(filter_.match_tx(tx) for filter_ in self.filters)
-
-
-class FilterAny(Filter):
-    def __init__(self, filters: list[Filter]):
-        self.filters = filters
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self.filters})"
-
-    def match_tx(self, tx: Tx) -> bool:
-        return any(filter_.match_tx(tx) for filter_ in self.filters)
-
-
-class FilterMsgsLength(Filter):
-    def __init__(self, length: int):
-        self.length = length
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(length={self.length})"
-
-    def match_tx(self, tx: Tx) -> bool:
-        return len(tx.body.messages) == self.length
 
 
 class FilterFirstActionPairSwap(Filter):

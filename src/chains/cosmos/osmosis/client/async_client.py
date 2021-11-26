@@ -1,20 +1,20 @@
-import asyncio
+from __future__ import annotations
+
 import logging
 from decimal import Decimal
 
-import grpclib.client
 import osmosis_proto.cosmos.bank.v1beta1 as cosmos_bank_pb
 from terra_sdk.core import AccAddress, Coins
 from terra_sdk.core.auth.data import BaseAccount
 
 import auth_secrets
 import configs
-import utils
 from utils.cache import CacheGroup, ttl_cache
 
-from ...client import BroadcasterMixin, CosmosClient
+from ...client import CosmosClient
 from ..mnemonic_key import MnemonicKey
 from ..token import OsmosisTokenAmount
+from .api_tx import TxApi
 from .gamm_api import GammApi
 
 log = logging.getLogger(__name__)
@@ -24,7 +24,9 @@ _CONTRACT_INFO_CACHE_TTL = 86400  # Contract info should not change; 24h ttl
 _NATIVE_OSMO_DENOM = "uosmo"
 
 
-class OsmosisClient(BroadcasterMixin, CosmosClient):
+class OsmosisClient(CosmosClient):
+    tx: TxApi  # Override superclass' property
+
     def __init__(
         self,
         lcd_uri: str = configs.OSMOSIS_LCD_URI,
@@ -58,51 +60,22 @@ class OsmosisClient(BroadcasterMixin, CosmosClient):
         )
 
         self.gamm = GammApi(self)
+        self.tx = TxApi(self)
 
         hd_wallet = auth_secrets.hd_wallet() if hd_wallet is None else hd_wallet
         self.key = MnemonicKey(hd_wallet["mnemonic"], hd_wallet["account"], hd_wallet_index)
 
     async def start(self):
-        self.lcd_http_client = utils.ahttp.AsyncClient(base_url=self.lcd_uri)
-        self.rpc_http_client = utils.ahttp.AsyncClient(base_url=self.rpc_http_uri)
-
-        grpc_url, grpc_port = self.grpc_uri.split(":")
-        self.grpc_channel = grpclib.client.Channel(grpc_url, int(grpc_port))
-
-        self.grpc_bank = cosmos_bank_pb.QueryStub(self.grpc_channel)
-
-        self.gamm.start()
-
-        await asyncio.gather(self._init_lcd_signer(), self._init_broadcaster_clients())
-        await self._check_connections()
+        await super().start()
 
         if not self.gas_prices:
             self.lcd.gas_prices = Coins("0uosmo")
-        await super().start()
 
-    async def _check_connections(self):
-        tasks = [
-            self.lcd_http_client.check_connection("node_info"),
-            self.rpc_http_client.check_connection("health"),
-        ]
-        results = await asyncio.gather(*tasks)
-        assert all(results), "Connection error(s)"
+        self.grpc_bank = cosmos_bank_pb.QueryStub(self.grpc_channel)
+        self.gamm.start()
 
         if configs.OSMOSIS_USE_BROADCASTER:
             await self.update_active_broadcaster()
-        await asyncio.gather(
-            *(conn.check_connection("node_info") for conn in self.broadcast_lcd_clients)
-        )
-
-    async def close(self):
-        log.debug(f"Closing {self=}")
-        self.grpc_channel.close()
-        await asyncio.gather(
-            self.lcd_http_client.aclose(),
-            self.rpc_http_client.aclose(),
-            *(client.aclose() for client in self.broadcast_lcd_clients),
-            self.lcd.session.close(),
-        )
 
     @ttl_cache(CacheGroup.OSMOSIS, _CONTRACT_QUERY_CACHE_SIZE)
     async def contract_query(self, contract_addr: AccAddress, query_msg: dict) -> dict:

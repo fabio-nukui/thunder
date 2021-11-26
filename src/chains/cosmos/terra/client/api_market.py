@@ -1,20 +1,24 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from terra_proto.terra.market.v1beta1 import QueryStub
 
 from utils.cache import CacheGroup, ttl_cache
 
+from ...client.base_api import Api
 from ..denoms import LUNA, SDT
 from ..token import TerraNativeToken, TerraTokenAmount
-from .base_api import Api
 
-MARKET_PARAMETERS_TTL = 3600
-PRECISION = 18
+if TYPE_CHECKING:
+    from .async_client import TerraClient  # noqa: F401
+
+_MARKET_PARAMETERS_TTL = 3600
+_PRECISION = 18
 
 
-class MarketApi(Api):
+class MarketApi(Api["TerraClient"]):
     def start(self):
         self.grpc_query = QueryStub(self.client.grpc_channel)
 
@@ -57,7 +61,7 @@ class MarketApi(Api):
         """
         base_bool = SDT.decimalize(await self.get_market_parameter("base_pool"))
         res = await self.grpc_query.terra_pool_delta()
-        pool_delta = int(res.terra_pool_delta.decode("ascii")) / 10 ** PRECISION
+        pool_delta = int(res.terra_pool_delta.decode("ascii")) / 10 ** _PRECISION
         terra_pool_delta = SDT.decimalize(pool_delta) + terra_pool_delta_change
 
         pool_terra = base_bool + terra_pool_delta
@@ -65,7 +69,7 @@ class MarketApi(Api):
 
         return pool_terra, pool_luna
 
-    @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=MARKET_PARAMETERS_TTL)
+    @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=_MARKET_PARAMETERS_TTL)
     async def get_tobin_taxes(self) -> dict[TerraNativeToken, Decimal]:
         response = await self.client.lcd.oracle.parameters()
         return {
@@ -76,7 +80,7 @@ class MarketApi(Api):
     async def get_market_parameter(self, param_name: str) -> Decimal:
         return (await self.get_market_parameters())[param_name]
 
-    @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=MARKET_PARAMETERS_TTL)
+    @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=_MARKET_PARAMETERS_TTL)
     async def get_market_parameters(self) -> dict[str, Decimal]:
         params = await self.client.lcd.market.parameters()
         return {k: Decimal(str(v)) for k, v in params.items()}

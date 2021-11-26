@@ -1,19 +1,23 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from terra_proto.terra.oracle.v1beta1 import QueryStub
 
 from utils.cache import CacheGroup, ttl_cache
 
+from ...client.base_api import Api
 from ..denoms import LUNA
 from ..token import TerraNativeToken
-from .base_api import Api
 
-PRECISION = 18
+if TYPE_CHECKING:
+    from .async_client import TerraClient  # noqa: F401
+
+_PRECISION = 18
 
 
-class OracleApi(Api):
+class OracleApi(Api["TerraClient"]):
     def start(self):
         self.grpc_query = QueryStub(self.client.grpc_channel)
 
@@ -21,7 +25,7 @@ class OracleApi(Api):
     async def get_exchange_rates(self) -> dict[TerraNativeToken, Decimal]:
         res = await self.grpc_query.exchange_rates()
         rates = {
-            TerraNativeToken(c.denom): Decimal(c.amount) / 10 ** PRECISION
+            TerraNativeToken(c.denom): Decimal(c.amount) / 10 ** _PRECISION
             for c in res.exchange_rates
         }
         rates[LUNA] = Decimal(1)
@@ -37,4 +41,4 @@ class OracleApi(Api):
         if isinstance(to_coin, str):
             to_coin = TerraNativeToken(to_coin)
         exchange_rates = await self.get_exchange_rates()
-        return round(exchange_rates[to_coin] / exchange_rates[from_coin], PRECISION)
+        return round(exchange_rates[to_coin] / exchange_rates[from_coin], _PRECISION)

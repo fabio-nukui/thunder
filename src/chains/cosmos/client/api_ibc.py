@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import asyncio
 from collections import defaultdict
+from typing import TYPE_CHECKING
 
 from .base_api import Api
 
+if TYPE_CHECKING:
+    from .async_client import CosmosClient  # noqa: F401
 
-class IbcApi(Api):
+
+class IbcApi(Api["CosmosClient"]):
     async def get_client_state(self, client_id: str) -> dict:
         url = f"ibc/core/client/v1/client_states/{client_id}"
         return (await self.client.lcd_http_client.get(url)).json()["client_state"]
