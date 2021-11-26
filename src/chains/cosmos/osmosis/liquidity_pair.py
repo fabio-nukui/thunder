@@ -19,7 +19,7 @@ Operation = tuple[OsmosisTokenAmount, list[MsgExecuteContract]]
 _BaseOsmoLiquidityPoolT = TypeVar("_BaseOsmoLiquidityPoolT", bound="BaseOsmosisLiquidityPool")
 
 PRECISION = 18
-ROUND_PREC = Decimal(1) / 10 ** PRECISION
+_ROUND_RATIO_MARGIN = Decimal("0.15")
 
 
 class BaseOsmosisLiquidityPool(ABC):
@@ -155,10 +155,16 @@ class GAMMLiquidityPool(BaseOsmosisLiquidityPool):
         weight_out = self.weights[token_out]
 
         adjusted_in = amount_in.amount * (1 - self.swap_fee)
-        y = (reserve_in / (reserve_in + adjusted_in)).quantize(ROUND_PREC, "ROUND_DOWN")
-        bar = (1 - y ** (weight_in / weight_out)).quantize(ROUND_PREC, "ROUND_DOWN")
+        y = reserve_in / (reserve_in + adjusted_in)
+        bar = 1 - y ** (weight_in / weight_out)
 
         amount_out = token_out.to_amount(reserve_out * bar)
+
+        if weight_in != weight_out:
+            # Apply aditional safety margin due to cosmos-sdk Pow() implementation
+            reserves_ratio = (reserve_out / weight_out) / (reserve_in / weight_in)
+            amount_out -= token_out.decimalize(int(reserves_ratio * _ROUND_RATIO_MARGIN))
+
         return amount_out.safe_margin(safety_margin)
 
     async def estimate_swap_exact_in(
