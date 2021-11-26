@@ -96,6 +96,7 @@ class OsmosisClient(BroadcasterMixin, CosmosClient):
 
     async def close(self):
         log.debug(f"Closing {self=}")
+        self.grpc_channel.close()
         await asyncio.gather(
             self.lcd_http_client.aclose(),
             self.rpc_http_client.aclose(),
