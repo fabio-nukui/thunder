@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from copy import copy
 from decimal import Decimal
 from typing import Sequence, TypeVar
 
 from osmosis_proto.osmosis.gamm.v1beta1 import SwapAmountInRoute
-from terra_sdk.core import AccAddress
 from terra_sdk.core.tx import Tx
 from terra_sdk.core.wasm import MsgExecuteContract
 
@@ -37,16 +37,6 @@ class BaseOsmosisLiquidityPool(ABC):
     @property
     def sorted_tokens(self) -> tuple[OsmosisToken, ...]:
         return tuple(sorted(self.tokens))
-
-    @abstractmethod
-    async def op_swap_exact_in(
-        self,
-        sender: AccAddress,
-        amount_in: OsmosisTokenAmount,
-        token_out: OsmosisNativeToken,
-        safety_margin: bool | int = True,
-    ) -> Operation:
-        ...
 
     @abstractmethod
     async def get_amount_out_exact_in(
@@ -127,15 +117,6 @@ class GAMMLiquidityPool(BaseOsmosisLiquidityPool):
         assets = await self.client.gamm.get_pool_assets(pool_id=self.pool_id)
         return {t: t.decimalize(a.token.amount) for t, a in zip(self.tokens, assets)}
 
-    async def op_swap_exact_in(
-        self,
-        sender: AccAddress,
-        amount_in: OsmosisTokenAmount,
-        token_out: OsmosisNativeToken,
-        safety_margin: bool | int = True,
-    ) -> Operation:
-        raise NotImplementedError
-
     async def get_amount_out_exact_in(
         self,
         amount_in: OsmosisTokenAmount,
@@ -182,10 +163,17 @@ class GAMMLiquidityPool(BaseOsmosisLiquidityPool):
         return token_out.to_amount(int_amount=res.token_out_amount)
 
     async def simulate_reserve_change(
-        self: _BaseOsmoLiquidityPoolT,
+        self: GAMMLiquidityPool,
         amounts: list[OsmosisTokenAmount],
-    ) -> _BaseOsmoLiquidityPoolT:
-        raise NotImplementedError
+    ) -> GAMMLiquidityPool:
+        reserves = await self.get_reserves()
+        simulation = copy(self)
+        simulation._stop_updates = True
+        for amount in amounts:
+            assert isinstance(amount.token, OsmosisNativeToken)
+            reserves[amount.token] += amount.amount
+        simulation._reserves = reserves
+        return simulation
 
     async def get_reserve_changes_from_msg(self, msg: dict) -> list[OsmosisTokenAmount]:
         raise NotImplementedError
