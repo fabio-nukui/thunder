@@ -12,10 +12,10 @@ from typing import Generic, Sequence
 from terra_sdk.client.lcd.api.tx import CreateTxOptions
 from terra_sdk.core.broadcast import SyncTxBroadcastResult
 from terra_sdk.core.fee import Fee
-from terra_sdk.core.msg import Msg
 from terra_sdk.core.tx import Tx
 from terra_sdk.exceptions import LCDResponseError
 
+from chains.cosmos.msg import Msg
 from exceptions import FeeEstimationError, TxAlreadyBroadcasted
 
 from .base_api import Api, CosmosClientT

@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Sequence, TypedDict,
 
 from terra_sdk.core.broadcast import SyncTxBroadcastResult
 from terra_sdk.core.fee import Fee
-from terra_sdk.core.msg import Msg
 
+from chains.cosmos.msg import Msg
 from exceptions import BlockchainNewState, TxAlreadyBroadcasted
 
 from .base_api import Api

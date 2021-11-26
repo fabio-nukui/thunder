@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING, Sequence
 
 from terra_sdk.core import Coins
 from terra_sdk.core.fee import Fee
-from terra_sdk.core.msg import Msg
 
 import configs
+from chains.cosmos.msg import Msg
 from exceptions import FeeEstimationError
 from utils.cache import CacheGroup, ttl_cache
 
