@@ -32,7 +32,9 @@ def _get_ibc_symbol(denom: str, chain_id: str) -> str:
         (t["base_denom"], t["path"]) for t in tokens if t["denom_hash"] == denom_hash
     ]
     channels = path.replace("transfer/", "")
-    symbol = f"{base_denom[1:].upper()}(ibc/{channels})"
+    if base_denom[0] == "u":
+        base_denom = base_denom[1:]
+    symbol = f"{base_denom.upper()}(ibc/{channels})"
     return symbol
 
 
