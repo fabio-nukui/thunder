@@ -9,7 +9,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
-from typing import Sequence
+from typing import Any, Sequence
 
 from terra_sdk.core.auth import TxInfo
 from terra_sdk.core.fee import Fee
@@ -18,10 +18,10 @@ from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.exceptions import LCDResponseError
 
 import utils
-from arbitrage.terra import (
-    TerraArbParams,
-    TerraRepeatedTxArbitrage,
-    TerraswapLPReserveSimulationMixin,
+from arbitrage.cosmos import (
+    CosmosArbParams,
+    CosmosRepeatedTxArbitrage,
+    LPReserveSimulationMixin,
     run_strategy,
 )
 from chains.cosmos.terra import (
@@ -47,6 +47,7 @@ from strategies.common.default_params import (
     MIN_START_AMOUNT,
     OPTIMIZATION_TOLERANCE,
 )
+from utils.cache import CacheGroup
 
 log = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ class NoPairFound(Exception):
 
 
 @dataclass
-class ArbParams(TerraArbParams):
+class ArbParams(CosmosArbParams):
     __slots__ = (
         "timestamp_found",
         "block_found",
@@ -123,7 +124,7 @@ async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
     for route_group in list_route_groups:
         for multi_routes in route_group:
             gas_adjustment = (
-                ANCHOR_MARKET_GAS_ADJUSMENT if anchor_market in multi_routes.pairs else None
+                ANCHOR_MARKET_GAS_ADJUSMENT if anchor_market in multi_routes.pools else None
             )
             try:
                 arbs.append(
@@ -140,7 +141,7 @@ def get_filters(
 ) -> dict[terraswap.RouterLiquidityPair, Filter]:
     filters: dict[terraswap.RouterLiquidityPair, Filter] = {}
     for arb_route in arb_routes:
-        for pair in arb_route.pairs:
+        for pair in arb_route.pools:
             if not isinstance(
                 pair, (terraswap.RouterNativeLiquidityPair, terraswap.LiquidityPair)
             ):
@@ -279,7 +280,7 @@ def _reorder_routes(routes: list[MultiRoutes]) -> list[MultiRoutes]:
     alte_routes = []
     non_alte_routes = []
     for r in routes:
-        if any(t.symbol == "ALTE" for p in r.pairs for t in p.tokens):
+        if any(t.symbol == "ALTE" for p in r.pools for t in p.tokens):
             alte_routes.append(r)
         else:
             non_alte_routes.append(r)
@@ -334,7 +335,7 @@ async def _pairs_from_factories(
     return pairs
 
 
-class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArbitrage):
+class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[TerraClient]):
     multi_routes: MultiRoutes
     gas_adjustment: Decimal | None
     routes: list[SingleRoute]
@@ -377,9 +378,9 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
 
         self.__init__(
             client,
-            pairs=multi_routes.pairs,
+            pools=multi_routes.pools,
             routes=multi_routes.routes,
-            filter_keys=multi_routes.pairs,
+            filter_keys=multi_routes.pools,
             fee_denom=self.start_token.denom,
         )
         self.estimated_gas_use = await self._estimate_gas_use()
@@ -410,8 +411,8 @@ class TerraCyclesArbitrage(TerraswapLPReserveSimulationMixin, TerraRepeatedTxArb
     async def _get_arbitrage_params(
         self,
         height: int,
-        filtered_mempool: dict[BaseTerraLiquidityPair, list[Tx]] = None,
-    ) -> ArbParams:
+        filtered_mempool: dict[Any, list[Tx]] = None,
+    ) -> CosmosArbParams:
         initial_balance = await self.start_token.get_balance(self.client)
 
         params: list[dict] = []
@@ -565,4 +566,4 @@ async def run(max_n_blocks: int = None):
     async with TerraClient() as client:
         arb_routes = await get_arbitrages(client)
         mempool_filters = get_filters(arb_routes)
-        await run_strategy(client, arb_routes, mempool_filters, max_n_blocks)
+        await run_strategy(client, arb_routes, mempool_filters, CacheGroup.TERRA, max_n_blocks)

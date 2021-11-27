@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Sequence, TypedDict,
 from terra_sdk.core.broadcast import SyncTxBroadcastResult
 from terra_sdk.core.fee import Fee
 
-from chains.cosmos.msg import Msg
+from chains.cosmos.msg import Msg, MsgType
 from exceptions import BlockchainNewState, TxAlreadyBroadcasted
 
 from .base_api import Api
@@ -83,7 +83,7 @@ class BroadcasterApi(Api["CosmosClient"]):
 
     async def post(
         self,
-        msgs: Sequence[Msg],
+        msgs: Sequence[MsgType],
         n_repeat: int,
         fee: Fee = None,
         fee_denom: str = None,

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import json
-from abc import ABC
+from abc import ABC, abstractmethod
 from decimal import Decimal
 from typing import TYPE_CHECKING, Generic, Optional, TypeVar, Union
 
-from terra_sdk.core import AccAddress, Dec
+from terra_sdk.core import AccAddress, Coin, Dec
 from terra_sdk.core.wasm import MsgExecuteContract
 
 from common.token import DecInput, Token, TokenAmount
@@ -24,7 +24,7 @@ def get_cw20_whitelist(chain_id: str) -> dict[str, AccAddress]:
         return json.load(f)
 
 
-class CosmosTokenAmount(TokenAmount):
+class CosmosTokenAmount(TokenAmount, ABC):
     token: CosmosToken
 
     def __init__(
@@ -38,6 +38,15 @@ class CosmosTokenAmount(TokenAmount):
         if isinstance(int_amount, Dec):
             int_amount = int(int_amount)
         super().__init__(token, amount, int_amount)
+
+    @classmethod
+    @abstractmethod
+    def from_coin(cls: type[_CosmosTokenAmountT], coin: Coin) -> _CosmosTokenAmountT:
+        ...
+
+    @classmethod
+    def from_str(cls: type[_CosmosTokenAmountT], data: str) -> _CosmosTokenAmountT:
+        return cls.from_coin(Coin.from_str(data))
 
     async def has_allowance(
         self,

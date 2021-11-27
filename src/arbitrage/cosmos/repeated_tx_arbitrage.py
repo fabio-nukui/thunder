@@ -4,7 +4,7 @@ import time
 from abc import ABC, abstractmethod
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Awaitable, Iterable, Mapping, Sequence
+from typing import Any, Awaitable, Generic, Iterable, Mapping, Sequence, TypeVar
 
 from terra_sdk.core.auth import TxInfo
 from terra_sdk.core.fee import Fee
@@ -12,8 +12,9 @@ from terra_sdk.core.wasm import MsgExecuteContract
 from terra_sdk.exceptions import LCDResponseError
 
 import utils
-from chains.cosmos.terra import TerraClient, TerraTokenAmount
-from chains.cosmos.terra.tx_filter import Filter
+from chains.cosmos.client import CosmosClient
+from chains.cosmos.token import CosmosTokenAmount
+from chains.cosmos.tx_filter import Filter
 from exceptions import BlockchainNewState, IsBusy
 
 from ..repeated_tx_arbitrage import (
@@ -25,12 +26,14 @@ from ..repeated_tx_arbitrage import (
 )
 
 log = logging.getLogger(__name__)
+_CosmosClientT = TypeVar("_CosmosClientT", bound=CosmosClient)
+
 
 MIN_CONFIRMATIONS = 1
 MAX_BLOCKS_WAIT_RECEIPT = 4
 
 
-class TerraArbParams(BaseArbParams):
+class CosmosArbParams(BaseArbParams):
     timestamp_found: float
     block_found: int
 
@@ -39,7 +42,9 @@ class TerraArbParams(BaseArbParams):
     est_fee: Fee
 
 
-class TerraRepeatedTxArbitrage(RepeatedTxArbitrage[TerraClient], ABC):
+class CosmosRepeatedTxArbitrage(
+    Generic[_CosmosClientT], RepeatedTxArbitrage[_CosmosClientT], ABC
+):
     def __init__(self, *args, filter_keys: Iterable, fee_denom: str = None, **kwargs):
         self.filter_keys = filter_keys
         self.fee_denom = fee_denom
@@ -49,7 +54,7 @@ class TerraRepeatedTxArbitrage(RepeatedTxArbitrage[TerraClient], ABC):
 
     async def _broadcast_txs(  # type: ignore[override]
         self,
-        arb_params: TerraArbParams,
+        arb_params: CosmosArbParams,
         height: int,
         fee_denom: str = None,
     ) -> list[ArbTx]:
@@ -65,7 +70,7 @@ class TerraRepeatedTxArbitrage(RepeatedTxArbitrage[TerraClient], ABC):
     async def _confirm_txs(  # type: ignore[override]
         self,
         height: int,
-        params: TerraArbParams,
+        params: CosmosArbParams,
         txs: list[ArbTx],
     ) -> list[ArbResult]:
         results = await asyncio.gather(
@@ -76,7 +81,7 @@ class TerraRepeatedTxArbitrage(RepeatedTxArbitrage[TerraClient], ABC):
     async def _confirm_single_tx(
         self,
         height: int,
-        params: TerraArbParams,
+        params: CosmosArbParams,
         tx_hash: str,
     ) -> ArbResult:
         tx_inclusion_delay = height - params.block_found
@@ -91,7 +96,7 @@ class TerraRepeatedTxArbitrage(RepeatedTxArbitrage[TerraClient], ABC):
             raise
         if height - info.height < MIN_CONFIRMATIONS:
             raise IsBusy
-        gas_cost = TerraTokenAmount.from_coin(*info.tx.auth_info.fee.amount)
+        gas_cost = CosmosTokenAmount.from_coin(*info.tx.auth_info.fee.amount)
         if info.logs is None:
             status = TxStatus.failed
             tx_err_log = info.rawlog
@@ -117,14 +122,15 @@ class TerraRepeatedTxArbitrage(RepeatedTxArbitrage[TerraClient], ABC):
     async def _extract_returns_from_info(
         self,
         logs: TxInfo,
-    ) -> tuple[TerraTokenAmount, Decimal]:
+    ) -> tuple[CosmosTokenAmount, Decimal]:
         ...
 
 
 async def run_strategy(
-    client: TerraClient,
-    arb_routes: Sequence[TerraRepeatedTxArbitrage],
+    client: CosmosClient,
+    arb_routes: Sequence[CosmosRepeatedTxArbitrage],
     mempool_filters: Mapping[Any, Filter],
+    cache_group: utils.cache.CacheGroup,
     max_n_blocks: int = None,
     log_time: bool = True,
 ):
@@ -135,7 +141,7 @@ async def run_strategy(
             start = time.perf_counter()
         if is_new_block := any(height > arb_route.last_run_height for arb_route in arb_routes):
             log.debug(f"New block: {height=}")
-            utils.cache.clear_caches(utils.cache.CacheGroup.TERRA)
+            utils.cache.clear_caches(cache_group)
             asyncio.create_task(client.update_active_broadcaster())
         if mempool:
             log.debug(f"New mempool txs: n_txs={len(mempool)}")

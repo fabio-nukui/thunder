@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import itertools
-from functools import cache
 from typing import Iterable, Sequence, Union, cast
 
 from terra_sdk.core import AccAddress
 from terra_sdk.core.wasm import MsgExecuteContract
+
+from utils.cache import lru_cache
 
 from .client import TerraClient
 from .native_liquidity_pair import BaseTerraLiquidityPair
@@ -47,14 +48,14 @@ class MultiRoutes:
         self.client = client
         self.list_steps = list_steps
         self.router_address = router_address
-        self.pairs = [pair for step in list_steps for pair in step]
+        self.pools = [pool for step in list_steps for pool in step]
         self.tokens = _extract_tokens_from_routes(start_token, list_steps)
         self.n_steps = len(list_steps)
 
         self.is_cycle = self.tokens[0] == self.tokens[-1]
         self.routes = [
-            SingleRoute(client, self.tokens, pairs, router_address)
-            for pairs in itertools.product(*list_steps)
+            SingleRoute(client, self.tokens, pools, router_address)
+            for pools in itertools.product(*list_steps)
         ]
         self.n_routes = len(self.routes)
 
@@ -71,17 +72,17 @@ class SingleRoute:
         self,
         client: TerraClient,
         tokens: Iterable[TerraToken],
-        pairs: Iterable[BaseTerraLiquidityPair],
+        pools: Iterable[BaseTerraLiquidityPair],
         router_address: AccAddress = None,
     ):
         self.client = client
         self.tokens = list(tokens)
-        self.pairs = list(pairs)
+        self.pools = list(pools)
         if router_address is None:
             self.router = None
         else:
-            assert all(isinstance(p, (LiquidityPair, RouterNativeLiquidityPair)) for p in pairs)
-            pairs_r = cast(Iterable[Union[LiquidityPair, RouterNativeLiquidityPair]], pairs)
+            assert all(isinstance(p, (LiquidityPair, RouterNativeLiquidityPair)) for p in pools)
+            pairs_r = cast(Iterable[Union[LiquidityPair, RouterNativeLiquidityPair]], pools)
             self.router = Router(router_address, pairs_r, client)
         self.is_cycle = self.tokens[0] == self.tokens[-1]
 
@@ -109,11 +110,11 @@ class SingleRoute:
             return await self.router.op_swap(
                 self.client.address, amount_in, route, min_amount_out, safety_margin
             )
-        pairs = self.pairs if not reverse else reversed(self.pairs)
+        pools = self.pools if not reverse else reversed(self.pools)
         step_amount = amount_in
         msgs: list[MsgExecuteContract] = []
-        for pair in pairs:
-            step_amount, step_msgs = await pair.op_swap(
+        for pool in pools:
+            step_amount, step_msgs = await pool.op_swap(
                 self.client.address, step_amount, safety_margin
             )
             msgs.extend(step_msgs)
@@ -131,17 +132,17 @@ class SingleRoute:
                 raise TypeError("Missing min_amount_out")
         return min_amount_out
 
-    @cache
+    @lru_cache()
     def _get_route_steps(self, reverse: bool) -> Sequence[RouteStep]:
-        pairs, token_in = (
-            (self.pairs, self.tokens[0])
+        pools, token_in = (
+            (self.pools, self.tokens[0])
             if not reverse
-            else (reversed(self.pairs), self.tokens[-1])
+            else (reversed(self.pools), self.tokens[-1])
         )
         steps: list[RouteStepNative | RouteStepTerraswap] = []
-        for pair in pairs:
-            token_out = pair.tokens[0] if token_in == pair.tokens[1] else pair.tokens[1]
-            if isinstance(pair, LiquidityPair):
+        for pool in pools:
+            token_out = pool.tokens[0] if token_in == pool.tokens[1] else pool.tokens[1]
+            if isinstance(pool, LiquidityPair):
                 steps.append(RouteStepTerraswap(token_in, token_out))
             else:
                 steps.append(RouteStepNative(token_in, token_out))  # type: ignore
@@ -154,11 +155,11 @@ class SingleRoute:
         reverse: bool = False,
         safety_margin: bool | int = True,
     ) -> TerraTokenAmount:
-        pairs = self.pairs if not reverse else reversed(self.pairs)
+        pools = self.pools if not reverse else reversed(self.pools)
         step_amount = amount_in
         if self.router is not None:
             route = self._get_route_steps(reverse)
             return await self.router.get_swap_amount_out(amount_in, route, safety_margin)
-        for pair in pairs:
-            step_amount = await pair.get_swap_amount_out(step_amount, safety_margin)
+        for pool in pools:
+            step_amount = await pool.get_swap_amount_out(step_amount, safety_margin)
         return step_amount

@@ -15,7 +15,7 @@ from terra_sdk.core.fee import Fee
 from terra_sdk.core.tx import Tx
 from terra_sdk.exceptions import LCDResponseError
 
-from chains.cosmos.msg import Msg
+from chains.cosmos.msg import MsgType
 from exceptions import FeeEstimationError, TxAlreadyBroadcasted
 
 from .base_api import Api, CosmosClientT
@@ -37,7 +37,7 @@ class BroadcastError(Exception):
 class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
     async def estimate_fee(
         self,
-        msgs: Sequence[Msg],
+        msgs: Sequence[MsgType],
         gas_adjustment: Decimal = None,
         use_fallback_estimate: bool = False,
         estimated_gas_use: int = None,
@@ -100,12 +100,12 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
         estimated_gas_use: int,
         gas_adjustment: Decimal,
         fee_denom: str,
-        msgs: Sequence[Msg],
+        msgs: Sequence[MsgType],
         **kwargs,
     ) -> Fee:
         ...
 
-    async def _check_msgs_in_mempool(self, msgs: Sequence[Msg]):
+    async def _check_msgs_in_mempool(self, msgs: Sequence[MsgType]):
         mempool = await self.client.mempool.fetch_mempool_txs()
         data = [msg.to_data() for msg in msgs]
         if data in mempool:
@@ -113,7 +113,7 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
 
     async def execute_multi_msgs(
         self,
-        msgs: Sequence[Msg],
+        msgs: Sequence[MsgType],
         n_repeat: int,
         fee: Fee = None,
         fee_denom: str = None,
@@ -133,7 +133,7 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
 
     async def execute_msgs(
         self,
-        msgs: Sequence[Msg],
+        msgs: Sequence[MsgType],
         fee: Fee = None,
         fee_denom: str = None,
         log_: bool = True,

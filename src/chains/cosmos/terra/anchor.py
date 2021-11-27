@@ -34,7 +34,7 @@ class Market(BaseTerraLiquidityPair):
         aust_addr = get_cw20_whitelist(client.chain_id)["aUST"]
         self.aUST = await TerraCW20Token.from_contract(aust_addr, client)
         self.tokens = (UST, self.aUST)
-        self._stop_updates = False
+        self.stop_updates = False
 
         return self
 

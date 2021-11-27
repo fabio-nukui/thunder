@@ -26,7 +26,7 @@ _NativeLiquidityPairT = TypeVar("_NativeLiquidityPairT", bound="NativeLiquidityP
 class BaseTerraLiquidityPair(ABC):
     client: TerraClient
     tokens: tuple[TerraToken, TerraToken]
-    _stop_updates: bool
+    stop_updates: bool
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.repr_symbol})"
@@ -100,7 +100,7 @@ class NativeLiquidityPair(BaseTerraLiquidityPair):
     def __init__(self, client: TerraClient, tokens: tuple[TerraNativeToken, TerraNativeToken]):
         self.client = client
         self.tokens = tokens if (tokens[0] < tokens[1]) else (tokens[1], tokens[0])
-        self._stop_updates = False
+        self.stop_updates = False
         self._pool_delta_changes = Decimal(0)
 
     def __hash__(self) -> int:

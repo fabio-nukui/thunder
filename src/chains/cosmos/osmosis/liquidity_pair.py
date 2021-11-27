@@ -25,7 +25,7 @@ _ROUND_RATIO_MARGIN = Decimal("0.15")
 class BaseOsmosisLiquidityPool(ABC):
     client: OsmosisClient
     tokens: Sequence[OsmosisToken]
-    _stop_updates: bool
+    stop_updates: bool
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.repr_symbol})"
@@ -95,7 +95,7 @@ class GAMMLiquidityPool(BaseOsmosisLiquidityPool):
         self = super().__new__(cls)
         self.pool_id = pool.id
         self.client = client
-        self._stop_updates = False
+        self.stop_updates = False
 
         self.address = pool.address
         self.swap_fee = Decimal(pool.pool_params.swap_fee) / 10 ** PRECISION
@@ -116,7 +116,7 @@ class GAMMLiquidityPool(BaseOsmosisLiquidityPool):
         return f"{self.__class__.__name__}(id={self.pool_id}, {self.repr_symbol})"
 
     async def get_reserves(self):
-        if not self._stop_updates:
+        if not self.stop_updates:
             self._reserves = await self._get_reserves()
         return self._reserves
 
@@ -175,7 +175,7 @@ class GAMMLiquidityPool(BaseOsmosisLiquidityPool):
     ) -> GAMMLiquidityPool:
         reserves = await self.get_reserves()
         simulation = copy(self)
-        simulation._stop_updates = True
+        simulation.stop_updates = True
         for amount in amounts:
             assert isinstance(amount.token, OsmosisNativeToken)
             reserves[amount.token] += amount.amount

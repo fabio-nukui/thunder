@@ -299,7 +299,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
         self.router_address = router_address
         self.assert_limit_order_address = assert_limit_order_address
 
-        self._stop_updates = False
+        self.stop_updates = False
         try:
             self.lp_token = await LPToken.from_pool_contract(
                 self.contract_addr, self.client, recursive_lp_token_code_id
@@ -341,7 +341,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
         return f"{self.__class__.__name__}({self.repr_symbol}, factory={self.factory_name!r})"
 
     async def get_reserves(self) -> AmountTuple:
-        if not self._stop_updates:
+        if not self.stop_updates:
             self._reserves = await self._get_reserves()
         return self._reserves
 
@@ -355,7 +355,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
 
     async def simulate_reserve_change(self, amounts: AmountTuple) -> LiquidityPair:
         simulation = copy(self)
-        simulation._stop_updates = True
+        simulation.stop_updates = True
         amounts = self.fix_amounts_order(amounts)
         reserves = await self.get_reserves()
         simulation._reserves = reserves[0] + amounts[0], reserves[1] + amounts[1]

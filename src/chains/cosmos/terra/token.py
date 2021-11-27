@@ -21,10 +21,6 @@ class TerraTokenAmount(CosmosTokenAmount):
         assert isinstance(self.token, TerraNativeToken)
         return Coin(self.token.denom, self.int_amount)
 
-    @classmethod
-    def from_str(cls, data: str) -> TerraTokenAmount:
-        return cls.from_coin(Coin.from_str(data))
-
 
 class BaseTerraToken(Token[TerraTokenAmount]):
     amount_class = TerraTokenAmount

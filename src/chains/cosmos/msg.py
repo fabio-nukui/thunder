@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Union
+
 from betterproto import Message
 from terra_sdk.core.msg import Msg as TerraMsg
 
@@ -16,3 +18,6 @@ class Msg(TerraMsg):
         from .utils import parse_proto
 
         return parse_proto(data)
+
+
+MsgType = Union[Msg, TerraMsg]
