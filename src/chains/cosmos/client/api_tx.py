@@ -9,7 +9,7 @@ from copy import copy
 from decimal import Decimal
 from typing import Generic, Sequence
 
-from terra_sdk.client.lcd.api.tx import CreateTxOptions
+from terra_sdk.client.lcd.api.tx import CreateTxOptions, SignerOptions
 from terra_sdk.core.broadcast import SyncTxBroadcastResult
 from terra_sdk.core.fee import Fee
 from terra_sdk.core.tx import Tx
@@ -56,7 +56,7 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
                 sequence=signer.sequence,
             )
             try:
-                fee = await self.client.lcd.tx.estimate_fee([signer], create_tx_options)
+                fee = await self._fee_estimation([signer], create_tx_options)
             except LCDResponseError as e:
                 if match := _pat_sequence_error.search(e.message):
                     if i == _MAX_FEE_ESTIMATION_TRIES:
@@ -85,6 +85,14 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
                 self.client.signer = signer
                 return fee
         raise Exception("Should never reach")
+
+    @abstractmethod
+    async def _fee_estimation(
+        self,
+        signers: list[SignerOptions],
+        options: CreateTxOptions,
+    ) -> Fee:
+        ...
 
     @abstractmethod
     async def _fallback_fee_estimation(

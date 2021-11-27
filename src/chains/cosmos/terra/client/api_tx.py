@@ -4,6 +4,7 @@ import logging
 from decimal import Decimal
 from typing import TYPE_CHECKING, Sequence
 
+from terra_sdk.client.lcd.api.tx import CreateTxOptions, SignerOptions
 from terra_sdk.core import Coins
 from terra_sdk.core.fee import Fee
 
@@ -39,6 +40,13 @@ class TxApi(CosmosTxApi["TerraClient"]):
             for denom, amount in res.json().items()
         }
         return Coins(adjusted_prices)
+
+    async def _fee_estimation(
+        self,
+        signers: list[SignerOptions],
+        options: CreateTxOptions,
+    ) -> Fee:
+        return await self.client.lcd.tx.estimate_fee(signers, options)
 
     async def _fallback_fee_estimation(
         self,

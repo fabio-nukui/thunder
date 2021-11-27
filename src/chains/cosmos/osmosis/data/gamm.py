@@ -49,7 +49,7 @@ class MsgSwapExactAmountIn(Msg):
     sender: AccAddress = attr.ib()
     routes: list[SwapAmountInRoute] = attr.ib()
     token_in: Coin = attr.ib()
-    token_out_min_amount: Coin = attr.ib()
+    token_out_min_amount: int = attr.ib(default=0)
 
     def to_amino(self) -> dict:
         return {
@@ -58,7 +58,7 @@ class MsgSwapExactAmountIn(Msg):
                 "sender": self.sender,
                 "routes": [r.to_data() for r in self.routes],
                 "tokenIn": self.token_in.to_data(),
-                "tokenOutMinAmount": self.token_out_min_amount.to_data(),
+                "tokenOutMinAmount": str(self.token_out_min_amount),
             },
         }
 
@@ -68,7 +68,7 @@ class MsgSwapExactAmountIn(Msg):
             sender=data["sender"],
             routes=[SwapAmountInRoute.from_data(r) for r in data["routes"]],
             token_in=Coin.from_data(data["tokenIn"]),
-            token_out_min_amount=Coin.from_data(data["tokenOutMinAmount"]),
+            token_out_min_amount=int(data["tokenOutMinAmount"]),
         )
 
     @classmethod
@@ -77,7 +77,7 @@ class MsgSwapExactAmountIn(Msg):
             sender=AccAddress(proto.sender),
             routes=[SwapAmountInRoute.from_proto(r) for r in proto.routes],
             token_in=Coin.from_proto(proto.token_in),  # type: ignore
-            token_out_min_amount=Coin.from_proto(proto.token_out_min_amount),  # type: ignore
+            token_out_min_amount=int(proto.token_out_min_amount),
         )
 
     def to_proto(self) -> MsgSwapExactAmountIn_pb:
@@ -85,5 +85,5 @@ class MsgSwapExactAmountIn(Msg):
             sender=self.sender,
             routes=[r.to_proto() for r in self.routes],
             token_in=self.token_in.to_proto(),  # type: ignore
-            token_out_min_amount=self.token_out_min_amount.to_proto(),  # type: ignore
+            token_out_min_amount=str(self.token_out_min_amount),
         )

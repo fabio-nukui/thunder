@@ -14,13 +14,13 @@ class GammApi(Api):
         self.grpc_msgs = MsgStub(self.client.grpc_channel)
         self.grpc_query = QueryStub(self.client.grpc_channel)
 
-    async def get_all_pools(self) -> list[Pool]:
-        pools: list[Pool] = []
+    async def get_all_pools(self) -> dict[int, Pool]:
+        pools: dict[int, Pool] = {}
         next_key = b""
         while True:
             req = PageRequest(key=next_key)
             res = await self.grpc_query.pools(pagination=req)
-            pools.extend([Pool.FromString(p.value) for p in res.pools])
+            pools.update({(p := Pool.FromString(raw.value)).id: p for raw in res.pools})
             if not (next_key := res.pagination.next_key):
                 break
         return pools
@@ -37,15 +37,14 @@ class GammApi(Api):
         self,
         routes: list[SwapAmountInRoute],
         amount_in: OsmosisTokenAmount,
-        min_out: OsmosisTokenAmount,
+        min_out: OsmosisTokenAmount = None,
         sender: AccAddress = None,
     ) -> MsgSwapExactAmountIn:
         sender = self.client.address if sender is None else sender
         assert isinstance(amount_in.token, OsmosisNativeToken)
-        assert isinstance(min_out.token, OsmosisNativeToken)
         return MsgSwapExactAmountIn(
-            sender,
-            routes,
-            Coin(denom=amount_in.token.denom, amount=amount_in.int_amount),
-            Coin(denom=min_out.token.denom, amount=min_out.int_amount),
+            sender=sender,
+            routes=routes,
+            token_in=Coin(denom=amount_in.token.denom, amount=amount_in.int_amount),
+            token_out_min_amount=min_out.int_amount if min_out is not None else 0,
         )

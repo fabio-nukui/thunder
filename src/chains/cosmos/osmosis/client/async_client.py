@@ -69,10 +69,11 @@ class OsmosisClient(CosmosClient):
         await super().start()
 
         if not self.gas_prices:
-            self.lcd.gas_prices = Coins(f"0{OSMO.denom}")
+            self.gas_prices = self.lcd.gas_prices = Coins(f"0{OSMO.denom}")
 
         self.grpc_bank = cosmos_bank_pb.QueryStub(self.grpc_channel)
         self.gamm.start()
+        self.tx.start()
 
         if configs.OSMOSIS_USE_BROADCASTER:
             await self.update_active_broadcaster()

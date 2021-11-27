@@ -5,7 +5,7 @@ from copy import copy
 from decimal import Decimal
 from typing import Sequence, TypeVar
 
-from osmosis_proto.osmosis.gamm.v1beta1 import SwapAmountInRoute
+from osmosis_proto.osmosis.gamm.v1beta1 import Pool, SwapAmountInRoute
 from terra_sdk.core.tx import Tx
 from terra_sdk.core.wasm import MsgExecuteContract
 
@@ -87,12 +87,16 @@ class GAMMLiquidityPool(BaseOsmosisLiquidityPool):
 
     @classmethod
     async def new(cls, pool_id: int, client: OsmosisClient) -> GAMMLiquidityPool:
+        pool = await client.gamm.get_pool(pool_id=pool_id)
+        return cls.from_proto(pool, client)
+
+    @classmethod
+    def from_proto(cls, pool: Pool, client: OsmosisClient) -> GAMMLiquidityPool:
         self = super().__new__(cls)
-        self.pool_id = pool_id
+        self.pool_id = pool.id
         self.client = client
         self._stop_updates = False
 
-        pool = await client.gamm.get_pool(pool_id=pool_id)
         self.address = pool.address
         self.swap_fee = Decimal(pool.pool_params.swap_fee) / 10 ** PRECISION
         self.exit_fee = Decimal(pool.pool_params.exit_fee) / 10 ** PRECISION
@@ -107,6 +111,9 @@ class GAMMLiquidityPool(BaseOsmosisLiquidityPool):
             self.weights[token] = Decimal(asset.weight)
 
         return self
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(id={self.pool_id}, {self.repr_symbol})"
 
     async def get_reserves(self):
         if not self._stop_updates:
