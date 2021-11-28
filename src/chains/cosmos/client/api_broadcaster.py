@@ -54,6 +54,8 @@ def _round_msg_values(value: Any) -> Any:
         except ValueError:
             return value
     if isinstance(value, (int, float)):
+        if not value:
+            return 0
         return math.floor(math.log10(value))
     return value
 
