@@ -7,15 +7,16 @@ from typing import Callable, Iterable, Sequence, Union
 from terra_sdk.core.tx import Tx
 
 from chains.cosmos.osmosis import GAMMLiquidityPool
+from chains.cosmos.osmosis.route import RoutePools as OsmosisRoute
 from chains.cosmos.terra import BaseTerraLiquidityPair
-from chains.cosmos.terra.swap_utils import SingleRoute
+from chains.cosmos.terra.route import RoutePools as TerraRoute
 from chains.cosmos.token import CosmosTokenAmount
 from exceptions import MaxSpreadAssertion
 
 log = logging.getLogger(__name__)
 LiquidityPool = Union[BaseTerraLiquidityPair, GAMMLiquidityPool]
 PoolsCls = Callable[[Iterable[LiquidityPool]], Sequence[LiquidityPool]]
-RoutePools = SingleRoute
+RoutePools = Union[TerraRoute, OsmosisRoute]
 
 
 class LPReserveSimulationMixin:
@@ -26,7 +27,7 @@ class LPReserveSimulationMixin:
         *args,
         pools: Sequence[LiquidityPool],
         pool_cls: PoolsCls = list,
-        routes: list[RoutePools] = None,
+        routes: Sequence[RoutePools] = None,
         **kwargs,
     ):
         self.pools = pools
@@ -85,4 +86,4 @@ class LPReserveSimulationMixin:
         finally:
             self.pools = pools
             for route in self.routes:
-                route.pools = route_pairs[route]
+                route.pools = route_pairs[route]  # type: ignore

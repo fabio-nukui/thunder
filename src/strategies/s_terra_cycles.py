@@ -37,7 +37,7 @@ from chains.cosmos.terra import (
     nexus,
     terraswap,
 )
-from chains.cosmos.terra.swap_utils import MultiRoutes, SingleRoute
+from chains.cosmos.terra.route import MultiRoutes, RoutePools
 from chains.cosmos.terra.tx_filter import Filter, FilterNativeSwap, FilterSwapTerraswap
 from exceptions import FeeEstimationError, InsufficientLiquidity, UnprofitableArbitrage
 from strategies.common.default_params import (
@@ -79,7 +79,7 @@ class ArbParams(CosmosArbParams):
     block_found: int
 
     initial_balance: TerraTokenAmount
-    route: SingleRoute
+    route: RoutePools
     reverse: bool
 
     initial_amount: TerraTokenAmount
@@ -338,7 +338,7 @@ async def _pairs_from_factories(
 class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[TerraClient]):
     multi_routes: MultiRoutes
     gas_adjustment: Decimal | None
-    routes: list[SingleRoute]
+    routes: list[RoutePools]
     start_token: TerraNativeToken
     use_router: bool
     estimated_gas_use: int
@@ -354,7 +354,7 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
         multi_routes: MultiRoutes,
         gas_adjustment: Decimal = None,
     ) -> TerraCyclesArbitrage:
-        """Arbitrage with UST as starting point and a cycle of liquidity pairs"""
+        """Arbitrage with TerraNativeToken as starting point and a cycle of liquidity pairs"""
         assert isinstance(multi_routes.tokens[0], TerraNativeToken) and multi_routes.is_cycle
 
         self = super().__new__(cls)
@@ -448,7 +448,7 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
 
     async def _get_params_single_route(
         self,
-        route: SingleRoute,
+        route: RoutePools,
         initial_balance: TerraTokenAmount,
     ) -> dict:
         reverse = await route.should_reverse(self.min_start_amount)
@@ -492,7 +492,7 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
 
     async def _get_optimal_argitrage_amount(
         self,
-        route: SingleRoute,
+        route: RoutePools,
         reverse: bool,
     ) -> TerraTokenAmount:
         profit = await self._get_gross_profit(self.min_start_amount, route, reverse)
@@ -510,7 +510,7 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
     async def _get_gross_profit(
         self,
         amount_in: TerraTokenAmount,
-        route: SingleRoute,
+        route: RoutePools,
         reverse: bool,
     ) -> TerraTokenAmount:
         amount_out = await route.get_swap_amount_out(amount_in, reverse, safety_margin=False)
@@ -519,7 +519,7 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
     async def _get_gross_profit_dec(
         self,
         amount_in: Decimal,
-        route: SingleRoute,
+        route: RoutePools,
         reverse: bool,
     ) -> Decimal:
         token_amount = self.start_token.to_amount(amount_in)

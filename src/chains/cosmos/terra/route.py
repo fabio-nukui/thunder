@@ -54,7 +54,7 @@ class MultiRoutes:
 
         self.is_cycle = self.tokens[0] == self.tokens[-1]
         self.routes = [
-            SingleRoute(client, self.tokens, pools, router_address)
+            RoutePools(client, self.tokens, pools, router_address)
             for pools in itertools.product(*list_steps)
         ]
         self.n_routes = len(self.routes)
@@ -67,7 +67,7 @@ class MultiRoutes:
         return _repr_route_symbols(self.tokens)
 
 
-class SingleRoute:
+class RoutePools:
     def __init__(
         self,
         client: TerraClient,

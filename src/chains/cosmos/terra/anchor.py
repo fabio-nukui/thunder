@@ -14,7 +14,6 @@ from .token import TerraCW20Token, TerraTokenAmount
 
 if TYPE_CHECKING:
     from .client import TerraClient
-    from .swap_utils import Operation
 
 ADDRESSES_FILE = "resources/addresses/cosmos/{chain_id}/anchor.json"
 
@@ -47,7 +46,7 @@ class Market(BaseTerraLiquidityPair):
         sender: AccAddress,
         amount_in: TerraTokenAmount,
         safety_margin: bool | int = True,
-    ) -> Operation:
+    ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
         amount_out = await self.get_swap_amount_out(amount_in, safety_margin)
         if amount_in.token == UST:
             msg = self.get_deposit_msg(sender, amount_in.int_amount)

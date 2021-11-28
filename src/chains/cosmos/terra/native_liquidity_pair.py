@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, TypeVar
 
 from terra_sdk.core import AccAddress
 from terra_sdk.core.tx import Tx
+from terra_sdk.core.wasm.msgs import MsgExecuteContract
 
 from exceptions import MaxSpreadAssertion
 
@@ -16,7 +17,6 @@ from .token import TerraNativeToken, TerraToken, TerraTokenAmount
 
 if TYPE_CHECKING:
     from .client import TerraClient
-    from .swap_utils import Operation
 
 AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
 _BaseTerraLiquidityPairT = TypeVar("_BaseTerraLiquidityPairT", bound="BaseTerraLiquidityPair")
@@ -47,7 +47,7 @@ class BaseTerraLiquidityPair(ABC):
         sender: AccAddress,
         amount_in: TerraTokenAmount,
         safety_margin: bool | int = True,
-    ) -> Operation:
+    ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
         ...
 
     @abstractmethod
@@ -138,7 +138,7 @@ class NativeLiquidityPair(BaseTerraLiquidityPair):
         sender: AccAddress,
         amount_in: TerraTokenAmount,
         safety_margin: bool | int = True,
-    ) -> Operation:
+    ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
         raise NotImplementedError
 
     async def simulate_reserve_change(
