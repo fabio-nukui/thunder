@@ -3,7 +3,7 @@ import logging
 
 import aiohttp
 from aiohttp.client_exceptions import ServerDisconnectedError
-from terra_sdk.client.lcd import AsyncLCDClient as TerraAsyncLCDClient
+from cosmos_sdk.client.lcd import AsyncLCDClient as TerraAsyncLCDClient
 
 log = logging.getLogger(__name__)
 

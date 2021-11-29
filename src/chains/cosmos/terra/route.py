@@ -4,8 +4,8 @@ import asyncio
 import itertools
 from typing import Iterable, Sequence, Union, cast
 
-from terra_sdk.core import AccAddress
-from terra_sdk.core.wasm import MsgExecuteContract
+from cosmos_sdk.core import AccAddress
+from cosmos_sdk.core.wasm import MsgExecuteContract
 
 from utils.cache import lru_cache
 

@@ -6,7 +6,7 @@ import logging
 from enum import Enum, auto
 from typing import TYPE_CHECKING, AsyncIterable, Mapping, TypeVar
 
-from terra_sdk.core.tx import Tx
+from cosmos_sdk.core.tx import Tx
 
 import configs
 import utils

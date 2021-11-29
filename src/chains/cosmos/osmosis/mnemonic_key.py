@@ -1,6 +1,6 @@
-from terra_sdk.core import AccAddress, AccPubKey, ValAddress, ValPubKey
-from terra_sdk.key.key import get_bech
-from terra_sdk.key.mnemonic import MnemonicKey as TerraMnemonicKey
+from cosmos_sdk.core import AccAddress, AccPubKey, ValAddress, ValPubKey
+from cosmos_sdk.key.key import get_bech
+from cosmos_sdk.key.mnemonic import MnemonicKey as TerraMnemonicKey
 
 OSMO_COIN_TYPE = 118
 

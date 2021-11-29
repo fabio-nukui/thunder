@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Union
 
-from terra_sdk.core import Coin
+from cosmos_sdk.core import Coin
 
 from common.token import Token
 

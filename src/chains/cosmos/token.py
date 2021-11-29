@@ -5,8 +5,8 @@ from abc import ABC, abstractmethod
 from decimal import Decimal
 from typing import TYPE_CHECKING, Generic, Optional, TypeVar, Union
 
-from terra_sdk.core import AccAddress, Coin, Dec
-from terra_sdk.core.wasm import MsgExecuteContract
+from cosmos_sdk.core import AccAddress, Coin, Dec
+from cosmos_sdk.core.wasm import MsgExecuteContract
 
 from common.token import DecInput, Token, TokenAmount
 

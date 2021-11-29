@@ -4,8 +4,8 @@ import json
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from terra_sdk.core import AccAddress, Coins
-from terra_sdk.core.wasm import MsgExecuteContract
+from cosmos_sdk.core import AccAddress, Coins
+from cosmos_sdk.core.wasm import MsgExecuteContract
 
 from ..token import get_cw20_whitelist
 from .denoms import UST

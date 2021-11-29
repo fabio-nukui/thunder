@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from terra_proto.terra.oracle.v1beta1 import QueryStub
+from cosmos_proto.terra.oracle.v1beta1 import QueryStub
 
 from utils.cache import CacheGroup, ttl_cache
 

@@ -5,9 +5,9 @@ from copy import copy
 from decimal import Decimal
 from typing import Sequence, TypeVar
 
-from osmosis_proto.osmosis.gamm.v1beta1 import Pool, SwapAmountInRoute
-from terra_sdk.core.tx import Tx
-from terra_sdk.core.wasm import MsgExecuteContract
+from cosmos_proto.osmosis.gamm.v1beta1 import Pool, SwapAmountInRoute
+from cosmos_sdk.core.tx import Tx
+from cosmos_sdk.core.wasm import MsgExecuteContract
 
 from exceptions import MaxSpreadAssertion
 
@@ -114,6 +114,9 @@ class GAMMLiquidityPool(BaseOsmosisLiquidityPool):
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(id={self.pool_id}, {self.repr_symbol})"
+
+    def __hash__(self) -> int:
+        return hash((self.__class__, self.client.chain_id, self.pool_id))
 
     async def get_reserves(self):
         if not self.stop_updates:

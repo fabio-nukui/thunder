@@ -5,8 +5,8 @@ import json
 import logging
 from typing import Iterable
 
-from terra_sdk.core import AccAddress
-from terra_sdk.core.tx import Tx
+from cosmos_sdk.core import AccAddress
+from cosmos_sdk.core.tx import Tx
 
 from ..tx_filter import Filter, FilterMsgsLength
 from . import terraswap

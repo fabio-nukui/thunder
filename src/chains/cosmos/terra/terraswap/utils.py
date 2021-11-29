@@ -1,4 +1,4 @@
-from terra_sdk.core.wasm import MsgExecuteContract
+from cosmos_sdk.core.wasm import MsgExecuteContract
 
 from ..token import TerraNativeToken, TerraToken, TerraTokenAmount
 

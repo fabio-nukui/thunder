@@ -4,8 +4,8 @@ from abc import ABC, abstractmethod
 from decimal import Decimal
 from typing import Iterable, Sequence, Union
 
-from terra_sdk.core import AccAddress, Coins
-from terra_sdk.core.wasm import MsgExecuteContract
+from cosmos_sdk.core import AccAddress, Coins
+from cosmos_sdk.core.wasm import MsgExecuteContract
 
 from ..client import TerraClient
 from ..token import TerraCW20Token, TerraNativeToken, TerraToken, TerraTokenAmount

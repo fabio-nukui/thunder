@@ -7,14 +7,14 @@ import logging
 from collections import defaultdict
 from decimal import Decimal
 
-import terra_proto.cosmos.bank.v1beta1 as cosmos_bank_pb
-import terra_proto.terra.wasm.v1beta1 as terra_wasm_pb
+import cosmos_proto.cosmos.bank.v1beta1 as cosmos_bank_pb
+import cosmos_proto.terra.wasm.v1beta1 as terra_wasm_pb
+from cosmos_sdk.core import AccAddress, Coins
+from cosmos_sdk.core.auth import TxLog
+from cosmos_sdk.core.auth.data import BaseAccount
+from cosmos_sdk.key.mnemonic import MnemonicKey
 from grpclib.const import Status as GRPCStatus
 from grpclib.exceptions import GRPCError
-from terra_sdk.core import AccAddress, Coins
-from terra_sdk.core.auth import TxLog
-from terra_sdk.core.auth.data import BaseAccount
-from terra_sdk.key.mnemonic import MnemonicKey
 
 import auth_secrets
 import configs

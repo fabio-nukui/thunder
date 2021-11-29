@@ -9,11 +9,11 @@ from copy import copy
 from decimal import Decimal
 from typing import Generic, Sequence
 
-from terra_sdk.client.lcd.api.tx import CreateTxOptions, SignerOptions
-from terra_sdk.core.broadcast import SyncTxBroadcastResult
-from terra_sdk.core.fee import Fee
-from terra_sdk.core.tx import Tx
-from terra_sdk.exceptions import LCDResponseError
+from cosmos_sdk.client.lcd.api.tx import CreateTxOptions, SignerOptions
+from cosmos_sdk.core.broadcast import SyncTxBroadcastResult
+from cosmos_sdk.core.fee import Fee
+from cosmos_sdk.core.tx import Tx
+from cosmos_sdk.exceptions import LCDResponseError
 
 from chains.cosmos.msg import MsgType
 from exceptions import FeeEstimationError, TxAlreadyBroadcasted

@@ -5,7 +5,7 @@ import re
 from functools import cache
 from typing import TYPE_CHECKING, Union
 
-from osmosis_proto.cosmos.base.v1beta1 import Coin
+from cosmos_proto.cosmos.base.v1beta1 import Coin
 
 from common.token import Token
 

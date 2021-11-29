@@ -11,12 +11,12 @@ from decimal import Decimal
 from typing import AsyncIterable
 
 import grpclib.client
-from terra_sdk.client.lcd.api.tx import SignerOptions
-from terra_sdk.core import AccAddress, Coins
-from terra_sdk.core.auth.data import BaseAccount
-from terra_sdk.core.tx import TxLog
-from terra_sdk.exceptions import LCDResponseError
-from terra_sdk.key.mnemonic import MnemonicKey
+from cosmos_sdk.client.lcd.api.tx import SignerOptions
+from cosmos_sdk.core import AccAddress, Coins
+from cosmos_sdk.core.auth.data import BaseAccount
+from cosmos_sdk.core.tx import TxLog
+from cosmos_sdk.exceptions import LCDResponseError
+from cosmos_sdk.key.mnemonic import MnemonicKey
 
 import utils
 from chains.cosmos.token import CosmosTokenAmount

@@ -6,10 +6,10 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Awaitable, Generic, Iterable, Mapping, Sequence, TypeVar
 
-from terra_sdk.core.auth import TxInfo
-from terra_sdk.core.fee import Fee
-from terra_sdk.core.wasm import MsgExecuteContract
-from terra_sdk.exceptions import LCDResponseError
+from cosmos_sdk.core.auth import TxInfo
+from cosmos_sdk.core.fee import Fee
+from cosmos_sdk.core.wasm import MsgExecuteContract
+from cosmos_sdk.exceptions import LCDResponseError
 
 import utils
 from chains.cosmos.client import CosmosClient

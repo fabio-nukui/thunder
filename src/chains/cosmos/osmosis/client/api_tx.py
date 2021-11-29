@@ -4,11 +4,11 @@ import logging
 from decimal import Decimal
 from typing import TYPE_CHECKING, cast
 
-from terra_proto.cosmos.tx.v1beta1 import ServiceStub
-from terra_sdk.client.lcd.api.tx import CreateTxOptions, SignerOptions
-from terra_sdk.core import Coins
-from terra_sdk.core.fee import Fee
-from terra_sdk.core.tx import AuthInfo, SignerData, Tx, TxBody
+from cosmos_proto.cosmos.tx.v1beta1 import ServiceStub
+from cosmos_sdk.client.lcd.api.tx import CreateTxOptions, SignerOptions
+from cosmos_sdk.core import Coins
+from cosmos_sdk.core.fee import Fee
+from cosmos_sdk.core.tx import AuthInfo, SignerData, Tx, TxBody
 
 from ...client.api_tx import TxApi as CosmosTxApi
 from ..denoms import OSMO

@@ -4,7 +4,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Callable, Iterable, Sequence, Union
 
-from terra_sdk.core.tx import Tx
+from cosmos_sdk.core.tx import Tx
 
 from chains.cosmos.osmosis import GAMMLiquidityPool
 from chains.cosmos.osmosis.route import RoutePools as OsmosisRoute

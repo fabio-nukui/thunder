@@ -4,8 +4,8 @@ import logging
 import math
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Sequence, TypedDict, TypeVar
 
-from terra_sdk.core.broadcast import SyncTxBroadcastResult
-from terra_sdk.core.fee import Fee
+from cosmos_sdk.core.broadcast import SyncTxBroadcastResult
+from cosmos_sdk.core.fee import Fee
 
 from chains.cosmos.msg import Msg, MsgType
 from exceptions import BlockchainNewState, TxAlreadyBroadcasted

@@ -4,9 +4,9 @@ import logging
 from decimal import Decimal
 from typing import TYPE_CHECKING, Sequence
 
-from terra_sdk.client.lcd.api.tx import CreateTxOptions, SignerOptions
-from terra_sdk.core import Coins
-from terra_sdk.core.fee import Fee
+from cosmos_sdk.client.lcd.api.tx import CreateTxOptions, SignerOptions
+from cosmos_sdk.core import Coins
+from cosmos_sdk.core.fee import Fee
 
 import configs
 from chains.cosmos.msg import Msg

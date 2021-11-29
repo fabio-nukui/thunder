@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-from terra_sdk.core import AccAddress
+from cosmos_sdk.core import AccAddress
 
 from .factory import Factory
 from .liquidity_pair import Action, LiquidityPair, RouterNativeLiquidityPair

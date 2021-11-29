@@ -10,10 +10,10 @@ from decimal import Decimal
 from enum import Enum
 from typing import TYPE_CHECKING, NamedTuple
 
-from terra_sdk.core import AccAddress, Coins
-from terra_sdk.core.tx import Tx
-from terra_sdk.core.wasm import MsgExecuteContract
-from terra_sdk.exceptions import LCDResponseError
+from cosmos_sdk.core import AccAddress, Coins
+from cosmos_sdk.core.tx import Tx
+from cosmos_sdk.core.wasm import MsgExecuteContract
+from cosmos_sdk.exceptions import LCDResponseError
 
 from exceptions import InsufficientLiquidity, MaxSpreadAssertion, NotContract
 from utils.cache import CacheGroup, lru_cache, ttl_cache

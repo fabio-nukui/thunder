@@ -91,8 +91,10 @@ def clear_caches(
     ttl_treshold = CACHE_GROUPS_TTL[group] if ttl_treshold is None else ttl_treshold
     if group == CacheGroup.ALL:
         caches_clear = [cache for list_caches in _caches.values() for cache in list_caches]
+    elif group == CacheGroup.DEFAULT:
+        caches_clear = _caches[CacheGroup.DEFAULT]
     else:
-        caches_clear = _caches[group]
+        caches_clear = _caches[CacheGroup.DEFAULT] + _caches[group]
     for cache in caches_clear:
         if clear_all or isinstance(cache, TTLCache) and cache._TTLCache__ttl <= ttl_treshold:  # type: ignore # noqa: E501
             cache.clear()

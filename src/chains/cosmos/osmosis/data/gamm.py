@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import attr
-from osmosis_proto.osmosis.gamm.v1beta1 import MsgSwapExactAmountIn as MsgSwapExactAmountIn_pb
-from osmosis_proto.osmosis.gamm.v1beta1 import SwapAmountInRoute as SwapAmountInRoute_pb
-from terra_sdk.core import AccAddress, Coin
+from cosmos_proto.osmosis.gamm.v1beta1 import MsgSwapExactAmountIn as MsgSwapExactAmountIn_pb
+from cosmos_proto.osmosis.gamm.v1beta1 import SwapAmountInRoute as SwapAmountInRoute_pb
+from cosmos_sdk.core import AccAddress, Coin
 
 from chains.cosmos.msg import Msg
 

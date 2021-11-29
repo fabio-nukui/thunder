@@ -36,10 +36,11 @@ RUN conda install --quiet --yes \
     conda clean --all -f -y && \
     fix-permissions $HOME $CONDA_DIR
 
+ARG RELEASES_URL=https://mg4r5dq4tpgvnm6tu5rwukctke5x3gfw.s3.amazonaws.com
+
 RUN pip install --no-cache-dir \
         'python-binance==1.0.15' \
-        'https://github.com/fabio-nukui/osmosis.proto/releases/download/0.1.1/osmosis_proto-0.1.1-py3-none-any.whl' \
-        'https://github.com/fabio-nukui/terra.py/releases/download/2.0.0b1/terra_sdk-2.0.0b1-py3-none-any.whl' && \
+        ${RELEASES_URL}'/cosmos.py/dist/cosmos_sdk-2.0.0b3-py3-none-any.whl' && \
     fix-permissions $HOME $CONDA_DIR
 
 ENV PATH="${HOME}/.local/bin:${PATH}"

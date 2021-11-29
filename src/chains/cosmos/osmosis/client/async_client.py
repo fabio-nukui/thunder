@@ -3,9 +3,9 @@ from __future__ import annotations
 import logging
 from decimal import Decimal
 
-import osmosis_proto.cosmos.bank.v1beta1 as cosmos_bank_pb
-from terra_sdk.core import AccAddress, Coins
-from terra_sdk.core.auth.data import BaseAccount
+import cosmos_proto.cosmos.bank.v1beta1 as cosmos_bank_pb
+from cosmos_sdk.core import AccAddress, Coins
+from cosmos_sdk.core.auth.data import BaseAccount
 
 import auth_secrets
 import configs

@@ -8,7 +8,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any, Generic, Optional, TypeVar
 
-from terra_sdk.core.tx import Tx
+from cosmos_sdk.core.tx import Tx
 
 from common import BlockchainClient, TokenAmount
 from exceptions import (

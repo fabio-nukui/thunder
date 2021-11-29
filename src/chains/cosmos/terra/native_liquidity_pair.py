@@ -6,9 +6,9 @@ from decimal import Decimal
 from functools import reduce
 from typing import TYPE_CHECKING, TypeVar
 
-from terra_sdk.core import AccAddress
-from terra_sdk.core.tx import Tx
-from terra_sdk.core.wasm.msgs import MsgExecuteContract
+from cosmos_sdk.core import AccAddress
+from cosmos_sdk.core.tx import Tx
+from cosmos_sdk.core.wasm.msgs import MsgExecuteContract
 
 from exceptions import MaxSpreadAssertion
 

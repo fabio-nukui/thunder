@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 
-from terra_sdk.core.tx import Tx
+from cosmos_sdk.core.tx import Tx
 
 log = logging.getLogger(__name__)
 

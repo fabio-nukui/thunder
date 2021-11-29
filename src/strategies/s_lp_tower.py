@@ -8,11 +8,11 @@ from enum import Enum
 from functools import partial
 from typing import Any, NamedTuple
 
-from terra_sdk.core.auth import TxInfo
-from terra_sdk.core.fee import Fee
-from terra_sdk.core.tx import Tx
-from terra_sdk.core.wasm import MsgExecuteContract
-from terra_sdk.exceptions import LCDResponseError
+from cosmos_sdk.core.auth import TxInfo
+from cosmos_sdk.core.fee import Fee
+from cosmos_sdk.core.tx import Tx
+from cosmos_sdk.core.wasm import MsgExecuteContract
+from cosmos_sdk.exceptions import LCDResponseError
 
 import utils
 from arbitrage.cosmos import (

@@ -5,8 +5,8 @@ import logging
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Iterable, Tuple, TypeVar
 
-from terra_sdk.core import AccAddress
-from terra_sdk.exceptions import LCDResponseError
+from cosmos_sdk.core import AccAddress
+from cosmos_sdk.exceptions import LCDResponseError
 
 from chains.cosmos.terra.token import TerraCW20Token, TerraNativeToken, TerraToken
 from exceptions import NotContract
