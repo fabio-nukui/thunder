@@ -9,7 +9,7 @@ from cosmos_proto.osmosis.gamm.v1beta1 import Pool, SwapAmountInRoute
 from cosmos_sdk.core.tx import Tx
 from cosmos_sdk.core.wasm import MsgExecuteContract
 
-from exceptions import MaxSpreadAssertion
+from exceptions import InsufficientLiquidity, MaxSpreadAssertion
 
 from .client import OsmosisClient
 from .token import OsmosisNativeToken, OsmosisToken, OsmosisTokenAmount
@@ -19,7 +19,10 @@ Operation = tuple[OsmosisTokenAmount, list[MsgExecuteContract]]
 _BaseOsmoLiquidityPoolT = TypeVar("_BaseOsmoLiquidityPoolT", bound="BaseOsmosisLiquidityPool")
 
 PRECISION = 18
-_ROUND_RATIO_MARGIN = Decimal("0.15")
+_MIN_RESERVE = Decimal("0.01")
+_ROUND_RATIO_MUL = Decimal("2")
+_ROUND_RATIO_POW = Decimal("1.7")
+_MAX_ADJUSTMENT_PCT = Decimal("0.00001")
 
 
 class BaseOsmosisLiquidityPool(ABC):
@@ -88,7 +91,10 @@ class GAMMLiquidityPool(BaseOsmosisLiquidityPool):
     @classmethod
     async def new(cls, pool_id: int, client: OsmosisClient) -> GAMMLiquidityPool:
         pool = await client.gamm.get_pool(pool_id=pool_id)
-        return cls.from_proto(pool, client)
+        self = cls.from_proto(pool, client)
+        if any(r < _MIN_RESERVE for r in self._reserves.values()):
+            raise InsufficientLiquidity
+        return self
 
     @classmethod
     def from_proto(cls, pool: Pool, client: OsmosisClient) -> GAMMLiquidityPool:
@@ -153,8 +159,9 @@ class GAMMLiquidityPool(BaseOsmosisLiquidityPool):
 
         if weight_in != weight_out:
             # Apply aditional safety margin due to cosmos-sdk Pow() implementation
-            reserves_ratio = (reserve_out / weight_out) / (reserve_in / weight_in)
-            amount_out -= token_out.decimalize(int(reserves_ratio * _ROUND_RATIO_MARGIN))
+            ratio = (reserve_out / weight_out) / (reserve_in / weight_in)
+            adjustment = token_out.decimalize(_ROUND_RATIO_MUL * ratio ** _ROUND_RATIO_POW)
+            amount_out -= min(adjustment, amount_out.amount * _MAX_ADJUSTMENT_PCT)
 
         return amount_out.safe_margin(safety_margin)
 
