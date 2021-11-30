@@ -1,14 +1,14 @@
 version: "3"
 
 services:
-  terra_broadcaster:
+  broadcaster:
     build:
       context: .
       dockerfile: docker/Dockerfile
-      target: terra_broadcaster
-    image: thunder-terra_broadcaster
-    container_name: thunder-terra_broadcaster
-    env_file: env/.env-terra_broadcaster
+      target: broadcaster
+    image: thunder-broadcaster
+    container_name: thunder-broadcaster
+    env_file: env/.env-broadcaster
     volumes:
       - ./logs:/home/thunder/work/logs
     network_mode: "host"

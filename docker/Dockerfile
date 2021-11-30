@@ -70,13 +70,13 @@ COPY --chown=$USER:$GID app/main.py ${HOME}/work/app.py
 CMD ["python", "app.py"]
 
 # ==================================== TERRA_BROADCASTER =======================================
-FROM prod as terra_broadcaster
+FROM prod as broadcaster
 
-COPY --chown=$USER:$GID app/terra_broadcaster.py ${HOME}/work/
+COPY --chown=$USER:$GID app/broadcaster.py ${HOME}/work/
 
-COPY --chown=$USER:$GID config/terra_broadcaster ${HOME}/work/
+COPY --chown=$USER:$GID config/broadcaster ${HOME}/work/
 
-CMD ["hypercorn", "--config", "hypercorn.toml", "terra_broadcaster:app", "--certfile", "server.pem", "--keyfile", "server.key"]
+CMD ["hypercorn", "--config", "hypercorn.toml", "broadcaster:app", "--certfile", "server.pem", "--keyfile", "server.key"]
 
 # =========================================== DEV ==============================================
 FROM base as dev

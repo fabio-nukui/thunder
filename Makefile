@@ -117,9 +117,9 @@ stop:  ## Stop docker conteiner running strategy "$STRAT" (e.g.: make stop STRAT
 	docker stop $(ARBITRAGE_CONTAINER_NAME)
 	docker rm $(ARBITRAGE_CONTAINER_NAME)
 
-start-terra_broadcaster:  ## Build and start terra-broadcast/ngnix containers/volumes
+start-broadcaster:  ## Build and start broadcaster/ngnix containers/volumes
 	echo $(GIT_BRANCH) > docker/git_commit
-	docker-compose up -d --build terra_broadcaster
+	docker-compose up -d --build broadcaster
 
 restart: build  ## Restart running strategy "$STRAT" with updated code
 	docker stop $(ARBITRAGE_CONTAINER_NAME)
@@ -139,7 +139,7 @@ download-notebooks: ## Download jupyter notebooks
 
 get-env: ## Download .env files and SSL certificates
 	aws s3 sync $(DATA_SOURCE)/env env
-	aws s3 sync s3://crypto-thunder/certificates/terra_broadcaster config/terra_broadcaster
+	aws s3 sync s3://crypto-thunder/certificates/broadcaster config/broadcaster
 	python3 scripts/fix_env_files.py
 
 check-all: qa test check-clean-tree ## Run all checks and tests
