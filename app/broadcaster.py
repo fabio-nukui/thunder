@@ -26,16 +26,12 @@ GIT_COMMIT = open("git_commit").read().strip()
 async def startup():
     setup()
     log.info(f"Running on git commit {GIT_COMMIT}")
-    await asyncio.gather(
-        *(client.start() for client in clients.values()), return_exceptions=True
-    )
+    await asyncio.gather(*(client.start() for client in clients.values()))
 
 
 @app.after_serving
 async def shutdown():
-    await asyncio.gather(
-        *(client.close() for client in clients.values()), return_exceptions=True
-    )
+    await asyncio.gather(*(client.close() for client in clients.values()))
 
 
 @app.route("/<string:chain>/lcd/<path:path>")
