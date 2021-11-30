@@ -77,11 +77,12 @@ def _get_pools(msgs: list[dict]) -> set[str]:
 
 
 class BroadcasterApi(Api["CosmosClient"]):
-    def __init__(self, client: CosmosClient):
+    def __init__(self, client: CosmosClient, allow_concurrent_pool_arbs):
         super().__init__(client)
         self._height: int = 0
         self._broadcaster_cache: dict[int, list[BroadcastCacheKey]] = {}
         self._current_pools: set[str] = set()
+        self._allow_concurrent_pool_arbs = allow_concurrent_pool_arbs
 
     async def post(
         self,
@@ -116,10 +117,14 @@ class BroadcasterApi(Api["CosmosClient"]):
         elif payload["height"] < self._height:
             return {"result": "new_block", "data": []}
 
-        tx_pools = _get_pools(payload["msgs"])
-        if self._current_pools & tx_pools or self._is_repeated_tx(payload):
+        if not self._allow_concurrent_pool_arbs:
+            tx_pools = _get_pools(payload["msgs"])
+            if self._current_pools & tx_pools:
+                return {"result": "repeated_tx", "data": []}
+            self._current_pools |= tx_pools
+
+        if self._is_repeated_tx(payload):
             return {"result": "repeated_tx", "data": []}
-        self._current_pools |= tx_pools
 
         msgs = [Msg.from_data(d) for d in payload["msgs"]]
         n_repeat = payload["n_repeat"]

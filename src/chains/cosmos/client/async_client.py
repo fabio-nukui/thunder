@@ -50,6 +50,7 @@ class CosmosClient(BroadcasterMixin, AsyncBlockchainClient, ABC):
         gas_prices: Coins.Input | None,
         gas_adjustment: Decimal,
         chain_id: str,
+        allow_concurrent_pool_arbs: bool = False,
         *args,
         **kwargs,
     ):
@@ -63,7 +64,7 @@ class CosmosClient(BroadcasterMixin, AsyncBlockchainClient, ABC):
         self.gas_adjustment = gas_adjustment
         self.chain_id = chain_id
 
-        self.broadcaster = BroadcasterApi(self)
+        self.broadcaster = BroadcasterApi(self, allow_concurrent_pool_arbs)
         self.ibc = IbcApi(self)
         self.mempool = MempoolApi(self)
 

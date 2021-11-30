@@ -424,7 +424,7 @@ class OsmosisCyclesArbitrage(
 
 
 async def run(max_n_blocks: int = None):
-    async with OsmosisClient() as client:
+    async with OsmosisClient(allow_concurrent_pool_arbs=True) as client:
         arb_routes = await get_arbitrages(client)
         mempool_filters = get_filters(arb_routes)
         await run_strategy(
