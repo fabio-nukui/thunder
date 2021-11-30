@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from abc import ABC, abstractmethod
 from copy import copy
 from decimal import Decimal
 from typing import TYPE_CHECKING, Sequence, TypeVar
 
 from cosmos_proto.osmosis.gamm.v1beta1 import Pool, SwapAmountInRoute
+from cosmos_sdk.core.gamm import MsgSwapExactAmountIn, MsgSwapExactAmountOut
 from cosmos_sdk.core.tx import Tx
 from cosmos_sdk.core.wasm import MsgExecuteContract
 
@@ -17,6 +19,8 @@ from .token import OsmosisNativeToken, OsmosisToken, OsmosisTokenAmount
 
 if TYPE_CHECKING:
     from .client import OsmosisClient
+
+log = logging.getLogger(__name__)
 
 Operation = tuple[OsmosisTokenAmount, list[MsgExecuteContract]]
 
@@ -197,6 +201,14 @@ class GAMMLiquidityPool(BaseOsmosisLiquidityPool):
 
         return amount_out.safe_margin(safety_margin)
 
+    async def get_amount_in_exact_out(
+        self,
+        token_in: OsmosisNativeToken,
+        amount_out: OsmosisTokenAmount,
+        safety_margin: bool | int = False,
+    ) -> OsmosisTokenAmount:
+        raise NotImplementedError
+
     async def estimate_swap_exact_in(
         self,
         amount_in: OsmosisTokenAmount,
@@ -225,4 +237,23 @@ class GAMMLiquidityPool(BaseOsmosisLiquidityPool):
         return simulation
 
     async def get_reserve_changes_from_msg(self, msg: dict) -> list[OsmosisTokenAmount]:
-        raise NotImplementedError
+        changes: list[OsmosisTokenAmount] = []
+        if isinstance(msg, MsgSwapExactAmountIn):
+            if not any(self.pool_id == r.pool_id for r in msg.routes):
+                return changes
+            token_in = OsmosisNativeToken(msg.token_in.denom)
+            amount_in = token_in.to_amount(int_amount=str(msg.token_in.amount))
+            for route in msg.routes:
+                token_out = OsmosisNativeToken(route.token_out_denom, self.client.chain_id)
+                if route.pool_id == self.pool_id:
+                    pool = self
+                    changes.append(amount_in)
+                else:
+                    pool = await GAMMLiquidityPool.new(route.pool_id, self.client)
+                amount_in = await pool.get_amount_out_exact_in(amount_in, token_out)
+                if route.pool_id == self.pool_id:
+                    changes.append(-amount_in)
+        if isinstance(msg, MsgSwapExactAmountOut):
+            log.debug("Unable to get_reserve_changes_from_msg: MsgSwapExactAmountOut")
+            return changes  # TODO: implement
+        return changes
