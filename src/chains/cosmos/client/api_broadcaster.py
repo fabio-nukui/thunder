@@ -110,7 +110,6 @@ class BroadcasterApi(Api["CosmosClient"]):
         ]
 
     async def broadcast(self, payload: BroadcasterPayload) -> BroadcasterResponse:
-        assert self.client.active_broadcaster is not None
         if payload["height"] > self._height:
             self._height = payload["height"]
             self._current_pools = set()
