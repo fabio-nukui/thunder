@@ -76,8 +76,7 @@ class OsmosisClient(CosmosClient):
         self.grpc_bank = cosmos_bank_pb.QueryStub(self.grpc_channel)
         self.gamm.start()
 
-        if configs.OSMOSIS_USE_BROADCASTER:
-            await self.update_active_broadcaster()
+        await self.update_active_broadcaster()
 
     @ttl_cache(CacheGroup.OSMOSIS, _CONTRACT_QUERY_CACHE_SIZE)
     async def contract_query(self, contract_addr: AccAddress, query_msg: dict) -> dict:

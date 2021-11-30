@@ -97,8 +97,7 @@ class TerraClient(CosmosClient):
         self.market.start()
         self.oracle.start()
 
-        if configs.TERRA_USE_BROADCASTER:
-            await self.update_active_broadcaster()
+        await self.update_active_broadcaster()
 
     async def close(self):
         await asyncio.gather(self.fcd_client.aclose(), super().close())

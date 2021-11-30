@@ -51,6 +51,8 @@ class BroadcasterMixin:
         self.broadcast_lcd_uris = [url for url in self.broadcast_lcd_uris if host_ip not in url]
 
     async def update_active_broadcaster(self):
+        if not self.use_broadcaster:
+            return
         tasks = (self._set_broadcaster_status(c) for c in self._broadcaster_clients)
         await asyncio.gather(*tasks)
 
@@ -58,12 +60,11 @@ class BroadcasterMixin:
         n_total = len(self._broadcasters_status)
         log.debug(f"{n_ok}/{n_total} broadcasters OK")
 
-        if self.use_broadcaster and not n_ok:
+        if self.active_broadcaster is not None and not n_ok:
             log.info("Stop using broadcaster")
-            self.use_broadcaster = False
-        elif not self.use_broadcaster and n_ok:
+            self.active_broadcaster = None
+        elif self.active_broadcaster is None and n_ok:
             log.info("Start using broadcaster")
-            self.use_broadcaster = True
 
         if self.use_broadcaster:
             for client, status_ok in self._broadcasters_status.items():
@@ -72,6 +73,7 @@ class BroadcasterMixin:
                         log.info(f"Switching broadcaster to {client.base_url}")
                         self.active_broadcaster = client
                     return
+            raise Exception("Did not found broadcaster with status_ok")
 
     async def _set_broadcaster_status(self, broadcaster_client: AsyncClient):
         try:

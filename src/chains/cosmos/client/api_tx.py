@@ -142,7 +142,7 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
         fee: Fee = None,
         fee_denom: str = None,
     ) -> list[tuple[float, SyncTxBroadcastResult]]:
-        if self.client.use_broadcaster:
+        if self.client.active_broadcaster is not None:
             return await self.client.broadcaster.post(msgs, n_repeat, fee, fee_denom)
         log.info("Broadcasting with local LCD")
         if fee is None:
@@ -162,7 +162,7 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
         fee_denom: str = None,
         log_: bool = True,
     ) -> SyncTxBroadcastResult:
-        if self.client.use_broadcaster:
+        if self.client.active_broadcaster is not None:
             ((timestamp, result),) = await self.client.broadcaster.post(
                 msgs, n_repeat=1, fee=fee, fee_denom=fee_denom
             )
