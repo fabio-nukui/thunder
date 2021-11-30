@@ -36,8 +36,8 @@ class MultiRoutes:
 class RoutePools:
     def __init__(
         self,
-        tokens: list[OsmosisNativeToken],
-        pools: list[GAMMLiquidityPool],
+        tokens: Sequence[OsmosisNativeToken],
+        pools: Sequence[GAMMLiquidityPool],
         client: OsmosisClient,
     ):
         assert len(tokens) == len(pools) + 1
@@ -58,7 +58,11 @@ class RoutePools:
             self.routes_reversed.insert(0, SwapAmountInRoute(pool.pool_id, token_in.denom))
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({'->'.join(token.symbol for token in self.tokens)})"
+        return f"{self.__class__.__name__}({self.repr_tokens})"
+
+    @property
+    def repr_tokens(self) -> str:
+        return "->".join(token.symbol for token in self.tokens)
 
     async def op_swap_exact_in(
         self,

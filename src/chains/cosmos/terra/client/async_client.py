@@ -149,7 +149,7 @@ class TerraClient(CosmosClient):
         return await super().get_account_data(address)
 
     @staticmethod
-    def extract_coin_balance_changes(
+    def get_coin_balance_changes(
         logs: list[TxLog] | None,
     ) -> dict[AccAddress, list[TerraTokenAmount]]:
         if not logs:

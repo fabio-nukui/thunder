@@ -1,18 +1,22 @@
 from __future__ import annotations
 
+import asyncio
 from abc import ABC, abstractmethod
 from copy import copy
 from decimal import Decimal
-from typing import Sequence, TypeVar
+from typing import TYPE_CHECKING, Sequence, TypeVar
 
 from cosmos_proto.osmosis.gamm.v1beta1 import Pool, SwapAmountInRoute
 from cosmos_sdk.core.tx import Tx
 from cosmos_sdk.core.wasm import MsgExecuteContract
 
 from exceptions import InsufficientLiquidity, MaxSpreadAssertion
+from utils.cache import CacheGroup, ttl_cache
 
-from .client import OsmosisClient
 from .token import OsmosisNativeToken, OsmosisToken, OsmosisTokenAmount
+
+if TYPE_CHECKING:
+    from .client import OsmosisClient
 
 Operation = tuple[OsmosisTokenAmount, list[MsgExecuteContract]]
 
@@ -23,6 +27,7 @@ _MIN_RESERVE = Decimal("0.01")
 _ROUND_RATIO_MUL = Decimal("2")
 _ROUND_RATIO_POW = Decimal("1.7")
 _MAX_ADJUSTMENT_PCT = Decimal("0.00001")
+_RESERVES_CACHE_SIZE = 1000
 
 
 class BaseOsmosisLiquidityPool(ABC):
@@ -88,35 +93,61 @@ class GAMMLiquidityPool(BaseOsmosisLiquidityPool):
     weights: dict[OsmosisNativeToken, Decimal]
     _reserves: dict[OsmosisNativeToken, Decimal]
 
+    __instances: dict[int, GAMMLiquidityPool | Exception] = {}
+    __instances_creation: dict[int, asyncio.Event] = {}
+
     @classmethod
     async def new(cls, pool_id: int, client: OsmosisClient) -> GAMMLiquidityPool:
         pool = await client.gamm.get_pool(pool_id=pool_id)
-        self = cls.from_proto(pool, client)
+        self = await cls.from_proto(pool, client)
         if any(r < _MIN_RESERVE for r in self._reserves.values()):
             raise InsufficientLiquidity
         return self
 
     @classmethod
-    def from_proto(cls, pool: Pool, client: OsmosisClient) -> GAMMLiquidityPool:
+    async def from_proto(cls, pool: Pool, client: OsmosisClient) -> GAMMLiquidityPool:
+        if pool.id in cls.__instances:
+            return cls._get_instance(pool.id, client)
+        if pool.id in cls.__instances_creation:
+            await cls.__instances_creation[pool.id].wait()
+            return cls._get_instance(pool.id, client)
+        cls.__instances_creation[pool.id] = asyncio.Event()
+
         self = super().__new__(cls)
-        self.pool_id = pool.id
-        self.client = client
-        self.stop_updates = False
+        try:
+            self.pool_id = pool.id
+            self.client = client
+            self.stop_updates = False
 
-        self.address = pool.address
-        self.swap_fee = Decimal(pool.pool_params.swap_fee) / 10 ** PRECISION
-        self.exit_fee = Decimal(pool.pool_params.exit_fee) / 10 ** PRECISION
+            self.address = pool.address
+            self.swap_fee = Decimal(pool.pool_params.swap_fee) / 10 ** PRECISION
+            self.exit_fee = Decimal(pool.pool_params.exit_fee) / 10 ** PRECISION
 
-        self.tokens = []
-        self._reserves = {}
-        self.weights = {}
-        for asset in pool.pool_assets:
-            token = OsmosisNativeToken(asset.token.denom, client)
-            self.tokens.append(token)
-            self._reserves[token] = token.decimalize(asset.token.amount)
-            self.weights[token] = Decimal(asset.weight)
+            self.tokens = []
+            self._reserves = {}
+            self.weights = {}
+            for asset in pool.pool_assets:
+                token = OsmosisNativeToken(asset.token.denom, client.chain_id)
+                self.tokens.append(token)
+                self._reserves[token] = token.decimalize(asset.token.amount)
+                self.weights[token] = Decimal(asset.weight)
+        except Exception as e:
+            cls.__instances[pool.id] = e
+        else:
+            cls.__instances[pool.id] = self
+        finally:
+            cls.__instances_creation[pool.id].set()
+            del cls.__instances_creation[pool.id]
 
         return self
+
+    @classmethod
+    def _get_instance(cls, pool_id: int, client: OsmosisClient) -> GAMMLiquidityPool:
+        instance = cls.__instances[pool_id]
+        if isinstance(instance, Exception):
+            raise instance
+        instance.client = client
+        return instance
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(id={self.pool_id}, {self.repr_symbol})"
@@ -129,6 +160,7 @@ class GAMMLiquidityPool(BaseOsmosisLiquidityPool):
             self._reserves = await self._get_reserves()
         return self._reserves
 
+    @ttl_cache(CacheGroup.OSMOSIS, maxsize=_RESERVES_CACHE_SIZE)
     async def _get_reserves(self) -> dict[OsmosisNativeToken, Decimal]:
         assets = await self.client.gamm.get_pool_assets(pool_id=self.pool_id)
         return {t: t.decimalize(a.token.amount) for t, a in zip(self.tokens, assets)}

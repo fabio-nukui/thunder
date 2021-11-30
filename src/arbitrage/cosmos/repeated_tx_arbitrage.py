@@ -133,10 +133,13 @@ async def run_strategy(
     cache_group: utils.cache.CacheGroup,
     max_n_blocks: int = None,
     log_time: bool = True,
+    verbose_decode_warnings: bool = True,
 ):
     log.info(f"Running strategy with {len(arb_routes)=} and {len(mempool_filters)=}")
     start_height = client.height
-    async for height, mempool in client.mempool.iter_height_mempool(mempool_filters):
+    async for height, mempool in client.mempool.iter_height_mempool(
+        mempool_filters, verbose_decode_warnings
+    ):
         if log_time:
             start = time.perf_counter()
         if is_new_block := any(height > arb_route.last_run_height for arb_route in arb_routes):

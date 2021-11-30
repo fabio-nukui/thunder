@@ -29,11 +29,12 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 FEE = Decimal("0.003")
-MAX_SWAP_SLIPPAGE = Decimal("0.00001")
-MAX_ADD_LIQUIDITY_SLIPPAGE = Decimal("0.0005")
-TOKEN_FROM_DATA_CACHE_SIZE = 1000
-ROUTER_DECODE_MSG_CACHE_SIZE = 200
-ROUTER_DECODE_MSG_CACHE_TTL = 30
+_MAX_SWAP_SLIPPAGE = Decimal("0.00001")
+_MAX_ADD_LIQUIDITY_SLIPPAGE = Decimal("0.0005")
+_TOKEN_FROM_DATA_CACHE_SIZE = 1000
+_ROUTER_DECODE_MSG_CACHE_SIZE = 200
+_ROUTER_DECODE_MSG_CACHE_TTL = 30
+_RESERVES_CACHE_SIZE = 1000
 
 AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
 
@@ -76,7 +77,7 @@ def _decode_msg(raw_msg: str | dict, always_base64: bool = False) -> dict:
     return json.loads(base64.b64decode(raw_msg))
 
 
-@lru_cache(TOKEN_FROM_DATA_CACHE_SIZE)
+@lru_cache(_TOKEN_FROM_DATA_CACHE_SIZE)
 async def token_from_data(
     asset_info: dict,
     client: TerraClient,
@@ -114,7 +115,7 @@ def _is_router_msg(msg: dict, router_address: AccAddress | None) -> bool:
     return execute_msg["send"]["contract"] == router_address
 
 
-@ttl_cache(CacheGroup.TERRA, ROUTER_DECODE_MSG_CACHE_SIZE, ROUTER_DECODE_MSG_CACHE_TTL)
+@ttl_cache(CacheGroup.TERRA, _ROUTER_DECODE_MSG_CACHE_SIZE, _ROUTER_DECODE_MSG_CACHE_TTL)
 async def get_router_reserve_changes_from_msg(
     client: TerraClient,
     msg: dict,
@@ -267,8 +268,8 @@ class LiquidityPair(BaseTerraLiquidityPair):
     lp_token: LPToken
     _reserves: AmountTuple
 
-    _instances: dict[AccAddress, LiquidityPair | Exception] = {}
-    _instances_creation: dict[AccAddress, asyncio.Event] = {}
+    __instances: dict[AccAddress, LiquidityPair | Exception] = {}
+    __instances_creation: dict[AccAddress, asyncio.Event] = {}
 
     @classmethod
     async def new(
@@ -283,34 +284,36 @@ class LiquidityPair(BaseTerraLiquidityPair):
         recursive_lp_token_code_id: int = None,
         check_liquidity: bool = True,
     ) -> LiquidityPair:
-        if contract_addr in cls._instances:
+        if contract_addr in cls.__instances:
             return await cls._get_instance(contract_addr, client, check_liquidity)
-        if contract_addr in cls._instances_creation:
-            await cls._instances_creation[contract_addr].wait()
+        if contract_addr in cls.__instances_creation:
+            await cls.__instances_creation[contract_addr].wait()
             return await cls._get_instance(contract_addr, client, check_liquidity)
-        cls._instances_creation[contract_addr] = asyncio.Event()
+        cls.__instances_creation[contract_addr] = asyncio.Event()
 
         self = super().__new__(cls)
-        self.contract_addr = contract_addr
-        self.client = client
-        self.fee_rate = FEE if fee_rate is None else fee_rate
-        self.factory_name = factory_name
-        self.factory_address = factory_address
-        self.router_address = router_address
-        self.assert_limit_order_address = assert_limit_order_address
-
-        self.stop_updates = False
         try:
+            self.contract_addr = contract_addr
+            self.client = client
+            self.fee_rate = FEE if fee_rate is None else fee_rate
+            self.factory_name = factory_name
+            self.factory_address = factory_address
+            self.router_address = router_address
+            self.assert_limit_order_address = assert_limit_order_address
+
+            self.stop_updates = False
+
             self.lp_token = await LPToken.from_pool_contract(
                 self.contract_addr, self.client, recursive_lp_token_code_id
             )
             self.tokens = self.lp_token.pair_tokens
-            cls._instances[self.contract_addr] = self
         except Exception as e:
-            cls._instances[self.contract_addr] = e
+            cls.__instances[contract_addr] = e
+        else:
+            cls.__instances[contract_addr] = self
         finally:
-            cls._instances_creation[contract_addr].set()
-            del cls._instances_creation[contract_addr]
+            cls.__instances_creation[contract_addr].set()
+            del cls.__instances_creation[contract_addr]
         if check_liquidity:
             await self._check_liquidity()
         return self
@@ -327,7 +330,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
         client: TerraClient,
         check_liquidity: bool,
     ) -> LiquidityPair:
-        instance = cls._instances[contract_addr]
+        instance = cls.__instances[contract_addr]
         if isinstance(instance, Exception):
             raise instance
         instance.client = client
@@ -345,7 +348,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
             self._reserves = await self._get_reserves()
         return self._reserves
 
-    @ttl_cache(CacheGroup.TERRA)
+    @ttl_cache(CacheGroup.TERRA, maxsize=_RESERVES_CACHE_SIZE)
     async def _get_reserves(self) -> AmountTuple:
         data = await self.client.contract_query(self.contract_addr, {"pool": {}})
         return (
@@ -389,7 +392,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
         safety_margin: bool | int = True,
         max_slippage: Decimal = None,
     ) -> Operation:
-        max_slippage = MAX_SWAP_SLIPPAGE if max_slippage is None else max_slippage
+        max_slippage = _MAX_SWAP_SLIPPAGE if max_slippage is None else max_slippage
         amount_out = await self.get_swap_amount_out(amount_in, safety_margin)
         min_amount_out = (amount_out * (1 - max_slippage)).safe_margin(safety_margin)
         msg = self.build_swap_msg(sender, amount_in, min_amount_out)
@@ -629,7 +632,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
     ) -> Operation:
         reserve_in, reserve_out = await self._get_in_out_reserves(amount_in)
         slippage_tolerance = (
-            MAX_ADD_LIQUIDITY_SLIPPAGE if slippage_tolerance is None else slippage_tolerance
+            _MAX_ADD_LIQUIDITY_SLIPPAGE if slippage_tolerance is None else slippage_tolerance
         )
 
         # Calculate optimum ratio to swap before adding liquidity, excluding tax influence
@@ -695,7 +698,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
         slippage_tolerance: Decimal = None,
     ) -> AmountTuple:
         slippage_tolerance = (
-            MAX_ADD_LIQUIDITY_SLIPPAGE if slippage_tolerance is None else slippage_tolerance
+            _MAX_ADD_LIQUIDITY_SLIPPAGE if slippage_tolerance is None else slippage_tolerance
         )
         reserves = await self.get_reserves()
         amounts_in = self.fix_amounts_order(amounts_in)
@@ -711,7 +714,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
         slippage_tolerance: Decimal = None,
     ) -> list[MsgExecuteContract]:
         slippage_tolerance = (
-            MAX_ADD_LIQUIDITY_SLIPPAGE if slippage_tolerance is None else slippage_tolerance
+            _MAX_ADD_LIQUIDITY_SLIPPAGE if slippage_tolerance is None else slippage_tolerance
         )
         msgs = []
         for amount in amounts_in:

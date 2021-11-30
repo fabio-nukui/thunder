@@ -2,17 +2,15 @@ from __future__ import annotations
 
 import json
 import re
-from functools import cache
-from typing import TYPE_CHECKING, Union
+from functools import cache, lru_cache
+from typing import Union
 
 from cosmos_proto.cosmos.base.v1beta1 import Coin
 
 from common.token import Token
 
+from ..ibc_denoms import get_ibc_denom
 from ..token import CosmosNativeToken, CosmosTokenAmount, CW20Token
-
-if TYPE_CHECKING:
-    from .client import OsmosisClient
 
 _IBC_TOKENS_FILE = "resources/contracts/cosmos/{chain_id}/ibc_tokens.json"
 _pat_coin = re.compile(r"^(\-?[0-9]+(\.[0-9]+)?)([0-9a-zA-Z/]+)$")
@@ -42,8 +40,8 @@ class OsmosisTokenAmount(CosmosTokenAmount):
     token: OsmosisToken
 
     @classmethod
-    def from_coin(cls, coin: Coin, client: OsmosisClient = None) -> OsmosisTokenAmount:
-        token = OsmosisNativeToken(coin.denom, client)
+    def from_coin(cls, coin: Coin, chain_id: str = None) -> OsmosisTokenAmount:
+        token = OsmosisNativeToken(coin.denom, chain_id)
         return cls(token, int_amount=coin.amount)
 
     def to_coin(self) -> Coin:
@@ -67,12 +65,12 @@ class BaseOsmosisToken(Token[OsmosisTokenAmount]):
 
 
 class OsmosisNativeToken(BaseOsmosisToken, CosmosNativeToken[OsmosisTokenAmount]):
-    def __init__(self, denom: str, client: OsmosisClient = None):
+    def __init__(self, denom: str, chain_id: str = None):
         if not denom.startswith("ibc/"):
             return super().__init__(denom, decimals=6)
-        if client is None:
+        if chain_id is None:
             return super().__init__(denom, decimals=6, symbol=denom)
-        symbol = _get_ibc_symbol(denom, client.chain_id)
+        symbol = _get_ibc_symbol(denom, chain_id)
         super().__init__(denom, decimals=6, symbol=symbol)
 
 
@@ -81,3 +79,9 @@ class OsmosisCW20Token(BaseOsmosisToken, CW20Token[OsmosisTokenAmount]):
 
 
 OsmosisToken = Union[OsmosisNativeToken, OsmosisCW20Token]
+
+
+@lru_cache()
+def get_ibc_token(name: str, chain_id: str) -> OsmosisNativeToken:
+    denom = get_ibc_denom(name, chain_id)
+    return OsmosisNativeToken(denom, chain_id)

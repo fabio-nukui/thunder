@@ -4,13 +4,16 @@ import asyncio
 import logging
 import math
 import time
+from collections import defaultdict
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
-from typing import Any, Sequence
+from typing import Any, Iterable, Sequence
 
+from cosmos_proto.osmosis.gamm.v1beta1 import Pool
 from cosmos_sdk.core.auth import TxInfo
 from cosmos_sdk.core.fee import Fee
+from cosmos_sdk.core.gamm import SwapAmountInRoute
 from cosmos_sdk.core.tx import Tx
 from cosmos_sdk.core.wasm import MsgExecuteContract
 from cosmos_sdk.exceptions import LCDResponseError
@@ -22,7 +25,6 @@ from arbitrage.cosmos import (
     LPReserveSimulationMixin,
     run_strategy,
 )
-from chains.cosmos import ibc_denoms
 from chains.cosmos.osmosis import (
     GAMMLiquidityPool,
     OsmosisClient,
@@ -30,8 +32,9 @@ from chains.cosmos.osmosis import (
     OsmosisTokenAmount,
 )
 from chains.cosmos.osmosis.route import MultiRoutes, RoutePools
+from chains.cosmos.osmosis.token import get_ibc_token
 from chains.cosmos.osmosis.tx_filter import FilterSwap
-from exceptions import FeeEstimationError, UnprofitableArbitrage
+from exceptions import FeeEstimationError, InsufficientLiquidity, UnprofitableArbitrage
 from strategies.common.default_params import MAX_N_REPEATS
 from utils.cache import CacheGroup
 
@@ -41,10 +44,12 @@ MIN_START_AMOUNT_UST = Decimal(10)
 MAX_SINGLE_ARBITRAGE_AMOUNT_UST = Decimal(50_000)
 OPTIMIZATION_TOLERANCE_UST = Decimal("0.05")
 MIN_PROFIT_UST = Decimal("0.1")
-
-
-class NoPairFound(Exception):
-    pass
+MIN_N_ARBITRAGES = 5
+MIN_ROUTE_TOKEN_AMOUNT = 1 * 10 ** 6
+LIQUIDITY_TEST_AMOUNT_UST = 50
+LIQUIDITY_TEST_AMOUNT_ATOM = 2
+MIN_ROUND_TRIP_EFFICIENCY = Decimal("0.60")
+MAX_HOPS = 3
 
 
 @dataclass
@@ -93,13 +98,114 @@ class ArbParams(CosmosArbParams):
 
 
 async def get_arbitrages(client: OsmosisClient) -> list[OsmosisCyclesArbitrage]:
-    raise NotImplementedError
+    pools = await client.gamm.get_all_pools()
+    list_route_groups: Sequence[list[MultiRoutes]] = await asyncio.gather(
+        _get_token_routes(client, pools.values(), "UST"),
+        _get_token_routes(client, pools.values(), "ATOM"),
+    )
+    arbs: list[OsmosisCyclesArbitrage] = []
+    for route_group in list_route_groups:
+        for multi_routes in route_group:
+            try:
+                arbs.append(await OsmosisCyclesArbitrage.new(client, multi_routes))
+            except FeeEstimationError as e:
+                log.info(f"Error when initializing arbitrage with {multi_routes}: {e!r}")
+    assert len(arbs) >= MIN_N_ARBITRAGES
+    return arbs
+
+
+async def _get_token_routes(
+    client: OsmosisClient,
+    pools: Iterable[Pool],
+    token_name: str,
+) -> list[MultiRoutes]:
+    token = get_ibc_token(token_name, client.chain_id)
+    liquidity_test_amount = _get_liquidity_test_amount(token)
+
+    dict_routes: dict[tuple[OsmosisNativeToken, ...], list[RoutePools]] = defaultdict(list)
+    for routes in _get_cycle_amount_in_routes(list(pools), token, client):
+        tasks = (GAMMLiquidityPool.new(r.pool_id, client) for r in routes)
+        try:
+            list_pools = await asyncio.gather(*tasks)
+        except InsufficientLiquidity:
+            continue
+
+        route_tokens = [OsmosisNativeToken(r.token_out_denom, client.chain_id) for r in routes]
+        route_pools = RoutePools([token, *route_tokens], list_pools, client)
+
+        amount_out = await route_pools.get_amount_out_swap_exact_in(liquidity_test_amount)
+        if amount_out / liquidity_test_amount < MIN_ROUND_TRIP_EFFICIENCY:
+            continue
+
+        same_tokens_routes = dict_routes[tuple(sorted(route_tokens))]
+        if not any(_same_pool_ids(r, route_pools) for r in same_tokens_routes):
+            same_tokens_routes.append(route_pools)
+
+    return [MultiRoutes(client, list_routes) for list_routes in dict_routes.values()]
+
+
+def _same_pool_ids(route_0: RoutePools, route_1: RoutePools) -> bool:
+    return sorted(p.pool_id for p in route_0.pools) == sorted(p.pool_id for p in route_1.pools)
+
+
+def _get_liquidity_test_amount(token: OsmosisNativeToken) -> OsmosisTokenAmount:
+    if token.symbol.startswith("USD"):
+        return token.to_amount(LIQUIDITY_TEST_AMOUNT_UST)
+    if token.symbol.startswith("ATOM"):
+        return token.to_amount(LIQUIDITY_TEST_AMOUNT_ATOM)
+    raise ValueError(token)
+
+
+def _get_cycle_amount_in_routes(
+    pools: list[Pool],
+    token_in: OsmosisNativeToken,
+    client: OsmosisClient,
+    max_hops: int = MAX_HOPS,
+    current_route: list[SwapAmountInRoute] = None,
+    original_token_in: OsmosisNativeToken = None,
+    final_routes: list[list[SwapAmountInRoute]] = None,
+) -> list[list[SwapAmountInRoute]]:
+    current_route = [] if current_route is None else current_route
+    original_token_in = token_in if original_token_in is None else original_token_in
+    final_routes = [] if final_routes is None else final_routes
+
+    assert len(pools) > 0, "at least one pair must be given"
+    assert max_hops > 0, "max_hops must be positive number"
+
+    for pool in pools:
+        if not any(
+            (a.token.denom == token_in.denom and int(a.token.amount) > MIN_ROUTE_TOKEN_AMOUNT)
+            for a in pool.pool_assets
+        ):
+            continue
+        for asset in pool.pool_assets:
+            if asset.token.denom == original_token_in.denom:
+                if current_route:
+                    # End of recursion
+                    route = [*current_route, SwapAmountInRoute(pool.id, asset.token.denom)]
+                    final_routes.append(route)
+                else:
+                    continue
+            elif asset.token.denom != token_in.denom and max_hops > 1 and len(pools) > 1:
+                token_in_ = OsmosisNativeToken(asset.token.denom, client.chain_id)
+                _get_cycle_amount_in_routes(
+                    pools=[p for p in pools if p is not pool],
+                    token_in=token_in_,
+                    client=client,
+                    max_hops=max_hops - 1,
+                    current_route=[*current_route, SwapAmountInRoute(pool.id, token_in_.denom)],
+                    original_token_in=original_token_in,
+                    final_routes=final_routes,
+                )
+    return final_routes
 
 
 def get_filters(
     arb_routes: list[OsmosisCyclesArbitrage],
 ) -> dict[GAMMLiquidityPool, FilterSwap]:
-    return {pool: FilterSwap(pool) for arb_route in arb_routes for pool in arb_route.pools}
+    return {
+        pool: FilterSwap(pool.pool_id) for arb_route in arb_routes for pool in arb_route.pools
+    }
 
 
 class OsmosisCyclesArbitrage(
@@ -128,7 +234,7 @@ class OsmosisCyclesArbitrage(
         self.start_token = multi_routes.start_token
         self.gas_adjustment = gas_adjustment
 
-        self.UST = OsmosisNativeToken(ibc_denoms.get_ibc_denom("UST", client.chain_id), client)
+        self.UST = get_ibc_token("UST", client.chain_id)
         min_start_amount = self.UST.to_amount(MIN_START_AMOUNT_UST)
         max_single_arbitrage_amount = self.UST.to_amount(MAX_SINGLE_ARBITRAGE_AMOUNT_UST)
         optimization_tolerance = self.UST.to_amount(OPTIMIZATION_TOLERANCE_UST)
@@ -154,7 +260,10 @@ class OsmosisCyclesArbitrage(
         return self
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(start_token={self.start_token}, pools={self.pools})"
+        return (
+            f"{self.__class__.__name__}"
+            f"({self.routes[0].repr_tokens}, n_routes={len(self.routes)})"
+        )
 
     def _reset_mempool_params(self):
         super()._reset_mempool_params()
@@ -163,7 +272,8 @@ class OsmosisCyclesArbitrage(
         longest_route = max(self.routes, key=lambda x: len(x.pools))
         try:
             _, msgs = await longest_route.op_swap_exact_in(
-                self.min_start_amount, min_amount_out=self.start_token.to_amount(0)
+                self.min_start_amount,
+                min_amount_out=self.min_start_amount * MIN_ROUND_TRIP_EFFICIENCY,
             )
             fee = await self.client.tx.estimate_fee(msgs)
         except Exception as e:
@@ -304,8 +414,7 @@ class OsmosisCyclesArbitrage(
         self,
         info: TxInfo,
     ) -> tuple[OsmosisTokenAmount, Decimal]:
-        raise NotImplementedError
-        balance_changes = OsmosisClient.extract_coin_balance_changes(info.logs)
+        balance_changes = OsmosisClient.get_coin_balance_changes(info.logs)
         arb_changes = balance_changes[self.client.address]
         amount_out = max(change for change in arb_changes if change.token == self.start_token)
         profit = sum(
@@ -320,5 +429,10 @@ async def run(max_n_blocks: int = None):
         arb_routes = await get_arbitrages(client)
         mempool_filters = get_filters(arb_routes)
         await run_strategy(
-            client, arb_routes, mempool_filters, CacheGroup.OSMOSIS, max_n_blocks
+            client,
+            arb_routes,
+            mempool_filters,
+            CacheGroup.OSMOSIS,
+            max_n_blocks,
+            verbose_decode_warnings=False,
         )

@@ -552,7 +552,7 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
         self,
         info: TxInfo,
     ) -> tuple[TerraTokenAmount, Decimal]:
-        balance_changes = TerraClient.extract_coin_balance_changes(info.logs)
+        balance_changes = TerraClient.get_coin_balance_changes(info.logs)
         arb_changes = balance_changes[self.client.address]
         amount_out = max(change for change in arb_changes if change.token == self.start_token)
         profit = sum(

@@ -10,7 +10,7 @@ from cosmos_sdk.core.tx import Tx
 
 import configs
 import utils
-from utils.cache import CacheGroup, ttl_cache
+from utils.cache import ttl_cache
 
 from .. import utils_rpc
 from ..tx_filter import Filter
@@ -71,9 +71,12 @@ class MempoolCacheManager:
         height: int,
         filters: Mapping[_T, Filter],
         new_block_only: bool = False,
+        verbose_decode_warnings: bool = True,
     ) -> tuple[int, dict[_T, list[Tx]]]:
         while True:
-            new_height, mempool = await self.get_new_height_mempool(height, new_block_only)
+            new_height, mempool = await self.get_new_height_mempool(
+                height, new_block_only, verbose_decode_warnings
+            )
             filtered_mempool = {
                 key: list_tx
                 for key, filter_ in filters.items()
@@ -83,12 +86,14 @@ class MempoolCacheManager:
                 return new_height, filtered_mempool
 
     async def get_new_height_mempool(
-        self,
-        height: int,
-        new_block_only: bool,
+        self, height: int, new_block_only: bool, verbose_decode_warnings: bool = True
     ) -> tuple[int, list[Tx]]:
         task_wait_next_block = asyncio.create_task(self._wait_next_block(height))
-        task_mempool_txs = asyncio.create_task(self._update_mempool_txs(wait_for_changes=True))
+        task_mempool_txs = asyncio.create_task(
+            self._update_mempool_txs(
+                wait_for_changes=True, verbose_decode_warnings=verbose_decode_warnings
+            )
+        )
 
         tasks = asyncio.as_completed([task_wait_next_block, task_mempool_txs])
         event = await next(tasks)
@@ -111,7 +116,11 @@ class MempoolCacheManager:
                 return UpdateEvent.new_block
             await asyncio.sleep(configs.TERRA_POLL_INTERVAL)
 
-    async def _update_mempool_txs(self, wait_for_changes: bool) -> UpdateEvent:
+    async def _update_mempool_txs(
+        self,
+        wait_for_changes: bool,
+        verbose_decode_warnings: bool,
+    ) -> UpdateEvent:
         while True:
             res = await self.client.rpc_http_client.get("unconfirmed_txs")
             raw_txs: set[str] = {
@@ -129,23 +138,26 @@ class MempoolCacheManager:
 
         self._txs_cache.update(
             {
-                raw_tx: self._decode_tx(raw_tx)
+                raw_tx: self._decode_tx(raw_tx, verbose_decode_warnings)
                 for raw_tx in raw_txs
                 if raw_tx not in self._txs_cache
             }
         )
         return UpdateEvent.mempool
 
-    async def fetch_mempool_txs(self) -> list[Tx]:
-        await self._update_mempool_txs(wait_for_changes=False)
+    async def fetch_mempool_txs(self, verbose_decode_warnings: bool) -> list[Tx]:
+        await self._update_mempool_txs(
+            wait_for_changes=False, verbose_decode_warnings=verbose_decode_warnings
+        )
         return list(tx for tx in self._txs_cache.values() if tx is not None)
 
-    @ttl_cache(CacheGroup.TERRA, maxsize=_DECODER_CACHE_SIZE, ttl=_DECODER_CACHE_TTL)
-    def _decode_tx(self, raw_tx: str) -> Tx | None:
+    @ttl_cache(maxsize=_DECODER_CACHE_SIZE, ttl=_DECODER_CACHE_TTL)
+    def _decode_tx(self, raw_tx: str, verbose_decode_warnings: bool) -> Tx | None:
         try:
             return Tx.from_proto_bytes(base64.b64decode(raw_tx))
         except Exception as e:
-            log.warning(f"Decode error ({e!r}) {len(raw_tx)=}: {raw_tx=}")
+            if verbose_decode_warnings:
+                log.warning(f"Decode error ({e!r}) {len(raw_tx)=}: {raw_tx=}")
             return None
 
 
@@ -154,8 +166,8 @@ class MempoolApi(Api["CosmosClient"]):
         super().__init__(client)
         self._cache_manager = MempoolCacheManager(client)
 
-    async def fetch_mempool_txs(self) -> list[Tx]:
-        return await self._cache_manager.fetch_mempool_txs()
+    async def fetch_mempool_txs(self, verbose_decode_warnings: bool = True) -> list[Tx]:
+        return await self._cache_manager.fetch_mempool_txs(verbose_decode_warnings)
 
     def start(self):
         self._cache_manager.start()
@@ -169,10 +181,14 @@ class MempoolApi(Api["CosmosClient"]):
     async def iter_height_mempool(
         self,
         filters: Mapping[_T, Filter],
+        verbose_decode_warnings: bool = True,
     ) -> AsyncIterable[tuple[int, dict[_T, list[Tx]]]]:
         while True:
             last_height, mempool = await self._cache_manager.filter_new_height_mempool(
-                self.client.height, filters, new_block_only=False
+                self.client.height,
+                filters,
+                new_block_only=False,
+                verbose_decode_warnings=verbose_decode_warnings,
             )
             if last_height > self.client.height:
                 self.client.height = last_height

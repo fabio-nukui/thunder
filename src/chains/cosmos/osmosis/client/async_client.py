@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 from decimal import Decimal
 
 import cosmos_proto.cosmos.bank.v1beta1 as cosmos_bank_pb
 from cosmos_sdk.core import AccAddress, Coins
 from cosmos_sdk.core.auth.data import BaseAccount
+from cosmos_sdk.core.tx import TxLog
 
 import auth_secrets
 import configs
@@ -90,7 +92,7 @@ class OsmosisClient(CosmosClient):
     async def get_balance(self, denom: str, address: AccAddress = None) -> OsmosisTokenAmount:
         address = self.address if address is None else address
         res = await self.grpc_bank.balance(address=address, denom=denom)
-        return OsmosisTokenAmount.from_coin(res.balance, self)
+        return OsmosisTokenAmount.from_coin(res.balance, self.chain_id)
 
     @ttl_cache(CacheGroup.OSMOSIS)
     async def get_all_balances(self, address: AccAddress = None) -> list[OsmosisTokenAmount]:
@@ -98,8 +100,26 @@ class OsmosisClient(CosmosClient):
         res = await self.grpc_bank.all_balances(address=address)
         if res.pagination.next_key:
             raise NotImplementedError("not implemented for paginated results")
-        return [OsmosisTokenAmount.from_coin(c, self) for c in res.balances]
+        return [OsmosisTokenAmount.from_coin(c, self.chain_id) for c in res.balances]
 
     @ttl_cache(CacheGroup.OSMOSIS)
     async def get_account_data(self, address: AccAddress = None) -> BaseAccount:
         return await super().get_account_data(address)
+
+    @staticmethod
+    def get_coin_balance_changes(
+        logs: list[TxLog] | None,
+    ) -> dict[AccAddress, list[OsmosisTokenAmount]]:
+        if not logs:
+            return {}
+        changes: dict[AccAddress, list[OsmosisTokenAmount]] = defaultdict(list)
+        for tx_log in logs:
+            if not (transfers := tx_log.events_by_type.get("transfer")):
+                continue
+            senders = [AccAddress(addr) for addr in transfers["sender"]]
+            recipients = [AccAddress(addr) for addr in transfers["recipient"]]
+            amounts = [OsmosisTokenAmount.from_str(a) for a in transfers["amount"]]
+            for sender, recipient, amount in zip(senders, recipients, amounts):
+                changes[sender].append(-amount)
+                changes[recipient].append(amount)
+        return dict(changes)

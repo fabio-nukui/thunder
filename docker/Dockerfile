@@ -40,7 +40,7 @@ ARG RELEASES_URL=https://mg4r5dq4tpgvnm6tu5rwukctke5x3gfw.s3.amazonaws.com
 
 RUN pip install --no-cache-dir \
         'python-binance==1.0.15' \
-        ${RELEASES_URL}'/cosmos.py/dist/cosmos_sdk-2.0.0b4-py3-none-any.whl' && \
+        ${RELEASES_URL}'/cosmos.py/dist/cosmos_sdk-2.0.0b6-py3-none-any.whl' && \
     fix-permissions $HOME $CONDA_DIR
 
 ENV PATH="${HOME}/.local/bin:${PATH}"
