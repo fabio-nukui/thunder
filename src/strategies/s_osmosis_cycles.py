@@ -36,18 +36,19 @@ from chains.cosmos.osmosis.token import get_ibc_token
 from chains.cosmos.osmosis.tx_filter import FilterSwap
 from exceptions import FeeEstimationError, InsufficientLiquidity, UnprofitableArbitrage
 from strategies.common.default_params import MAX_N_REPEATS
-from utils.cache import CacheGroup
+from utils.cache import CacheGroup, ttl_cache
 
 log = logging.getLogger(__name__)
 
-MIN_START_AMOUNT_UST = Decimal(10)
-MAX_SINGLE_ARBITRAGE_AMOUNT_UST = Decimal(50_000)
-OPTIMIZATION_TOLERANCE_UST = Decimal("0.05")
+_START_TOKEN_PRICE_CACHE_TTL = 600
+
+MIN_START_AMOUNT_UST = Decimal(20)
+MAX_ARBITRAGE_UST = Decimal(50_000)
+OPTIMIZATION_TOL_UST = Decimal("0.05")
 MIN_PROFIT_UST = Decimal("0.1")
 MIN_N_ARBITRAGES = 5
 MIN_ROUTE_TOKEN_AMOUNT = 1 * 10 ** 6
 LIQUIDITY_TEST_AMOUNT_UST = 50
-LIQUIDITY_TEST_AMOUNT_ATOM = 2
 MIN_ROUND_TRIP_EFFICIENCY = Decimal("0.60")
 MAX_HOPS = 3
 
@@ -97,6 +98,12 @@ class ArbParams(CosmosArbParams):
         }
 
 
+async def _get_atom_price() -> Decimal:
+    url = "https://api.coingecko.com/api/v3/simple/price?ids=cosmos&vs_currencies=usd"
+    res = await utils.ahttp.get(url)
+    return Decimal(str((res.json()["cosmos"]["usd"])))
+
+
 async def get_arbitrages(client: OsmosisClient) -> list[OsmosisCyclesArbitrage]:
     pools = await client.gamm.get_all_pools()
     list_route_groups: Sequence[list[MultiRoutes]] = await asyncio.gather(
@@ -120,7 +127,7 @@ async def _get_token_routes(
     token_name: str,
 ) -> list[MultiRoutes]:
     token = get_ibc_token(token_name, client.chain_id)
-    liquidity_test_amount = _get_liquidity_test_amount(token)
+    liquidity_test_amount = await _get_liquidity_test_amount(token)
 
     dict_routes: dict[tuple[OsmosisNativeToken, ...], list[RoutePools]] = defaultdict(list)
     for routes in _get_cycle_amount_in_routes(list(pools), token, client):
@@ -148,11 +155,11 @@ def _same_pool_ids(route_0: RoutePools, route_1: RoutePools) -> bool:
     return sorted(p.pool_id for p in route_0.pools) == sorted(p.pool_id for p in route_1.pools)
 
 
-def _get_liquidity_test_amount(token: OsmosisNativeToken) -> OsmosisTokenAmount:
+async def _get_liquidity_test_amount(token: OsmosisNativeToken) -> OsmosisTokenAmount:
     if token.symbol.startswith("USD"):
         return token.to_amount(LIQUIDITY_TEST_AMOUNT_UST)
     if token.symbol.startswith("ATOM"):
-        return token.to_amount(LIQUIDITY_TEST_AMOUNT_ATOM)
+        return token.to_amount(LIQUIDITY_TEST_AMOUNT_UST / await _get_atom_price())
     raise ValueError(token)
 
 
@@ -214,7 +221,6 @@ class OsmosisCyclesArbitrage(
     routes: Sequence[RoutePools]
     start_token: OsmosisNativeToken
     gas_adjustment: Decimal | None
-    UST: OsmosisNativeToken
     estimated_gas_use: int
     min_start_amount: OsmosisTokenAmount
     max_single_arbitrage: OsmosisTokenAmount
@@ -234,21 +240,6 @@ class OsmosisCyclesArbitrage(
         self.start_token = multi_routes.start_token
         self.gas_adjustment = gas_adjustment
 
-        self.UST = get_ibc_token("UST", client.chain_id)
-        min_start_amount = self.UST.to_amount(MIN_START_AMOUNT_UST)
-        max_single_arbitrage_amount = self.UST.to_amount(MAX_SINGLE_ARBITRAGE_AMOUNT_UST)
-        optimization_tolerance = self.UST.to_amount(OPTIMIZATION_TOLERANCE_UST)
-
-        (
-            self.min_start_amount,
-            self.max_single_arbitrage,
-            self.optimization_tolerance,
-        ) = await asyncio.gather(
-            client.gamm.get_best_amount_out(min_start_amount, self.start_token),
-            client.gamm.get_best_amount_out(max_single_arbitrage_amount, self.start_token),
-            client.gamm.get_best_amount_out(optimization_tolerance, self.start_token),
-        )
-
         self.__init__(
             client,
             pools=multi_routes.pools,
@@ -256,7 +247,13 @@ class OsmosisCyclesArbitrage(
             filter_keys=multi_routes.pools,
             fee_denom=OSMO.denom,
         )
+
+        price = await self._get_start_token_price()
+        self.min_start_amount = self.start_token.to_amount(MIN_START_AMOUNT_UST) / price
+        self.max_single_arbitrage = self.start_token.to_amount(MAX_ARBITRAGE_UST) / price
+        self.optimization_tolerance = self.start_token.to_amount(OPTIMIZATION_TOL_UST) / price
         self.estimated_gas_use = await self._estimate_gas_use()
+
         return self
 
     def __repr__(self) -> str:
@@ -267,6 +264,14 @@ class OsmosisCyclesArbitrage(
 
     def _reset_mempool_params(self):
         super()._reset_mempool_params()
+
+    @ttl_cache(CacheGroup.OSMOSIS, ttl=_START_TOKEN_PRICE_CACHE_TTL)
+    async def _get_start_token_price(self) -> Decimal:
+        if self.start_token == get_ibc_token("UST", self.client.chain_id):
+            return Decimal(1)
+        if self.start_token == get_ibc_token("ATOM", self.client.chain_id):
+            return await _get_atom_price()
+        raise ValueError(f"Unexpected {self.start_token=}")
 
     async def _estimate_gas_use(self) -> int:
         longest_route = max(self.routes, key=lambda x: len(x.pools))
@@ -298,11 +303,9 @@ class OsmosisCyclesArbitrage(
         if not params:
             raise UnprofitableArbitrage(errors)
         best_param = max(params, key=lambda x: x["net_profit"])
-        net_profit_ust = await self.client.gamm.get_best_amount_out(
-            best_param["net_profit"], self.UST
-        )
-        if net_profit_ust < MIN_PROFIT_UST:
-            raise UnprofitableArbitrage(f"Low profitability: USD {net_profit_ust.amount:.2f}")
+        net_profit_usd = best_param["net_profit"].amount * await self._get_start_token_price()
+        if net_profit_usd < MIN_PROFIT_UST:
+            raise UnprofitableArbitrage(f"Low profitability: USD {net_profit_usd:.2f}")
 
         return ArbParams(
             timestamp_found=time.time(),
@@ -315,7 +318,7 @@ class OsmosisCyclesArbitrage(
             n_repeat=best_param["n_repeat"],
             est_final_amount=best_param["final_amount"],
             est_fee=best_param["fee"],
-            est_net_profit_usd=net_profit_ust.amount,
+            est_net_profit_usd=net_profit_usd,
         )
 
     async def _get_params_single_route(
@@ -341,9 +344,9 @@ class OsmosisCyclesArbitrage(
         token_fee = OsmosisNativeToken(coin_fee.denom)
         gas_cost = token_fee.to_amount(int_amount=str(coin_fee.amount)) * n_repeat
         gas_cost_raw = gas_cost / self.client.gas_adjustment
-        gas_cost_converted = await self.client.gamm.get_best_amount_out(
-            gas_cost_raw, self.start_token
-        )
+        if gas_cost_raw:
+            raise NotImplementedError(f"Not implemented for gas price > 0, {gas_cost_raw=}")
+        gas_cost_converted = self.start_token.to_amount(0)
         net_profit = final_amount - initial_amount - gas_cost_converted
         return {
             "route": route,
