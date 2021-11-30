@@ -40,7 +40,7 @@ from utils.cache import CacheGroup, ttl_cache
 
 log = logging.getLogger(__name__)
 
-_START_TOKEN_PRICE_CACHE_TTL = 600
+_TOKEN_PRICE_CACHE_TTL = 600
 
 MIN_START_AMOUNT_UST = Decimal(20)
 MAX_ARBITRAGE_UST = Decimal(50_000)
@@ -98,6 +98,7 @@ class ArbParams(CosmosArbParams):
         }
 
 
+@ttl_cache(CacheGroup.OSMOSIS, ttl=_TOKEN_PRICE_CACHE_TTL)
 async def _get_atom_price() -> Decimal:
     url = "https://api.coingecko.com/api/v3/simple/price?ids=cosmos&vs_currencies=usd"
     res = await utils.ahttp.get(url)
@@ -266,7 +267,6 @@ class OsmosisCyclesArbitrage(
     def _reset_mempool_params(self):
         super()._reset_mempool_params()
 
-    @ttl_cache(CacheGroup.OSMOSIS, ttl=_START_TOKEN_PRICE_CACHE_TTL)
     async def _get_start_token_price(self) -> Decimal:
         if self.start_token == get_ibc_token("UST", self.client.chain_id):
             return Decimal(1)
