@@ -4,11 +4,10 @@ import asyncio
 from typing import Sequence
 
 from cosmos_sdk.core import AccAddress
+from cosmos_sdk.core.gamm import MsgSwapExactAmountIn, SwapAmountInRoute
 
 from chains.cosmos.osmosis.client import OsmosisClient
-from chains.cosmos.osmosis.data import MsgSwapExactAmountIn
 
-from .data import SwapAmountInRoute
 from .liquidity_pair import GAMMLiquidityPool
 from .token import OsmosisNativeToken, OsmosisTokenAmount
 

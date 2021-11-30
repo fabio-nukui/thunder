@@ -15,10 +15,10 @@ from cosmos_sdk.client.lcd.api.tx import CreateTxOptions, SignerOptions
 from cosmos_sdk.core import Coins
 from cosmos_sdk.core.broadcast import SyncTxBroadcastResult
 from cosmos_sdk.core.fee import Fee
+from cosmos_sdk.core.msg import Msg
 from cosmos_sdk.core.tx import AuthInfo, SignerData, Tx, TxBody
 from cosmos_sdk.exceptions import LCDResponseError
 
-from chains.cosmos.msg import MsgType
 from exceptions import FeeEstimationError, TxAlreadyBroadcasted
 
 from .base_api import Api, CosmosClientT
@@ -43,7 +43,7 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
 
     async def estimate_fee(
         self,
-        msgs: Sequence[MsgType],
+        msgs: Sequence[Msg],
         gas_adjustment: Decimal = None,
         use_fallback_estimate: bool = False,
         estimated_gas_use: int = None,
@@ -124,12 +124,12 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
         estimated_gas_use: int,
         gas_adjustment: Decimal,
         fee_denom: str,
-        msgs: Sequence[MsgType],
+        msgs: Sequence[Msg],
         **kwargs,
     ) -> Fee:
         ...
 
-    async def _check_msgs_in_mempool(self, msgs: Sequence[MsgType]):
+    async def _check_msgs_in_mempool(self, msgs: Sequence[Msg]):
         mempool = await self.client.mempool.fetch_mempool_txs()
         data = [msg.to_data() for msg in msgs]
         if data in mempool:
@@ -137,7 +137,7 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
 
     async def execute_multi_msgs(
         self,
-        msgs: Sequence[MsgType],
+        msgs: Sequence[Msg],
         n_repeat: int,
         fee: Fee = None,
         fee_denom: str = None,
@@ -157,7 +157,7 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
 
     async def execute_msgs(
         self,
-        msgs: Sequence[MsgType],
+        msgs: Sequence[Msg],
         fee: Fee = None,
         fee_denom: str = None,
         log_: bool = True,

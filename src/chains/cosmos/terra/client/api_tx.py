@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING, Sequence
 
 from cosmos_sdk.core import Coins
 from cosmos_sdk.core.fee import Fee
+from cosmos_sdk.core.msg import Msg
 
 import configs
-from chains.cosmos.msg import Msg
 from exceptions import FeeEstimationError
 from utils.cache import CacheGroup, ttl_cache
 

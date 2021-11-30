@@ -5,11 +5,11 @@ import asyncio
 from cosmos_proto.cosmos.base.query.v1beta1 import PageRequest
 from cosmos_proto.osmosis.gamm.v1beta1 import MsgStub, Pool, PoolAsset, QueryStub
 from cosmos_sdk.core import AccAddress, Coin
+from cosmos_sdk.core.gamm import MsgSwapExactAmountIn, SwapAmountInRoute
 
 from chains.cosmos.osmosis.liquidity_pair import GAMMLiquidityPool
 from utils.cache import CacheGroup, ttl_cache
 
-from ..data.gamm import MsgSwapExactAmountIn, SwapAmountInRoute
 from ..token import OsmosisNativeToken, OsmosisTokenAmount
 from .base_api import Api
 
