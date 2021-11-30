@@ -195,7 +195,8 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
                 else:
                     raise e
             else:
-                self.client.signer.sequence = (signer.sequence or 0) + 1
+                last_sequence = max(signer.sequence or 0, self.client.signer.sequence or 0)
+                self.client.signer.sequence = last_sequence + 1
                 asyncio.create_task(self._broadcast_async(tx))
                 log.debug(f"Tx executed: {res.txhash}")
                 return res

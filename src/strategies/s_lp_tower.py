@@ -139,7 +139,13 @@ class LPTowerArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[Terra
         pool_tower: terraswap.LiquidityPair,
     ):
         pools = Pools(pool_0, pool_1, pool_tower)
-        super().__init__(client, pools=pools, pool_cls=Pools._make, filter_keys=pools)
+        super().__init__(
+            client,
+            pools=pools,
+            pool_cls=Pools._make,
+            filter_keys=pools,
+            cls_amount=TerraTokenAmount,
+        )
 
     def __repr__(self) -> str:
         return (

@@ -246,6 +246,7 @@ class OsmosisCyclesArbitrage(
             routes=multi_routes.routes,
             filter_keys=multi_routes.pools,
             fee_denom=OSMO.denom,
+            cls_amount=OsmosisTokenAmount,
         )
 
         price = await self._get_start_token_price()

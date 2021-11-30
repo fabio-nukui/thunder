@@ -45,9 +45,17 @@ class CosmosArbParams(BaseArbParams):
 class CosmosRepeatedTxArbitrage(
     Generic[_CosmosClientT], RepeatedTxArbitrage[_CosmosClientT], ABC
 ):
-    def __init__(self, *args, filter_keys: Iterable, fee_denom: str = None, **kwargs):
+    def __init__(
+        self,
+        *args,
+        filter_keys: Iterable,
+        fee_denom: str = None,
+        cls_amount: type[CosmosTokenAmount] = CosmosTokenAmount,
+        **kwargs,
+    ):
         self.filter_keys = filter_keys
         self.fee_denom = fee_denom
+        self.cls_amount = cls_amount
         kwargs = kwargs.get("broadcast_kwargs", {})
         kwargs["broadcast_kwargs"] = kwargs | {"fee_denom": fee_denom}
         super().__init__(*args, **kwargs)
@@ -96,7 +104,7 @@ class CosmosRepeatedTxArbitrage(
             raise
         if height - info.height < MIN_CONFIRMATIONS:
             raise IsBusy
-        gas_cost = CosmosTokenAmount.from_coin(*info.tx.auth_info.fee.amount)
+        gas_cost = self.cls_amount.from_coin(*info.tx.auth_info.fee.amount)
         if info.logs is None:
             status = TxStatus.failed
             tx_err_log = info.rawlog

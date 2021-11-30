@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Sequence, TypeVar
 
 from cosmos_proto.osmosis.gamm.v1beta1 import Pool, SwapAmountInRoute
 from cosmos_sdk.core.gamm import MsgSwapExactAmountIn, MsgSwapExactAmountOut
+from cosmos_sdk.core.msg import Msg
 from cosmos_sdk.core.tx import Tx
 from cosmos_sdk.core.wasm import MsgExecuteContract
 
@@ -67,7 +68,7 @@ class BaseOsmosisLiquidityPool(ABC):
         ...
 
     @abstractmethod
-    async def get_reserve_changes_from_msg(self, msg: dict) -> list[OsmosisTokenAmount]:
+    async def get_reserve_changes_from_msg(self, msg: Msg) -> list[OsmosisTokenAmount]:
         ...
 
     async def get_reserve_changes_from_tx(self, tx: Tx) -> list[OsmosisTokenAmount]:
@@ -75,7 +76,7 @@ class BaseOsmosisLiquidityPool(ABC):
         errors = []
         for msg in tx.body.messages:
             try:
-                tx_changes = await self.get_reserve_changes_from_msg(msg.to_data())
+                tx_changes = await self.get_reserve_changes_from_msg(msg)
                 acc_changes = [c + tx_c for c, tx_c in zip(acc_changes, tx_changes)]
             except MaxSpreadAssertion:
                 raise
@@ -84,7 +85,9 @@ class BaseOsmosisLiquidityPool(ABC):
                     raise e
                 errors.append(e)
         if not any(acc_changes):
-            raise Exception(f"Error when parsing msgs: {errors}")
+            if any(isinstance(msg, MsgSwapExactAmountIn) for msg in tx.body.messages):
+                # TODO: remove "if" when MsgSwapExactAmountOut is implemented
+                raise Exception(f"Error when parsing msgs: {errors}")
         return acc_changes
 
 
@@ -236,24 +239,24 @@ class GAMMLiquidityPool(BaseOsmosisLiquidityPool):
         simulation._reserves = reserves
         return simulation
 
-    async def get_reserve_changes_from_msg(self, msg: dict) -> list[OsmosisTokenAmount]:
-        changes: list[OsmosisTokenAmount] = []
+    async def get_reserve_changes_from_msg(self, msg: Msg) -> list[OsmosisTokenAmount]:
+        changes = {t: t.to_amount(0) for t in self.tokens}
         if isinstance(msg, MsgSwapExactAmountIn):
             if not any(self.pool_id == r.pool_id for r in msg.routes):
-                return changes
+                return list(changes.values())
             token_in = OsmosisNativeToken(msg.token_in.denom)
             amount_in = token_in.to_amount(int_amount=str(msg.token_in.amount))
             for route in msg.routes:
                 token_out = OsmosisNativeToken(route.token_out_denom, self.client.chain_id)
                 if route.pool_id == self.pool_id:
                     pool = self
-                    changes.append(amount_in)
+                    changes[amount_in.token] += amount_in  # type: ignore
                 else:
                     pool = await GAMMLiquidityPool.new(route.pool_id, self.client)
                 amount_in = await pool.get_amount_out_exact_in(amount_in, token_out)
                 if route.pool_id == self.pool_id:
-                    changes.append(-amount_in)
+                    changes[amount_in.token] -= amount_in  # type: ignore
         if isinstance(msg, MsgSwapExactAmountOut):
             log.debug("Unable to get_reserve_changes_from_msg: MsgSwapExactAmountOut")
-            return changes  # TODO: implement
-        return changes
+            return list(changes.values())  # TODO: implement
+        return list(changes.values())
