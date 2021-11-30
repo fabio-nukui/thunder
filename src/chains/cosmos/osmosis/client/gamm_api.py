@@ -53,8 +53,8 @@ class GammApi(Api):
         return MsgSwapExactAmountIn(
             sender=sender,
             routes=routes,
-            token_in=Coin(denom=amount_in.token.denom, amount=amount_in.int_amount),
-            token_out_min_amount=min_out.int_amount if min_out is not None else 0,
+            tokenIn=Coin(denom=amount_in.token.denom, amount=amount_in.int_amount),
+            tokenOutMinAmount=min_out.int_amount if min_out is not None else 0,
         )
 
     async def get_best_amount_out(
