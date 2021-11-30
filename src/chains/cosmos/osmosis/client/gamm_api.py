@@ -68,6 +68,8 @@ class GammApi(Api):
             raise NotImplementedError
         if amount_in.token == token_out:
             return amount_in
+        if not amount_in:
+            return token_out.to_amount(0)
         sender = sender or self.client.address
         assert isinstance(amount_in.token, OsmosisNativeToken)
         pools = await self.get_all_pools()

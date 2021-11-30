@@ -91,7 +91,7 @@ class RoutePools:
         safety_margin: bool | int = False,
     ) -> OsmosisTokenAmount:
         pools = self.pools[::-1] if reverse else self.pools
-        tokens = self.tokens[-1:0:-1] if reverse else self.tokens[1:]
+        tokens = self.tokens[-2::-1] if reverse else self.tokens[1:]
         for pool, token_out in zip(pools, tokens):
             amount_in = await pool.get_amount_out_exact_in(amount_in, token_out, safety_margin)
         return amount_in

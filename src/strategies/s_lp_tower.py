@@ -12,7 +12,6 @@ from cosmos_sdk.core.auth import TxInfo
 from cosmos_sdk.core.fee import Fee
 from cosmos_sdk.core.tx import Tx
 from cosmos_sdk.core.wasm import MsgExecuteContract
-from cosmos_sdk.exceptions import LCDResponseError
 
 import utils
 from arbitrage.cosmos import (
@@ -32,7 +31,7 @@ from chains.cosmos.terra import (
     terraswap,
 )
 from chains.cosmos.terra.tx_filter import Filter, FilterNativeSwap, FilterSwapTerraswap
-from exceptions import FeeEstimationError, UnprofitableArbitrage
+from exceptions import UnprofitableArbitrage
 from utils.cache import CacheGroup
 
 from .common.default_params import MIN_PROFIT_UST, MIN_START_AMOUNT, OPTIMIZATION_TOLERANCE
@@ -175,26 +174,12 @@ class LPTowerArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[Terra
             final_amount, msgs = await self._op_arbitrage(
                 initial_amount, direction, safety_margin=True
             )
-            try:
-                fee = await self.client.tx.estimate_fee(
-                    msgs,
-                    use_fallback_estimate=self._simulating_reserve_changes,
-                    estimated_gas_use=ESTIMATED_GAS_USE,
-                    native_amount=UST.to_amount(initial_amount.amount * lp_ust_price),
-                )
-            except LCDResponseError as e:
-                self.log.debug(
-                    "Error when estimating fee",
-                    extra={
-                        "data": {
-                            "balance_ratio": f"{balance_ratio:.3%}",
-                            "direction": direction,
-                            "msgs": [msg.to_data() for msg in msgs],
-                        },
-                    },
-                    exc_info=True,
-                )
-                raise FeeEstimationError(e)
+            fee = await self.client.tx.estimate_fee(
+                msgs,
+                use_fallback_estimate=self._simulating_reserve_changes,
+                estimated_gas_use=ESTIMATED_GAS_USE,
+                native_amount=UST.to_amount(initial_amount.amount * lp_ust_price),
+            )
         gas_cost = TerraTokenAmount.from_coin(*fee.amount)
         gas_cost_raw = gas_cost.amount / self.client.gas_adjustment
         net_profit_ust = (final_amount - initial_amount).amount * lp_ust_price - gas_cost_raw

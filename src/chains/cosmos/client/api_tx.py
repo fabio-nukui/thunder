@@ -7,12 +7,15 @@ import time
 from abc import ABC, abstractmethod
 from copy import copy
 from decimal import Decimal
-from typing import Generic, Sequence
+from typing import Generic, Sequence, cast
 
+import grpclib
+from cosmos_proto.cosmos.tx.v1beta1 import ServiceStub
 from cosmos_sdk.client.lcd.api.tx import CreateTxOptions, SignerOptions
+from cosmos_sdk.core import Coins
 from cosmos_sdk.core.broadcast import SyncTxBroadcastResult
 from cosmos_sdk.core.fee import Fee
-from cosmos_sdk.core.tx import Tx
+from cosmos_sdk.core.tx import AuthInfo, SignerData, Tx, TxBody
 from cosmos_sdk.exceptions import LCDResponseError
 
 from chains.cosmos.msg import MsgType
@@ -35,6 +38,9 @@ class BroadcastError(Exception):
 
 
 class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
+    def start(self):
+        self.grpc_service = ServiceStub(self.client.grpc_channel)
+
     async def estimate_fee(
         self,
         msgs: Sequence[MsgType],
@@ -45,20 +51,24 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
         **kwargs,
     ) -> Fee:
         fee_denom = fee_denom or self.client.fee_denom
+        gas_prices = Coins([self.client.gas_prices[fee_denom]])
         gas_adjustment = gas_adjustment or self.client.gas_adjustment
         signer = self.client.signer
         for i in range(1, _MAX_FEE_ESTIMATION_TRIES + 1):
             create_tx_options = CreateTxOptions(
                 msgs,
-                gas_prices=self.client.gas_prices,
+                gas_prices=gas_prices,
                 gas_adjustment=gas_adjustment,
                 fee_denoms=[fee_denom],
                 sequence=signer.sequence,
             )
             try:
                 fee = await self._fee_estimation([signer], create_tx_options)
-            except LCDResponseError as e:
-                if match := _pat_sequence_error.search(e.message):
+            except grpclib.GRPCError as e:
+                error_msg = e.message or ""
+                if e.status == grpclib.Status.INVALID_ARGUMENT and (
+                    match := _pat_sequence_error.search(error_msg)
+                ):
                     if i == _MAX_FEE_ESTIMATION_TRIES:
                         raise Exception(f"Fee estimation failed after {i} tries", e)
                     await self._check_msgs_in_mempool(msgs)
@@ -68,8 +78,8 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
                     continue
                 if not use_fallback_estimate:
                     raise e
-                if "spread assertion" in e.message:
-                    raise FeeEstimationError(e.message)
+                if "spread assertion" in error_msg:
+                    raise FeeEstimationError(error_msg)
                 if estimated_gas_use is None:
                     raise FeeEstimationError(
                         "Could not use fallback fee estimation without estimated_gas_use", e
@@ -86,13 +96,27 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
                 return fee
         raise Exception("Should never reach")
 
-    @abstractmethod
     async def _fee_estimation(
         self,
-        signers: list[SignerOptions],
+        signer_opts: list[SignerOptions],
         options: CreateTxOptions,
     ) -> Fee:
-        ...
+        gas_prices = options.gas_prices or self.client.gas_prices
+        gas_adjustment = options.gas_adjustment or self.client.gas_adjustment
+
+        tx_body = TxBody(messages=list(options.msgs), memo=options.memo or "")
+        coins_fee = Coins(",".join(f"0{denom}" for denom in options.fee_denoms or []))
+        auth_info = AuthInfo([], Fee(0, coins_fee))
+
+        tx = Tx(tx_body, auth_info, [])
+        signers = cast(list[SignerData], signer_opts)
+        tx.append_empty_signatures(signers)
+
+        sim = await self.grpc_service.simulate(tx=tx.to_proto())
+        gas = int(sim.gas_info.gas_used * gas_adjustment)
+        fee_amount = (gas_prices * gas).to_int_coins()
+
+        return Fee(gas, fee_amount)
 
     @abstractmethod
     async def _fallback_fee_estimation(

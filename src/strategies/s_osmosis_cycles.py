@@ -16,7 +16,6 @@ from cosmos_sdk.core.fee import Fee
 from cosmos_sdk.core.gamm import SwapAmountInRoute
 from cosmos_sdk.core.tx import Tx
 from cosmos_sdk.core.wasm import MsgExecuteContract
-from cosmos_sdk.exceptions import LCDResponseError
 
 import utils
 from arbitrage.cosmos import (
@@ -26,6 +25,7 @@ from arbitrage.cosmos import (
     run_strategy,
 )
 from chains.cosmos.osmosis import (
+    OSMO,
     GAMMLiquidityPool,
     OsmosisClient,
     OsmosisNativeToken,
@@ -254,7 +254,7 @@ class OsmosisCyclesArbitrage(
             pools=multi_routes.pools,
             routes=multi_routes.routes,
             filter_keys=multi_routes.pools,
-            fee_denom=self.start_token.denom,
+            fee_denom=OSMO.denom,
         )
         self.estimated_gas_use = await self._estimate_gas_use()
         return self
@@ -329,27 +329,22 @@ class OsmosisCyclesArbitrage(
         single_initial_amount, n_repeat = self._check_repeats(initial_amount, initial_balance)
         if n_repeat > 1:
             _, msgs = await route.op_swap_exact_in(single_initial_amount, reverse=reverse)
-        try:
-            fee = await self.client.tx.estimate_fee(
-                msgs,
-                gas_adjustment=self.gas_adjustment,
-                use_fallback_estimate=self._simulating_reserve_changes,
-                estimated_gas_use=self.estimated_gas_use,
-                fee_denom=self.fee_denom,
-            )
-        except LCDResponseError as e:
-            self.log.debug(
-                "Error when estimating fee",
-                extra={"data": {"msgs": [msg.to_data() for msg in msgs]}},
-                exc_info=True,
-            )
-            raise FeeEstimationError(e)
+        fee = await self.client.tx.estimate_fee(
+            msgs,
+            gas_adjustment=self.gas_adjustment,
+            use_fallback_estimate=self._simulating_reserve_changes,
+            estimated_gas_use=self.estimated_gas_use,
+            fee_denom=self.fee_denom,
+        )
 
         (coin_fee,) = fee.amount
         token_fee = OsmosisNativeToken(coin_fee.denom)
         gas_cost = token_fee.to_amount(int_amount=str(coin_fee.amount)) * n_repeat
         gas_cost_raw = gas_cost / self.client.gas_adjustment
-        net_profit = final_amount - initial_amount - gas_cost_raw
+        gas_cost_converted = await self.client.gamm.get_best_amount_out(
+            gas_cost_raw, self.start_token
+        )
+        net_profit = final_amount - initial_amount - gas_cost_converted
         return {
             "route": route,
             "reverse": reverse,

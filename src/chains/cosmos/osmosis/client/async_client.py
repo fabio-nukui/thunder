@@ -75,7 +75,6 @@ class OsmosisClient(CosmosClient):
 
         self.grpc_bank = cosmos_bank_pb.QueryStub(self.grpc_channel)
         self.gamm.start()
-        self.tx.start()
 
         if configs.OSMOSIS_USE_BROADCASTER:
             await self.update_active_broadcaster()

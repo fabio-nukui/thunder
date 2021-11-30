@@ -83,6 +83,7 @@ class CosmosClient(BroadcasterMixin, AsyncBlockchainClient, ABC):
         await self._check_connections()
 
         self.mempool.start()
+        self.tx.start()
 
         await super().start()
 

@@ -15,7 +15,6 @@ from cosmos_sdk.core.auth import TxInfo
 from cosmos_sdk.core.fee import Fee
 from cosmos_sdk.core.tx import Tx
 from cosmos_sdk.core.wasm import MsgExecuteContract
-from cosmos_sdk.exceptions import LCDResponseError
 
 import utils
 from arbitrage.cosmos import (
@@ -461,21 +460,13 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
             initial_amount = single_initial_amount
         if n_repeat > 1 or capped_amount:
             _, msgs = await route.op_swap(single_initial_amount, reverse)
-        try:
-            fee = await self.client.tx.estimate_fee(
-                msgs,
-                gas_adjustment=self.gas_adjustment,
-                use_fallback_estimate=self._simulating_reserve_changes,
-                estimated_gas_use=self.estimated_gas_use,
-                fee_denom=self.fee_denom,
-            )
-        except LCDResponseError as e:
-            self.log.debug(
-                "Error when estimating fee",
-                extra={"data": {"msgs": [msg.to_data() for msg in msgs]}},
-                exc_info=True,
-            )
-            raise FeeEstimationError(e)
+        fee = await self.client.tx.estimate_fee(
+            msgs,
+            gas_adjustment=self.gas_adjustment,
+            use_fallback_estimate=self._simulating_reserve_changes,
+            estimated_gas_use=self.estimated_gas_use,
+            fee_denom=self.fee_denom,
+        )
         gas_cost = TerraTokenAmount.from_coin(*fee.amount) * n_repeat
         gas_cost_raw = gas_cost / self.client.gas_adjustment
         net_profit = final_amount - initial_amount - gas_cost_raw
