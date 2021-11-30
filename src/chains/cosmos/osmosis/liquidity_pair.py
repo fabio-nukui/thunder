@@ -244,8 +244,8 @@ class GAMMLiquidityPool(BaseOsmosisLiquidityPool):
         if isinstance(msg, MsgSwapExactAmountIn):
             if not any(self.pool_id == r.pool_id for r in msg.routes):
                 return list(changes.values())
-            token_in = OsmosisNativeToken(msg.token_in.denom)
-            amount_in = token_in.to_amount(int_amount=str(msg.token_in.amount))
+            token_in = OsmosisNativeToken(msg.tokenIn.denom)
+            amount_in = token_in.to_amount(int_amount=str(msg.tokenIn.amount))
             for route in msg.routes:
                 token_out = OsmosisNativeToken(route.token_out_denom, self.client.chain_id)
                 if route.pool_id == self.pool_id:
