@@ -59,7 +59,7 @@ class TxApi(CosmosTxApi["TerraClient"]):
 
         res_simulation, res_tax = await asyncio.gather(
             self.grpc_service.simulate(tx=tx),
-            self.grpc_service_terra.compute_tax(tx=tx),
+            self.grpc_service_terra.compute_tax(tx_bytes=bytes(tx)),
         )
 
         gas = int(res_simulation.gas_info.gas_used * gas_adjustment)
