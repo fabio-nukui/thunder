@@ -45,7 +45,7 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
         self,
         msgs: Sequence[Msg],
         gas_adjustment: Decimal = None,
-        use_fallback_estimate: bool = False,
+        use_fallback_estimate: bool = True,
         estimated_gas_use: int = None,
         fee_denom: str = None,
         **kwargs,
