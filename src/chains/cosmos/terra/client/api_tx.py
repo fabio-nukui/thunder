@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from decimal import Decimal
 from typing import TYPE_CHECKING, Sequence
 
+from cosmos_proto.terra.tx.v1beta1 import ServiceStub
+from cosmos_sdk.client.lcd.api.tx import CreateTxOptions, SignerOptions
 from cosmos_sdk.core import Coins
 from cosmos_sdk.core.fee import Fee
 from cosmos_sdk.core.msg import Msg
@@ -31,6 +34,10 @@ class BroadcastError(Exception):
 
 
 class TxApi(CosmosTxApi["TerraClient"]):
+    def start(self):
+        super().start()
+        self.grpc_service_terra = ServiceStub(self.client.grpc_channel)
+
     @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=_TERRA_GAS_PRICE_CACHE_TTL)
     async def get_gas_prices(self) -> Coins:
         res = await self.client.fcd_client.get("v1/txs/gas_prices")
@@ -39,6 +46,27 @@ class TxApi(CosmosTxApi["TerraClient"]):
             for denom, amount in res.json().items()
         }
         return Coins(adjusted_prices)
+
+    async def _fee_estimation(
+        self,
+        signer_opts: list[SignerOptions],
+        options: CreateTxOptions,
+    ) -> Fee:
+        gas_prices = options.gas_prices or self.client.gas_prices
+        gas_adjustment = options.gas_adjustment or self.client.gas_adjustment
+
+        tx = self._get_tx_empty_signatures(signer_opts, options).to_proto()
+
+        res_simulation, res_tax = await asyncio.gather(
+            self.grpc_service.simulate(tx=tx),
+            self.grpc_service_terra.compute_tax(tx=tx),
+        )
+
+        gas = int(res_simulation.gas_info.gas_used * gas_adjustment)
+        fee_amount = (gas_prices * gas).to_int_coins()
+        tax_amount = Coins.from_proto(res_tax.tax_amount)
+
+        return Fee(gas, fee_amount + tax_amount)
 
     async def _fallback_fee_estimation(
         self,

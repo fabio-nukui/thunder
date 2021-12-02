@@ -104,6 +104,19 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
         gas_prices = options.gas_prices or self.client.gas_prices
         gas_adjustment = options.gas_adjustment or self.client.gas_adjustment
 
+        tx = self._get_tx_empty_signatures(signer_opts, options)
+
+        sim = await self.grpc_service.simulate(tx=tx.to_proto())
+        gas = int(sim.gas_info.gas_used * gas_adjustment)
+        fee_amount = (gas_prices * gas).to_int_coins()
+
+        return Fee(gas, fee_amount)
+
+    def _get_tx_empty_signatures(
+        self,
+        signer_opts: list[SignerOptions],
+        options: CreateTxOptions,
+    ) -> Tx:
         tx_body = TxBody(messages=list(options.msgs), memo=options.memo or "")
         coins_fee = Coins(",".join(f"0{denom}" for denom in options.fee_denoms or []))
         auth_info = AuthInfo([], Fee(0, coins_fee))
@@ -111,12 +124,7 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
         tx = Tx(tx_body, auth_info, [])
         signers = cast(list[SignerData], signer_opts)
         tx.append_empty_signatures(signers)
-
-        sim = await self.grpc_service.simulate(tx=tx.to_proto())
-        gas = int(sim.gas_info.gas_used * gas_adjustment)
-        fee_amount = (gas_prices * gas).to_int_coins()
-
-        return Fee(gas, fee_amount)
+        return tx
 
     @abstractmethod
     async def _fallback_fee_estimation(
