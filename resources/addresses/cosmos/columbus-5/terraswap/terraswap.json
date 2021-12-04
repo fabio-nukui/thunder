@@ -1,6 +1,7 @@
 {
   "factory": "terra1ulgw0td86nvs4wtpsc80thv6xelk76ut7a7apj",
   "pairs": {
+    "(ANC-UST)-(BLUNA-LUNA)": "terra1s47rsyk3q7h8ketsuw2swdtgqr4lqfvt9jfdx3",
     "(BLUNA-LUNA)-(UST-LUNA)": "terra1wrwf3um5vm30vpwnlpvjzgwpf5fjknt68nah05",
     "ALTE-LUNA": "terra1kh2g4fnhvqtnwwpqa84eywn72ve9vdkp5chhlx",
     "ALTE-UST": "terra18adm0emn6j3pnc90ldechhun62y898xrdmfgfz",
@@ -9,6 +10,7 @@
     "BETH-UST": "terra1c0afrdc5253tkp5wt7rxhuj42xwyf2lcre0s7c",
     "BLUNA-LUNA": "terra1jxazgm67et0ce260kvrpfv50acuushpjsz2y0p",
     "BLUNA-UST": "terra1qpd9n7afwf45rkjlpujrrdfh83pldec8rpujgn",
+    "BTL-UST": "terra1ykfz4hrq8en2f098j8a4ppaq8u8hangpw9tnqu",
     "DKWON-UST": "terra1uz8hhjwg3472744kgkz69jfqf3d2uwl5aw66mw",
     "DOSH-UST": "terra1ntdceldg23ymqljh94wcp78dl6qmzndq8u2hwa",
     "DPH-UST": "terra1zz39wfyyqt4tjz7dz6p7s9c8pwmcw2xzde3xl8",
@@ -16,6 +18,7 @@
     "KINGS-UST": "terra187pxc9su35stqfdd02xy2r778qd83lruaey3fq",
     "KRT-LUNA": "terra1zw0kfxrxgrs5l087mjm79hcmj3y8z6tljuhpmc",
     "LOTA-UST": "terra1pn20mcwnmeyxf68vpt3cyel3n57qm9mp289jta",
+    "LunaX-LUNA": "terra1zrzy688j8g6446jzd88vzjzqtywh6xavww92hy",
     "MIAW-ALTE": "terra1c7uxt89gap5gcclvhtqvx3wpd0ee2dpjhf0ct6",
     "MIAW-UST": "terra12mzh5cp6tgc65t2cqku5zvkjj8xjtuv5v9whyd",
     "MINE-ALTE": "terra1hkp4hulmttwzagzphr6vczvjm46e6ryxv99nan",
@@ -39,6 +42,7 @@
     "TWD-UST": "terra1etdkg9p0fkl8zal6ecp98kypd32q8k3ryced9d",
     "UST-LUNA": "terra1tndcaqxkpc5ce9qee5ggqf430mr2z3pefe5wj6",
     "UST-MIR": "terra1amv303y8kzxuegvurh0gug2xe9wkgj65enq2ux",
+    "UST-UST": "terra19z6n7l67rkg6y7vggwr3jh889t9vg6yn2jdl9n",
     "UST-mAAPL": "terra1774f8rwx76k7ruy0gqnzq25wh7lmd72eg6eqp5",
     "UST-mABNB": "terra1gq7lq389w4dxqtkxj03wp0fvz0cemj0ek5wwmm",
     "UST-mAMC": "terra1uenpalqlmfaf4efgtqsvzpa3gh898d9h2a232g",
@@ -68,13 +72,16 @@
     "UST-mUSO": "terra1zey9knmvs2frfrjnf4cfv4prc4ts3mrsefstrj",
     "UST-mVIXY": "terra1krny2jc0tpkzeqfmswm7ss8smtddxqm3mxxsjm",
     "VKR-UST": "terra1e59utusv5rspqsu8t37h5w887d9rdykljedxw0",
+    "WHALE-UST": "terra1v4kpj65uq63m4x0mqzntzm27ecpactt42nyp5c",
     "aUST-UST": "terra1z50zu7j39s2dls8k9xqyxc89305up0w7f7ec3n",
     "mETH-BETH": "terra1c5swgtnuunpf75klq5uztynurazuwqf0mmmcyy",
     "nETH-Psi": "terra14zhkur7l7ut7tx6kvj28fp5q982lrqns59mnp3",
+    "nETH-UST": "terra12j29ct74f4wx0vrz54c96sl4gvz5a3k7mynzrq",
     "nLuna-Psi": "terra1zvn8z6y8u2ndwvsjhtpsjsghk6pa6ugwzxp6vx",
     "tSHIBA-UST": "terra1stdzf28wlq7llzfecse366r657rtdh6wtrdfk2",
     "whORION-LUNA": "terra170hht9lwe50ugfhnruzjaezpj29l7nvw3l6725",
-    "whORION-UST": "terra1z6tp0ruxvynsx5r9mmcc2wcezz9ey9pmrw5r8g"
+    "whORION-UST": "terra1z6tp0ruxvynsx5r9mmcc2wcezz9ey9pmrw5r8g",
+    "whWBNB-UST": "terra1runncker37zx0wlp43xchzep33udsn6yje3rt3"
   },
   "router": "terra19qx5xe6q9ll4w0890ux7lv2p4mf3csd4qvt3ex",
   "assert_limit_order": "terra1vs9jr7pxuqwct3j29lez3pfetuu8xmq7tk3lzk"
