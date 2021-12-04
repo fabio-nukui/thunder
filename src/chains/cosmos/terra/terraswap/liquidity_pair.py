@@ -62,11 +62,12 @@ class NotTerraswapLPToken(Exception):
 async def pair_tokens_from_data(
     asset_infos: list[dict],
     client: TerraClient,
-    recursive_lp_token_code_id: int = None,
+    lp_code_id: int = None,
+    cw20_code_id: int = None,
 ) -> tuple[TerraToken, TerraToken]:
     token_0, token_1 = await asyncio.gather(
-        token_from_data(asset_infos[0], client, recursive_lp_token_code_id),
-        token_from_data(asset_infos[1], client, recursive_lp_token_code_id),
+        token_from_data(asset_infos[0], client, lp_code_id, cw20_code_id),
+        token_from_data(asset_infos[1], client, lp_code_id, cw20_code_id),
     )
     return token_0, token_1
 
@@ -81,16 +82,17 @@ def _decode_msg(raw_msg: str | dict, always_base64: bool = False) -> dict:
 async def token_from_data(
     asset_info: dict,
     client: TerraClient,
-    recursive_lp_token_code_id: int = None,
+    lp_code_id: int = None,
+    cw20_code_id: int = None,
 ) -> TerraToken:
     if "native_token" in asset_info:
         return TerraNativeToken(asset_info["native_token"]["denom"])
     if "token" in asset_info:
         contract_addr: AccAddress = asset_info["token"]["contract_addr"]
-        if recursive_lp_token_code_id is not None:
+        if lp_code_id is not None and cw20_code_id is not None:
             try:
                 return await LPToken.from_contract(
-                    contract_addr, client, recursive_lp_token_code_id=recursive_lp_token_code_id
+                    contract_addr, client, lp_code_id=lp_code_id, cw20_code_id=cw20_code_id
                 )
             except NotTerraswapLPToken:
                 pass
@@ -815,14 +817,15 @@ class LPToken(TerraCW20Token):
         contract_addr: AccAddress,
         client: TerraClient,
         pair_tokens: tuple[TerraToken, TerraToken] = None,
-        recursive_lp_token_code_id: int = None,
+        lp_code_id: int = None,
+        cw20_code_id: int = None,
     ) -> LPToken:
-        if recursive_lp_token_code_id is not None:
+        if lp_code_id is not None:
             try:
                 res = await client.contract_info(contract_addr)
             except NotContract:
                 raise NotTerraswapLPToken
-            if recursive_lp_token_code_id != int(res["code_id"]):
+            if int(res["code_id"]) != cw20_code_id:
                 raise NotTerraswapLPToken
         self = await super().from_contract(contract_addr, client)
         if pair_tokens is None:
@@ -831,11 +834,14 @@ class LPToken(TerraCW20Token):
                 raise NotTerraswapLPToken
             minter_addr = res["minter"]
             try:
+                res = await client.contract_info(minter_addr)
+                if lp_code_id is not None and int(res["code_id"]) != lp_code_id:
+                    raise NotTerraswapLPToken
                 pair_data = await client.contract_query(minter_addr, {"pair": {}})
             except LCDResponseError:
                 raise NotTerraswapLPToken
             pair_tokens = await pair_tokens_from_data(
-                pair_data["asset_infos"], client, recursive_lp_token_code_id
+                pair_data["asset_infos"], client, lp_code_id
             )
         self.pair_tokens = pair_tokens
         return self

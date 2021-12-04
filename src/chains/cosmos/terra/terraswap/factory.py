@@ -5,6 +5,7 @@ import logging
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Iterable, Tuple, TypeVar
 
+import grpclib
 from cosmos_sdk.core import AccAddress
 from cosmos_sdk.exceptions import LCDResponseError
 
@@ -56,7 +57,7 @@ class Factory:
     pairs_addresses: dict[str, AccAddress]
     assert_limit_order_address: AccAddress | None
     pair_code_id: int
-    lp_token_code_id: int
+    cw20_token_code_id: int
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.contract_addr})"
@@ -78,7 +79,7 @@ class Factory:
 
         config = await client.contract_query(self.contract_addr, {"config": {}})
         self.pair_code_id = config["pair_code_id"]
-        self.lp_token_code_id = config["token_code_id"]
+        self.cw20_token_code_id = config["token_code_id"]
 
         return self
 
@@ -110,7 +111,10 @@ class Factory:
             try:
                 if recursive:
                     tokens = await pair_tokens_from_data(
-                        info["asset_infos"], self.client, self.lp_token_code_id
+                        info["asset_infos"],
+                        self.client,
+                        self.pair_code_id,
+                        self.cw20_token_code_id,
                     )
                 else:
                     tokens = await pair_tokens_from_data(info["asset_infos"], self.client)
@@ -118,11 +122,9 @@ class Factory:
                 continue
             except NotContract:  # One or more of the tokens were not implemented
                 continue
-            except LCDResponseError as e:
-                log.debug(
-                    f"Error querying {info['contract_addr']}: "
-                    f"status={e.response.status} {e.message}"
-                )
+            except (LCDResponseError, grpclib.GRPCError) as e:
+                status = e.response.status if isinstance(e, LCDResponseError) else e.status
+                log.debug(f"Error querying {info['contract_addr']}: {status=} {e.message}")
                 continue
             if not all(_check_cw20_whitelist(token, cw20_whitelist) for token in tokens):
                 log.debug(f"Rejected {info['contract_addr']}: one of {tokens} not in whitelist")
@@ -180,9 +182,9 @@ class Factory:
             return False
         return int(info["code_id"]) == self.pair_code_id
 
-    async def is_lp_token(self, contract_addr: AccAddress) -> bool:
+    async def is_cw20_token(self, contract_addr: AccAddress) -> bool:
         try:
             info = await self.client.contract_info(contract_addr)
         except NotContract:
             return False
-        return int(info["code_id"]) == self.lp_token_code_id
+        return int(info["code_id"]) == self.cw20_token_code_id

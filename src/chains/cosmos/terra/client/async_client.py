@@ -111,7 +111,11 @@ class TerraClient(CosmosClient):
                 contract_address=contract_addr, query_msg=json.dumps(query_msg).encode("utf-8")
             )
         except GRPCError as e:
-            if e.status == GRPCStatus.NOT_FOUND:
+            if (
+                e.status == GRPCStatus.NOT_FOUND
+                or e.status == GRPCStatus.INTERNAL
+                and "not found" in str(e.message)
+            ):
                 raise NotContract
             raise
         return json.loads(res.query_result)
@@ -121,7 +125,7 @@ class TerraClient(CosmosClient):
         try:
             res = await self.grpc_wasm.contract_info(contract_address=address)
         except GRPCError as e:
-            if e.status == GRPCStatus.NOT_FOUND:
+            if e.status == GRPCStatus.NOT_FOUND or "not found" in str(e.message):
                 raise NotContract
             raise
         data = res.contract_info.to_dict()
