@@ -1,4 +1,4 @@
-from . import anchor, nexus, terraswap
+from . import anchor, nexus, stader, terraswap
 from .client import TerraClient
 from .denoms import LUNA, UST
 from .native_liquidity_pair import BaseTerraLiquidityPair, NativeLiquidityPair
@@ -7,6 +7,7 @@ from .token import TerraCW20Token, TerraNativeToken, TerraToken, TerraTokenAmoun
 __all__ = [
     "anchor",
     "nexus",
+    "stader",
     "terraswap",
     "TerraClient",
     "LUNA",

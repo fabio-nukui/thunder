@@ -43,6 +43,7 @@ class MultiRoutes:
         client: TerraClient,
         start_token: TerraToken,
         list_steps: Sequence[Sequence[BaseTerraLiquidityPair]],
+        single_direction: bool = False,
         router_address: AccAddress = None,
     ):
         self.client = client
@@ -54,7 +55,7 @@ class MultiRoutes:
 
         self.is_cycle = self.tokens[0] == self.tokens[-1]
         self.routes = [
-            RoutePools(client, self.tokens, pools, router_address)
+            RoutePools(client, self.tokens, pools, single_direction, router_address)
             for pools in itertools.product(*list_steps)
         ]
         self.n_routes = len(self.routes)
@@ -73,11 +74,13 @@ class RoutePools:
         client: TerraClient,
         tokens: Iterable[TerraToken],
         pools: Iterable[BaseTerraLiquidityPair],
+        single_direction: bool = False,
         router_address: AccAddress = None,
     ):
         self.client = client
         self.tokens = list(tokens)
         self.pools = list(pools)
+        self.single_direction = single_direction
         if router_address is None:
             self.router = None
         else:
@@ -91,6 +94,8 @@ class RoutePools:
 
     async def should_reverse(self, amount_in: TerraTokenAmount) -> bool:
         assert self.is_cycle, "Reversion testing only applicable to cycles"
+        if self.single_direction:
+            return False
         amount_forward, amount_reverse = await asyncio.gather(
             self.get_swap_amount_out(amount_in, reverse=False, safety_margin=False),
             self.get_swap_amount_out(amount_in, reverse=True, safety_margin=False),
