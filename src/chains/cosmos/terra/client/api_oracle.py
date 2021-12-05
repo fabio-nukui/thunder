@@ -21,7 +21,7 @@ class OracleApi(Api["TerraClient"]):
     def start(self):
         self.grpc_query = QueryStub(self.client.grpc_channel)
 
-    @ttl_cache(CacheGroup.TERRA, maxsize=1)
+    @ttl_cache(CacheGroup.TERRA)
     async def get_exchange_rates(self) -> dict[TerraNativeToken, Decimal]:
         res = await self.grpc_query.exchange_rates()
         rates = {

@@ -38,7 +38,7 @@ class TxApi(CosmosTxApi["TerraClient"]):
         super().start()
         self.grpc_service_terra = ServiceStub(self.client.grpc_channel)
 
-    @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=_TERRA_GAS_PRICE_CACHE_TTL)
+    @ttl_cache(CacheGroup.TERRA, ttl=_TERRA_GAS_PRICE_CACHE_TTL)
     async def get_gas_prices(self) -> Coins:
         res = await self.client.fcd_client.get("v1/txs/gas_prices")
         adjusted_prices = {

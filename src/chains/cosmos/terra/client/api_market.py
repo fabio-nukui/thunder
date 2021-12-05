@@ -51,7 +51,7 @@ class MarketApi(Api["TerraClient"]):
         ask_amount = await self.compute_swap_no_spread(offer_amount, ask_denom)
         return (ask_amount * (1 - spread)).safe_margin(safety_margin)
 
-    @ttl_cache(CacheGroup.TERRA, maxsize=1)
+    @ttl_cache(CacheGroup.TERRA)
     async def get_virtual_pools(
         self,
         terra_pool_delta_change: Decimal = Decimal(0),
@@ -69,7 +69,7 @@ class MarketApi(Api["TerraClient"]):
 
         return pool_terra, pool_luna
 
-    @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=_MARKET_PARAMETERS_TTL)
+    @ttl_cache(CacheGroup.TERRA, ttl=_MARKET_PARAMETERS_TTL)
     async def get_tobin_taxes(self) -> dict[TerraNativeToken, Decimal]:
         response = await self.client.lcd.oracle.parameters()
         return {
@@ -80,7 +80,7 @@ class MarketApi(Api["TerraClient"]):
     async def get_market_parameter(self, param_name: str) -> Decimal:
         return (await self.get_market_parameters())[param_name]
 
-    @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=_MARKET_PARAMETERS_TTL)
+    @ttl_cache(CacheGroup.TERRA, ttl=_MARKET_PARAMETERS_TTL)
     async def get_market_parameters(self) -> dict[str, Decimal]:
         params = await self.client.lcd.market.parameters()
         return {k: Decimal(str(v)) for k, v in params.items()}

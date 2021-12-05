@@ -49,7 +49,7 @@ class EthereumClient(EVMClient):
             base_fee_multiplier=configs.ETHEREUM_BASE_FEE_MULTIPLIER,
         )
 
-    get_gas_price = ttl_cache(CacheGroup.ETHEREUM, maxsize=1)(EVMClient.get_gas_price)  # type: ignore # noqa: E501
+    get_gas_price = ttl_cache(CacheGroup.ETHEREUM)(EVMClient.get_gas_price)  # type: ignore # noqa: E501
 
 
 class BSCClient(EVMClient):
@@ -72,4 +72,4 @@ class BSCClient(EVMClient):
             gas_multiplier=configs.BSC_GAS_MULTIPLIER,
         )
 
-    get_gas_price = ttl_cache(CacheGroup.BSC, maxsize=1)(EVMClient.get_gas_price)  # type: ignore # noqa: E501
+    get_gas_price = ttl_cache(CacheGroup.BSC)(EVMClient.get_gas_price)  # type: ignore # noqa: E501

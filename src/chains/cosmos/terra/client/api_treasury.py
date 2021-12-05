@@ -20,11 +20,11 @@ class TaxPayer(str, Enum):
 
 
 class TreasuryApi(Api["TerraClient"]):
-    @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=_TERRA_TAX_CACHE_TTL)
+    @ttl_cache(CacheGroup.TERRA, ttl=_TERRA_TAX_CACHE_TTL)
     async def get_tax_rate(self) -> Decimal:
         return Decimal(str(await self.client.lcd.treasury.tax_rate()))
 
-    @ttl_cache(CacheGroup.TERRA, maxsize=1, ttl=_TERRA_TAX_CACHE_TTL)
+    @ttl_cache(CacheGroup.TERRA, ttl=_TERRA_TAX_CACHE_TTL)
     async def get_tax_caps(self) -> dict[TerraNativeToken, TerraTokenAmount]:
         res = await self.client.lcd_http_client.get("/terra/treasury/v1beta1/tax_caps")
         caps = {}
