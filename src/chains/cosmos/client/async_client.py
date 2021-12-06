@@ -125,6 +125,7 @@ class CosmosClient(BroadcasterMixin, AsyncBlockchainClient, ABC):
             *(client.aclose() for client in self.broadcast_lcd_clients),
             self.lcd.session.close(),
         )
+        self.started = False
 
     @abstractmethod
     async def get_balance(self, denom: str, address: AccAddress = None) -> CosmosTokenAmount:

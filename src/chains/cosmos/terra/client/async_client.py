@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import base64
 import json
 import logging
@@ -89,20 +88,24 @@ class TerraClient(CosmosClient):
         assert await self.fcd_client.check_connection("node_info")
 
         await super().start()
+        try:
+            if not self.gas_prices:
+                self.gas_prices = self.lcd.gas_prices = await self.tx.get_gas_prices()
 
-        if not self.gas_prices:
-            self.gas_prices = self.lcd.gas_prices = await self.tx.get_gas_prices()
+            self.grpc_bank = cosmos_bank_pb.QueryStub(self.grpc_channel)
+            self.grpc_wasm = terra_wasm_pb.QueryStub(self.grpc_channel)
 
-        self.grpc_bank = cosmos_bank_pb.QueryStub(self.grpc_channel)
-        self.grpc_wasm = terra_wasm_pb.QueryStub(self.grpc_channel)
+            self.market.start()
+            self.oracle.start()
 
-        self.market.start()
-        self.oracle.start()
-
-        await self.update_active_broadcaster()
+            await self.update_active_broadcaster()
+        except Exception as e:
+            log.warning(f"{self}: Error in initialization: {e!r}")
+            self.started = False
 
     async def close(self):
-        await asyncio.gather(self.fcd_client.aclose(), super().close())
+        await self.fcd_client.aclose()
+        await super().close()
 
     @ttl_cache(CacheGroup.TERRA, _CONTRACT_QUERY_CACHE_SIZE)
     async def contract_query(self, contract_addr: AccAddress, query_msg: dict) -> dict:

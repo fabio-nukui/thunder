@@ -71,14 +71,17 @@ class OsmosisClient(CosmosClient):
 
     async def start(self):
         await super().start()
+        try:
+            if not self.gas_prices:
+                self.gas_prices = self.lcd.gas_prices = Coins(f"0{OSMO.denom}")
 
-        if not self.gas_prices:
-            self.gas_prices = self.lcd.gas_prices = Coins(f"0{OSMO.denom}")
+            self.grpc_bank = cosmos_bank_pb.QueryStub(self.grpc_channel)
+            self.gamm.start()
 
-        self.grpc_bank = cosmos_bank_pb.QueryStub(self.grpc_channel)
-        self.gamm.start()
-
-        await self.update_active_broadcaster()
+            await self.update_active_broadcaster()
+        except Exception as e:
+            log.warning(f"{self}: Error in initialization: {e!r}")
+            self.started = False
 
     @ttl_cache(CacheGroup.OSMOSIS, _CONTRACT_QUERY_CACHE_SIZE)
     async def contract_query(self, contract_addr: AccAddress, query_msg: dict) -> dict:
