@@ -19,7 +19,7 @@ handlers:
     level: DEBUG
     filename: logs/thunder.log
     maxBytes: 20971520
-    backupCount: 10
+    backupCount: 50
   watchtower:
     class: watchtower.CloudWatchLogHandler
     formatter: json
