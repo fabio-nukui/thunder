@@ -170,6 +170,11 @@
     "path": "transfer/channel-41"
   },
   {
+    "denom_hash": "4F3B0EC2FE2D370D10C3671A1B7B06D2A964C721470C305CBB846ED60E6CAA20",
+    "base_denom": "hydrogen",
+    "path": "transfer/channel-95"
+  },
+  {
     "denom_hash": "52B1AA623B34EB78FD767CEA69E8D7FA6C9CFE1FBF49C5406268FD325E2CC2AC",
     "base_denom": "uiov",
     "path": "transfer/channel-15"
@@ -198,6 +203,11 @@
     "denom_hash": "5F39126E011984C9853954A23870ED58FC4CC268259AD8F39AC48B3B59DBCAD1",
     "base_denom": "ungm",
     "path": "transfer/channel-47/transfer/channel-19"
+  },
+  {
+    "denom_hash": "5F8C43424288EBC52E07DB6E69D7558E07CF814FF98209C248396E37E3B51BD9",
+    "base_denom": "uusd",
+    "path": "transfer/channel-72/transfer/channel-2/transfer/channel-141/transfer/channel-72"
   },
   {
     "denom_hash": "5FB047AD1445F86C93D9CC5363204EF407551C26F8983C4C80CADF03BC2B7C6A",
@@ -230,6 +240,11 @@
     "path": "transfer/channel-37"
   },
   {
+    "denom_hash": "68844920773BFC57EECEDE2CA0EFCDCAE800C4595960570BB15F8729F688E22D",
+    "base_denom": "uusd",
+    "path": "transfer/channel-88/transfer/channel-2"
+  },
+  {
     "denom_hash": "6AD6D63B70C00DE0BE56771E1118649EA989BE98754E2F8CD6E234F457946D0B",
     "base_denom": "umed",
     "path": "transfer/channel-45"
@@ -248,6 +263,11 @@
     "denom_hash": "79DD10784082A513FA5A9675BC872891340BD9D14B6D1BB3120D4C17D8BE6013",
     "base_denom": "xbtsg",
     "path": "transfer/channel-0/transfer/channel-192"
+  },
+  {
+    "denom_hash": "7A08C6F11EF0F59EB841B9F788A87EC9F2361C7D9703157EC13D940DC53031FA",
+    "base_denom": "ncheq",
+    "path": "transfer/channel-108"
   },
   {
     "denom_hash": "7C4D60AA95E5A7558B0A364860979CA34B7FF8AAF255B87AF9E879374470CEC0",
@@ -440,6 +460,11 @@
     "path": "transfer/channel-51"
   },
   {
+    "denom_hash": "DD91FD69772681274207F560417947E7EFC5CC47761BF4D1E6A5A043EF765A60",
+    "base_denom": "uatom",
+    "path": "transfer/channel-95/transfer/channel-4"
+  },
+  {
     "denom_hash": "DE7BB0DB69B3F36332B9D8626B0E2DA815111C5E77D0FC2FBFD1F77406DF90EE",
     "base_denom": "uxprt",
     "path": "transfer/channel-47/transfer/channel-7"
@@ -473,6 +498,11 @@
     "denom_hash": "E6931F78057F7CC5DA0FD6CEF82FF39373A6E0452BF1FD76910B93292CF356C1",
     "base_denom": "basecro",
     "path": "transfer/channel-5"
+  },
+  {
+    "denom_hash": "EA3E1640F9B1532AB129A571203A0B9F789A7F14BB66E350DCBFA18E1A1931F0",
+    "base_denom": "ucmdx",
+    "path": "transfer/channel-87"
   },
   {
     "denom_hash": "ED0B14BB35A8B29B7524D6E6ED01EEF8EAA2A5B7E560D4FECEFAED33CA52A0D3",
