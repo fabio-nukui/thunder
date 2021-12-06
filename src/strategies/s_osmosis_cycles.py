@@ -347,7 +347,7 @@ class OsmosisCyclesArbitrage(
             msgs,
             gas_adjustment=self.gas_adjustment,
             use_fallback_estimate=self._simulating_reserve_changes,
-            estimated_gas_use=self.estimated_gas_use,
+            estimated_gas_use=self.estimated_gas_use * n_repeat,
             fee_denom=self.fee_denom,
         )
 
