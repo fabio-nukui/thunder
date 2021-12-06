@@ -8,6 +8,7 @@ from typing import Union
 from cosmos_proto.cosmos.base.v1beta1 import Coin
 
 from common.token import Token
+from exceptions import TokenNotFound
 
 from ..ibc_denoms import get_ibc_denom
 from ..token import CosmosNativeToken, CosmosTokenAmount, CW20Token
@@ -26,9 +27,10 @@ def _get_ibc_tokens(chain_id: str) -> list[dict]:
 def _get_ibc_symbol(denom: str, chain_id: str) -> str:
     tokens = _get_ibc_tokens(chain_id)
     denom_hash = denom.partition("/")[2]
-    ((base_denom, path),) = [
-        (t["base_denom"], t["path"]) for t in tokens if t["denom_hash"] == denom_hash
-    ]
+    token_data = [(t["base_denom"], t["path"]) for t in tokens if t["denom_hash"] == denom_hash]
+    if not token_data:
+        raise TokenNotFound(denom)
+    ((base_denom, path),) = token_data
     channels = path.replace("transfer/", "")
     if base_denom[0] == "u":
         base_denom = base_denom[1:]

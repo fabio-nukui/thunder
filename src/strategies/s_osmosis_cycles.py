@@ -34,7 +34,12 @@ from chains.cosmos.osmosis import (
 from chains.cosmos.osmosis.route import MultiRoutes, RoutePools
 from chains.cosmos.osmosis.token import get_ibc_token
 from chains.cosmos.osmosis.tx_filter import FilterSwap
-from exceptions import FeeEstimationError, InsufficientLiquidity, UnprofitableArbitrage
+from exceptions import (
+    FeeEstimationError,
+    InsufficientLiquidity,
+    TokenNotFound,
+    UnprofitableArbitrage,
+)
 from strategies.common.default_params import MAX_N_REPEATS
 from utils.cache import CacheGroup, ttl_cache
 
@@ -195,7 +200,11 @@ def _get_cycle_amount_in_routes(
                 else:
                     continue
             elif asset.token.denom != token_in.denom and max_hops > 1 and len(pools) > 1:
-                token_in_ = OsmosisNativeToken(asset.token.denom, client.chain_id)
+                try:
+                    token_in_ = OsmosisNativeToken(asset.token.denom, client.chain_id)
+                except TokenNotFound as e:
+                    log.warning(f"{e!r}")
+                    continue
                 _get_cycle_amount_in_routes(
                     pools=[p for p in pools if p is not pool],
                     token_in=token_in_,

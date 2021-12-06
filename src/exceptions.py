@@ -32,6 +32,10 @@ class OptimizationError(Exception):
     pass
 
 
+class TokenNotFound(Exception):
+    pass
+
+
 class TxAlreadyBroadcasted(Exception):
     pass
 
