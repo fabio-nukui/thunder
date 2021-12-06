@@ -66,9 +66,7 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
                 fee = await self._fee_estimation([signer], create_tx_options)
             except grpclib.GRPCError as e:
                 error_msg = e.message or ""
-                if e.status == grpclib.Status.INVALID_ARGUMENT and (
-                    match := _pat_sequence_error.search(error_msg)
-                ):
+                if match := _pat_sequence_error.search(error_msg):
                     if i == _MAX_FEE_ESTIMATION_TRIES:
                         raise Exception(f"Fee estimation failed after {i} tries", e)
                     await self._check_msgs_in_mempool(msgs)
