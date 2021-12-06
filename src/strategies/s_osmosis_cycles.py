@@ -342,6 +342,7 @@ class OsmosisCyclesArbitrage(
         single_initial_amount, n_repeat = self._check_repeats(initial_amount, initial_balance)
         if n_repeat > 1:
             _, msgs = await route.op_swap_exact_in(single_initial_amount, reverse=reverse)
+        msgs, n_repeat = msgs * n_repeat, 1
         fee = await self.client.tx.estimate_fee(
             msgs,
             gas_adjustment=self.gas_adjustment,
