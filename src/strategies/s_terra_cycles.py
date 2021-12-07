@@ -572,6 +572,8 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
         if n_repeat > MAX_N_REPEATS:
             self.log.warning(f"{n_repeat=} is too hight, reducing to {MAX_N_REPEATS}")
             n_repeat = MAX_N_REPEATS
+        if n_repeat == 1 and initial_amount > self.max_single_arbitrage / 2:
+            n_repeat = 2
         return initial_amount / n_repeat, n_repeat, False
 
     async def _extract_returns_from_info(
