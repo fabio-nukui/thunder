@@ -148,16 +148,16 @@ def get_filters(
 ) -> dict[terraswap.RouterLiquidityPair, Filter]:
     filters: dict[terraswap.RouterLiquidityPair, Filter] = {}
     for arb_route in arb_routes:
-        for pair in arb_route.pools:
+        for pool in arb_route.pools:
             if not isinstance(
-                pair, (terraswap.RouterNativeLiquidityPair, terraswap.LiquidityPair)
+                pool, (terraswap.RouterNativeLiquidityPair, terraswap.LiquidityPair)
             ):
                 continue
-            router_addresses = {pair.router_address} if pair.router_address else set()
-            filter_: Filter = FilterSwapTerraswap([pair], router_addresses)
-            if isinstance(pair, NativeLiquidityPair):
-                filter_ = filter_ | FilterNativeSwap([pair])
-            filters[pair] = filter_  # type: ignore
+            router_addresses = {pool.router_address} if pool.router_address else set()
+            filter_: Filter = FilterSwapTerraswap([pool], router_addresses)
+            if isinstance(pool, NativeLiquidityPair):
+                filter_ = filter_ | FilterNativeSwap([pool])
+            filters[pool] = filter_  # type: ignore
     return filters
 
 

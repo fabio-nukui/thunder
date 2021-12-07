@@ -77,7 +77,7 @@ class LPReserveSimulationMixin:
             else:
                 simulations[pool] = pool
         pools = self.pools
-        route_pairs = {route: route.pools for route in self.routes}
+        route_pools = {route: route.pools for route in self.routes}
         try:
             for route in self.routes:
                 route.pools = [simulations[pool] for pool in route.pools]  # type: ignore
@@ -86,4 +86,4 @@ class LPReserveSimulationMixin:
         finally:
             self.pools = pools
             for route in self.routes:
-                route.pools = route_pairs[route]  # type: ignore
+                route.pools = route_pools[route]  # type: ignore

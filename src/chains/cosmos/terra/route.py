@@ -85,8 +85,8 @@ class RoutePools:
             self.router = None
         else:
             assert all(isinstance(p, (LiquidityPair, RouterNativeLiquidityPair)) for p in pools)
-            pairs_r = cast(Iterable[Union[LiquidityPair, RouterNativeLiquidityPair]], pools)
-            self.router = Router(router_address, pairs_r, client)
+            pools_r = cast(Iterable[Union[LiquidityPair, RouterNativeLiquidityPair]], pools)
+            self.router = Router(router_address, pools_r, client)
         self.is_cycle = self.tokens[0] == self.tokens[-1]
 
     def __repr__(self) -> str:
@@ -160,11 +160,11 @@ class RoutePools:
         reverse: bool = False,
         safety_margin: bool | int = True,
     ) -> TerraTokenAmount:
-        pools = self.pools if not reverse else reversed(self.pools)
-        step_amount = amount_in
         if self.router is not None:
             route = self._get_route_steps(reverse)
             return await self.router.get_swap_amount_out(amount_in, route, safety_margin)
+        pools = self.pools if not reverse else reversed(self.pools)
+        step_amount = amount_in
         for pool in pools:
             step_amount = await pool.get_swap_amount_out(step_amount, safety_margin)
         return step_amount
