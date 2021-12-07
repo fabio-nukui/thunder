@@ -74,7 +74,7 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
                     signer.sequence = int(match.group(1))
                     log.debug(f"Retrying fee estimation with updated {signer.sequence=}")
                     continue
-                if not use_fallback_estimate or e.status == grpclib.Status.UNKNOWN:
+                if not use_fallback_estimate:
                     raise FeeEstimationError(e)
                 if estimated_gas_use is None:
                     raise FeeEstimationError(
