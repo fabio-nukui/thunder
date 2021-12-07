@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from .client import TerraClient
 
 ADDRESSES_FILE = "resources/addresses/cosmos/{chain_id}/stader.json"
+_CONFIG_CACHE_TTL = 60
 
 
 def _get_addresses(chain_id: str) -> dict[str, AccAddress]:
@@ -68,10 +69,19 @@ class LunaXVault(BaseTerraLiquidityPair):
             self._exchange_rate = Decimal(state["exchange_rate"])
         return self._exchange_rate
 
+    @ttl_cache(CacheGroup.TERRA, ttl=_CONFIG_CACHE_TTL)
+    async def get_config(self) -> dict:
+        res = await self.client.contract_query(self.contract_addr, {"config": {}})
+        return res["config"]
+
     @ttl_cache(CacheGroup.TERRA)
     async def get_state(self) -> dict:
         res = await self.client.contract_query(self.contract_addr, {"state": {}})
         return res["state"]
+
+    async def get_max_deposit(self) -> TerraTokenAmount:
+        config = await self.get_config()
+        return LUNA.to_amount(int_amount=config["max_deposit"])
 
     async def get_swap_amount_out(
         self,

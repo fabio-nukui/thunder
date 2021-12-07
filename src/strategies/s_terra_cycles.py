@@ -9,7 +9,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
-from typing import Any, Sequence
+from typing import Any, Awaitable, Callable, Sequence
 
 from cosmos_sdk.core.auth import TxInfo
 from cosmos_sdk.core.fee import Fee
@@ -128,9 +128,14 @@ async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
             gas_adjustment = (
                 ANCHOR_MARKET_GAS_ADJUSMENT if anchor_market in multi_routes.pools else None
             )
+            get_max_single_arbitrage = (
+                lunax_vault.get_max_deposit if lunax_vault in multi_routes.pools else None
+            )
             try:
                 arbs.append(
-                    await TerraCyclesArbitrage.new(client, multi_routes, gas_adjustment)
+                    await TerraCyclesArbitrage.new(
+                        client, multi_routes, gas_adjustment, get_max_single_arbitrage
+                    )
                 )
             except FeeEstimationError as e:
                 log.info(f"Error when initializing arbitrage with {multi_routes}: {e!r}")
@@ -351,6 +356,7 @@ async def _pairs_from_factories(
 class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[TerraClient]):
     multi_routes: MultiRoutes
     gas_adjustment: Decimal | None
+    func_max_single_arbitrage: Callable[[], Awaitable[TerraTokenAmount]] | None
     routes: list[RoutePools]
     start_token: TerraNativeToken
     use_router: bool
@@ -366,6 +372,7 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
         client: TerraClient,
         multi_routes: MultiRoutes,
         gas_adjustment: Decimal = None,
+        func_max_single_arbitrage: Callable[[], Awaitable[TerraTokenAmount]] = None,
     ) -> TerraCyclesArbitrage:
         """Arbitrage with TerraNativeToken as starting point and a cycle of liquidity pairs"""
         assert isinstance(multi_routes.tokens[0], TerraNativeToken) and multi_routes.is_cycle
@@ -375,6 +382,7 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
         self.multi_routes = multi_routes
         self.start_token = multi_routes.tokens[0]
         self.gas_adjustment = gas_adjustment
+        self.func_max_single_arbitrage = func_max_single_arbitrage
         self.use_router = multi_routes.router_address is not None
 
         (
@@ -409,6 +417,11 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
     def _reset_mempool_params(self):
         super()._reset_mempool_params()
 
+    async def _get_max_single_arbitrage(self) -> TerraTokenAmount:
+        if self.func_max_single_arbitrage is None:
+            return self.max_single_arbitrage
+        return await self.func_max_single_arbitrage()
+
     async def _estimate_gas_use(self) -> int:
         list_gas: list[int] = []
         for route in self.routes:
@@ -428,13 +441,18 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
         filtered_mempool: dict[Any, list[Tx]] = None,
     ) -> CosmosArbParams:
         initial_balance = await self.start_token.get_balance(self.client)
+        max_single_arbitrage = await self._get_max_single_arbitrage()
 
         params: list[dict] = []
         errors: list[Exception] = []
         async with self._simulate_reserve_changes(filtered_mempool):
             for route in self.routes:
                 try:
-                    params.append(await self._get_params_single_route(route, initial_balance))
+                    params.append(
+                        await self._get_params_single_route(
+                            route, initial_balance, max_single_arbitrage
+                        )
+                    )
                 except (FeeEstimationError, UnprofitableArbitrage) as e:
                     errors.append(e)
         if not params:
@@ -464,12 +482,13 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
         self,
         route: RoutePools,
         initial_balance: TerraTokenAmount,
+        max_single_arbitrage: TerraTokenAmount,
     ) -> dict:
         reverse = await route.should_reverse(self.min_start_amount)
         initial_amount = await self._get_optimal_argitrage_amount(route, reverse)
         final_amount, msgs = await route.op_swap(initial_amount, reverse)
         single_initial_amount, n_repeat, capped_amount = self._check_repeats(
-            initial_amount, initial_balance
+            initial_amount, initial_balance, max_single_arbitrage
         )
         if capped_amount:
             initial_amount = single_initial_amount
@@ -535,6 +554,7 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
         self,
         initial_amount: TerraTokenAmount,
         initial_balance: TerraTokenAmount,
+        max_single_arbitrage: TerraTokenAmount,
     ) -> tuple[TerraTokenAmount, int, bool]:
         available_amount = initial_balance - self.min_reserved_amount
         if not self.use_router:
@@ -547,7 +567,7 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
                 )
                 return available_amount, 1, True
             return initial_amount, 1, False
-        max_amount = min(available_amount.amount, self.max_single_arbitrage.amount)
+        max_amount = min(available_amount.amount, max_single_arbitrage.amount)
         n_repeat = math.ceil(initial_amount.amount / max_amount)
         if n_repeat > MAX_N_REPEATS:
             self.log.warning(f"{n_repeat=} is too hight, reducing to {MAX_N_REPEATS}")
