@@ -8,6 +8,8 @@ from typing import Iterable
 import httpx
 from httpx._types import URLTypes
 
+from . import aws
+
 log = logging.getLogger(__name__)
 
 
@@ -179,6 +181,13 @@ async def _send_request(
 
 
 async def get_host_ip() -> str:
+    try:
+        return await aws.get_public_ip()
+    except httpx.HTTPError:
+        return await get_host_ip_from_external_services()
+
+
+async def get_host_ip_from_external_services():
     ip_getter_service_urls = [
         "http://icanhazip.com",
         "http://ifconfig.me",
@@ -187,14 +196,15 @@ async def get_host_ip() -> str:
         "http://ipinfo.io/ip",
         "http://ipecho.net/plain",
     ]
-    ips = await asyncio.gather(*(_get_text(url) for url in ip_getter_service_urls))
+    async with AsyncClient() as client:
+        ips = await asyncio.gather(*(_get_text(client, url) for url in ip_getter_service_urls))
     counter = Counter(ip for ip in ips if re.match(r"^(?:\d{1,3}\.){3}\d{1,3}$", ip))
     return counter.most_common(1)[0][0]
 
 
-async def _get_text(url) -> str:
+async def _get_text(client: AsyncClient, url: str) -> str:
     try:
-        return (await get(url, follow_redirects=True, supress_logs=True)).text.strip()
+        return (await client.get(url, follow_redirects=True, supress_logs=True)).text.strip()
     except Exception as e:
         log.debug(f"Error on ip getter service {url=} ({e!r})")
         return ""
