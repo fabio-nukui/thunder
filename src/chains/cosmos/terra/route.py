@@ -79,7 +79,7 @@ class RoutePools:
     ):
         self.client = client
         self.tokens = list(tokens)
-        self.pools = list(pools)
+        self._pools = list(pools)
         self.single_direction = single_direction
         if router_address is None:
             self.router = None
@@ -91,6 +91,20 @@ class RoutePools:
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({_repr_route_symbols(self.tokens)})"
+
+    @property
+    def pools(self) -> list[BaseTerraLiquidityPair]:
+        return self._pools
+
+    @pools.setter
+    def pools(self, pools: list[BaseTerraLiquidityPair]):
+        self._pools = pools
+        if self.router is not None:
+            for pool in pools:
+                if isinstance(pool, LiquidityPair):
+                    self.router.terraswap_pairs[pool.sorted_tokens] = pool
+                elif isinstance(pool, RouterNativeLiquidityPair):
+                    self.router.native_pairs[pool.sorted_tokens] = pool
 
     async def should_reverse(self, amount_in: TerraTokenAmount) -> bool:
         assert self.is_cycle, "Reversion testing only applicable to cycles"
