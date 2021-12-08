@@ -6,6 +6,7 @@ import math
 import re
 import time
 from collections import defaultdict
+from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
@@ -499,19 +500,21 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
                 sim_mempool: dict[Any, list[Tx]] | None
                 msgs = []
                 step_msgs: list[MsgExecuteContract] = []
-                for _ in range(n_repeat):
-                    if step_msgs:
-                        tx = Tx(
-                            body=TxBody(messages=step_msgs),  # type: ignore
-                            auth_info=AuthInfo([], Fee(0, Coins())),
-                            signatures=[],
-                        )
-                        sim_mempool = {
-                            p: [tx] for p in route.pools if isinstance(p, FILTER_POOL_TYPES)
-                        }
-                    else:
-                        sim_mempool = None
-                    async with self._simulate_reserve_changes(sim_mempool):
+                async with AsyncExitStack() as stack:
+                    for _ in range(n_repeat):
+                        if step_msgs:
+                            tx = Tx(
+                                body=TxBody(messages=step_msgs),  # type: ignore
+                                auth_info=AuthInfo([], Fee(0, Coins())),
+                                signatures=[],
+                            )
+                            sim_mempool = {
+                                p: [tx] for p in route.pools if isinstance(p, FILTER_POOL_TYPES)
+                            }
+                        else:
+                            sim_mempool = None
+                        simulation = self._simulate_reserve_changes(sim_mempool)
+                        await stack.enter_async_context(simulation)
                         _, step_msgs = await route.op_swap(single_initial_amount, reverse)
                         msgs.extend(step_msgs)
                 estimated_gas_use *= n_repeat
