@@ -51,6 +51,7 @@ class LPReserveSimulationMixin:
     async def _simulate_reserve_changes(
         self,
         filtered_mempool: dict[LiquidityPool, list[Tx]] = None,
+        verbose: bool = True,
     ):
         if not filtered_mempool:
             yield self.pools
@@ -72,7 +73,8 @@ class LPReserveSimulationMixin:
         for pool in self.pools:
             pool_changes = self._mempool_reserve_changes[pool]
             if any(amount for amount in pool_changes):
-                self.log.debug(f"Simulation of reserve changes: {pool}: {pool_changes}")
+                if verbose:
+                    self.log.debug(f"Simulation of reserve changes: {pool}: {pool_changes}")
                 simulations[pool] = await pool.simulate_reserve_change(pool_changes)  # type: ignore # noqa: E501
             else:
                 simulations[pool] = pool

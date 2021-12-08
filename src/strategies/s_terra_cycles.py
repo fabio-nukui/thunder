@@ -518,7 +518,7 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
                             }
                         else:
                             sim_mempool = None
-                        simulation = self._simulate_reserve_changes(sim_mempool)
+                        simulation = self._simulate_reserve_changes(sim_mempool, verbose=False)
                         await stack.enter_async_context(simulation)
                         slippage_tolerance = _get_slippage_tolerance(n_repeat, n)
                         _, step_msgs = await route.op_swap(
