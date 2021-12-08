@@ -31,6 +31,14 @@ class BaseTerraLiquidityPair(ABC):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.repr_symbol})"
 
+    def __hash__(self) -> int:
+        return hash((self.__class__, self.tokens))
+
+    def __eq__(self, other) -> bool:
+        if isinstance(other, type(self)):
+            return self.tokens == other.tokens
+        return NotImplemented
+
     @property
     def repr_symbol(self) -> str:
         return f"{self.tokens[0].repr_symbol}/{self.tokens[1].repr_symbol}"
@@ -102,14 +110,6 @@ class NativeLiquidityPair(BaseTerraLiquidityPair):
         self.tokens = tokens if (tokens[0] < tokens[1]) else (tokens[1], tokens[0])
         self.stop_updates = False
         self._pool_delta_changes = Decimal(0)
-
-    def __hash__(self) -> int:
-        return hash((self.__class__, self.tokens))
-
-    def __eq__(self, other) -> bool:
-        if isinstance(other, type(self)):
-            return self.tokens == other.tokens
-        return NotImplemented
 
     async def get_swap_amounts(
         self,
