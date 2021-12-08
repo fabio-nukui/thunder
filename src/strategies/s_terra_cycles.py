@@ -131,10 +131,15 @@ async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
             get_max_single_arbitrage = (
                 lunax_vault.get_max_deposit if lunax_vault in multi_routes.pools else None
             )
+            capped_arb = lunax_vault in multi_routes.pools
             try:
                 arbs.append(
                     await TerraCyclesArbitrage.new(
-                        client, multi_routes, gas_adjustment, get_max_single_arbitrage
+                        client,
+                        multi_routes,
+                        gas_adjustment,
+                        get_max_single_arbitrage,
+                        capped_arb,
                     )
                 )
             except FeeEstimationError as e:
@@ -365,6 +370,7 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
     min_reserved_amount: TerraTokenAmount
     max_single_arbitrage: TerraTokenAmount
     optimization_tolerance: TerraTokenAmount
+    capped_arb: bool
 
     @classmethod
     async def new(
@@ -373,6 +379,7 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
         multi_routes: MultiRoutes,
         gas_adjustment: Decimal = None,
         func_max_single_arbitrage: Callable[[], Awaitable[TerraTokenAmount]] = None,
+        capped_arb: bool = False,
     ) -> TerraCyclesArbitrage:
         """Arbitrage with TerraNativeToken as starting point and a cycle of liquidity pairs"""
         assert isinstance(multi_routes.tokens[0], TerraNativeToken) and multi_routes.is_cycle
@@ -384,6 +391,7 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
         self.gas_adjustment = gas_adjustment
         self.func_max_single_arbitrage = func_max_single_arbitrage
         self.use_router = multi_routes.router_address is not None
+        self.capped_arb = capped_arb
 
         (
             self.min_start_amount,
@@ -557,7 +565,7 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
         max_single_arbitrage: TerraTokenAmount,
     ) -> tuple[TerraTokenAmount, int, bool]:
         available_amount = initial_balance - self.min_reserved_amount
-        if not self.use_router:
+        if not self.use_router and not self.capped_arb:
             if initial_amount > available_amount:
                 symbol = self.start_token.symbol
                 self.log.info(
