@@ -58,6 +58,7 @@ MIN_RESERVED_AMOUNT = UST.to_amount(30)
 MIN_N_ARBITRAGES = 20
 ANCHOR_MARKET_GAS_ADJUSMENT = Decimal("1.35")
 FILTER_POOL_TYPES = (terraswap.LiquidityPair, terraswap.RouterNativeLiquidityPair)
+SLIPPAGE_TOLERANCE_PER_CONCAT_REPEAT = Decimal("0.001")
 
 
 class NoPairFound(Exception):
@@ -355,6 +356,10 @@ async def _pairs_from_factories(
     return pairs
 
 
+def _get_slippage_tolerance(n_repeat_total: int, n: int) -> Decimal:
+    return SLIPPAGE_TOLERANCE_PER_CONCAT_REPEAT * (n_repeat_total - n)
+
+
 class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[TerraClient]):
     multi_routes: MultiRoutes
     gas_adjustment: Decimal | None
@@ -501,7 +506,7 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
                 msgs = []
                 step_msgs: list[MsgExecuteContract] = []
                 async with AsyncExitStack() as stack:
-                    for _ in range(n_repeat):
+                    for n in range(n_repeat):
                         if step_msgs:
                             tx = Tx(
                                 body=TxBody(messages=step_msgs),  # type: ignore
@@ -515,7 +520,12 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
                             sim_mempool = None
                         simulation = self._simulate_reserve_changes(sim_mempool)
                         await stack.enter_async_context(simulation)
-                        _, step_msgs = await route.op_swap(single_initial_amount, reverse)
+                        slippage_tolerance = _get_slippage_tolerance(n_repeat, n)
+                        _, step_msgs = await route.op_swap(
+                            single_initial_amount,
+                            reverse,
+                            min_amount_out=single_initial_amount * (1 - slippage_tolerance),
+                        )
                         msgs.extend(step_msgs)
                 estimated_gas_use *= n_repeat
                 n_repeat = 1
