@@ -566,7 +566,7 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
     ) -> tuple[TerraTokenAmount, int, bool]:
         available_amount = initial_balance - self.min_reserved_amount
         if self.capped_arb:
-            return self.max_single_arbitrage, 1, True
+            return max_single_arbitrage, 1, True
         if not self.use_router:
             if initial_amount > available_amount:
                 symbol = self.start_token.symbol
