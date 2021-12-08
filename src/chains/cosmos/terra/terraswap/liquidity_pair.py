@@ -345,6 +345,14 @@ class LiquidityPair(BaseTerraLiquidityPair):
             return super().__repr__()
         return f"{self.__class__.__name__}({self.repr_symbol}, factory={self.factory_name!r})"
 
+    def __hash__(self) -> int:
+        return hash((self.__class__, self.contract_addr))
+
+    def __eq__(self, other) -> bool:
+        if isinstance(other, type(self)):
+            return self.contract_addr == other.contract_addr
+        return NotImplemented
+
     async def get_reserves(self) -> AmountTuple:
         if not self.stop_updates:
             self._reserves = await self._get_reserves()
