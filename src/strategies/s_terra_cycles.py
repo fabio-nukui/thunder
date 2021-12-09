@@ -295,17 +295,6 @@ async def _get_ust_dex_3cycle_routes(
     return _reorder_routes(routes)
 
 
-def _reorder_routes(routes: list[MultiRoutes]) -> list[MultiRoutes]:
-    alte_routes = []
-    non_alte_routes = []
-    for r in routes:
-        if any(t.symbol == "ALTE" for p in r.pools for t in p.tokens):
-            alte_routes.append(r)
-        else:
-            non_alte_routes.append(r)
-    return non_alte_routes + alte_routes
-
-
 async def _get_ust_loopdex_terraswap_2cycle_routes(
     client: TerraClient,
     loop_factory: terraswap.LoopFactory,
@@ -336,6 +325,20 @@ async def _get_ust_loopdex_terraswap_2cycle_routes(
             continue
         routes.append(MultiRoutes(client, UST, [[terraswap_pair], [loop_pair]]))
     return routes
+
+
+def _reorder_routes(routes: list[MultiRoutes]) -> list[MultiRoutes]:
+    main_routes = []
+    alte_routes = []
+    swap_routes = []
+    for r in routes:
+        if any(t.symbol == "ALTE" for p in r.pools for t in p.tokens):
+            alte_routes.append(r)
+        elif any(t.symbol == "SWAP" for p in r.pools for t in p.tokens):
+            swap_routes.append(r)
+        else:
+            main_routes.append(r)
+    return main_routes + swap_routes + alte_routes
 
 
 async def _pairs_from_factories(
