@@ -10,6 +10,8 @@ from collections import defaultdict
 from decimal import Decimal
 from typing import AsyncIterable
 
+import cosmos_proto.cosmos.auth.v1beta1 as cosmos_auth_pb
+import cosmos_proto.cosmos.base.tendermint.v1beta1 as cosmos_tendermint_tb
 import grpclib.client
 from cosmos_sdk.client.lcd.api.tx import SignerOptions
 from cosmos_sdk.core import AccAddress, Coins
@@ -79,6 +81,8 @@ class CosmosClient(BroadcasterMixin, AsyncBlockchainClient, ABC):
 
         grpc_url, grpc_port = self.grpc_uri.split(":")
         self.grpc_channel = grpclib.client.Channel(grpc_url, int(grpc_port))
+        self.grpc_service_tendermint = cosmos_tendermint_tb.ServiceStub(self.grpc_channel)
+        self.grpc_query_auth = cosmos_auth_pb.QueryStub(self.grpc_channel)
 
         await asyncio.gather(self._init_lcd(), self._init_broadcaster_clients())
         await self._check_connections()
@@ -136,11 +140,12 @@ class CosmosClient(BroadcasterMixin, AsyncBlockchainClient, ABC):
         ...
 
     async def is_syncing(self) -> bool:
-        return await self.lcd.tendermint.syncing()
+        res = await self.grpc_service_tendermint.get_syncing()
+        return res.syncing
 
     async def get_latest_height(self) -> int:
-        info = await self.lcd.tendermint.block_info()
-        return int(info["block"]["header"]["height"])
+        res = await self.grpc_service_tendermint.get_latest_block()
+        return res.block.header.height
 
     async def contract_query(self, contract_addr: AccAddress, query_msg: dict) -> dict:
         try:
@@ -161,7 +166,8 @@ class CosmosClient(BroadcasterMixin, AsyncBlockchainClient, ABC):
 
     async def get_account_data(self, address: AccAddress = None) -> BaseAccount:
         address = self.address if address is None else address
-        return await self.lcd.auth.account_info(address)
+        res = await self.grpc_query_auth.account(address=address)
+        return BaseAccount.from_proto_bytes(res.account.value)
 
     async def get_account_number(self, address: AccAddress = None) -> int:
         return (await self.get_account_data(address)).account_number
