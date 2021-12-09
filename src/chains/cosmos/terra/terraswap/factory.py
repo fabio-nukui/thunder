@@ -129,7 +129,7 @@ class Factory:
             if not all(_check_cw20_whitelist(token, cw20_whitelist) for token in tokens):
                 log.debug(f"Rejected {info['contract_addr']}: one of {tokens} not in whitelist")
                 continue
-            pair_symbol = "-".join(token.repr_symbol for token in tokens)
+            pair_symbol = "-".join(f"[{token.repr_symbol}]" for token in tokens)
             if pair_symbol in addresses["pairs"]:
                 log.debug(f"{pair_symbol=}, address={info['contract_addr']} already in pairs")
             else:

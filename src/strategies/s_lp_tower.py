@@ -105,7 +105,7 @@ async def get_arbitrages(client: TerraClient) -> list[LPTowerArbitrage]:
     factory = await terraswap.TerraswapFactory.new(client)
 
     pool_0, pool_1, pool_tower = await factory.get_pairs(
-        ["BLUNA-LUNA", "UST-LUNA", "(BLUNA-LUNA)-(UST-LUNA)"]
+        ["[BLUNA]-[LUNA]", "[UST]-[LUNA]", "[(BLUNA-LUNA)]-[(UST-LUNA)]"]
     )
     return [LPTowerArbitrage(client, pool_0, pool_1, pool_tower)]
 

@@ -169,8 +169,8 @@ async def _get_ust_native_routes(
     loop_factory: terraswap.LoopFactory,
     terraswap_factory: terraswap.TerraswapFactory,
 ) -> list[MultiRoutes]:
-    loop_pair = await loop_factory.get_pair("LUNA-UST")
-    terraswap_pair = await terraswap_factory.get_pair("UST-LUNA")
+    loop_pair = await loop_factory.get_pair("[LUNA]-[UST]")
+    terraswap_pair = await terraswap_factory.get_pair("[UST]-[LUNA]")
     native_pair = terraswap_factory.get_native_pair((UST, LUNA))
 
     return [
@@ -187,11 +187,11 @@ async def _get_luna_native_routes(
     client: TerraClient,
     factory: terraswap.TerraswapFactory,
 ) -> list[MultiRoutes]:
-    pat_token_symbol = re.compile(r"^[A-Z]+-LUNA$")
+    pat_token_symbol = re.compile(r"^\[[A-Z]+\]-\[LUNA\]$")
 
     routes: list[MultiRoutes] = []
     for pair_symbol in factory.pairs_addresses:
-        if not (match := pat_token_symbol.match(pair_symbol)) or pair_symbol == "UST-LUNA":
+        if not (match := pat_token_symbol.match(pair_symbol)) or pair_symbol == "[UST]-[LUNA]":
             continue
         terraswap_pair = await factory.get_pair(match.group(), check_liquidity=False)
         if not isinstance(terraswap_pair.tokens[0], TerraNativeToken):
@@ -268,7 +268,7 @@ async def _get_ust_dex_3cycle_routes(
     client: TerraClient,
     factories: list[terraswap.Factory],
 ) -> list[MultiRoutes]:
-    pat_ust_pair_symbol = re.compile(r"^(?:[a-zA-Z]+-UST|UST-[a-zA-Z]+)$")
+    pat_ust_pair_symbol = re.compile(r"^(?:\[[a-zA-Z]+\]-\[UST\]|\[UST\]-\[[a-zA-Z]+\])$")
     tasks = (
         f.get_pair(name)
         for f in factories
@@ -311,14 +311,16 @@ async def _get_ust_loopdex_terraswap_2cycle_routes(
     loop_factory: terraswap.LoopFactory,
     terraswap_factory: terraswap.TerraswapFactory,
 ) -> list[MultiRoutes]:
-    pat_token_symbol = re.compile(r"([A-Z]+)-UST|UST-([A-Z]+)")
+    pat_token_symbol = re.compile(r"(\[[A-Z]+\])-\[UST\]|\[UST\]-(\[[A-Z]+\])")
     pair_symbol: str
 
     routes: list[MultiRoutes] = []
     for pair_symbol in loop_factory.pairs_addresses:
         if not (match := pat_token_symbol.match(pair_symbol)):
             continue
-        reversed_symbol = f"{match.group(2)}-UST" if match.group(2) else f"UST-{match.group(1)}"
+        reversed_symbol = (
+            f"{match.group(2)}-[UST]" if match.group(2) else f"[UST]-{match.group(1)}"
+        )
         if pair_symbol in terraswap_factory.pairs_addresses:
             terraswap_pair_symbol = pair_symbol
         elif reversed_symbol in terraswap_factory.pairs_addresses:
@@ -342,9 +344,9 @@ async def _pairs_from_factories(
     symbol_1: str,
 ) -> list[terraswap.LiquidityPair]:
     if symbol_0 == symbol_1:
-        raise NoPairFound(f"Invalid pair {symbol_0}-{symbol_1}")
+        raise NoPairFound(f"Invalid pair [{symbol_0}]-[{symbol_1}]")
     pairs = []
-    for pair_symbol in (f"{symbol_0}-{symbol_1}", f"{symbol_1}-{symbol_0}"):
+    for pair_symbol in (f"[{symbol_0}]-[{symbol_1}]", f"[{symbol_1}]-[{symbol_0}]"):
         for factory in terraswap_factories:
             if pair_symbol in factory.pairs_addresses:
                 try:
@@ -352,7 +354,7 @@ async def _pairs_from_factories(
                 except InsufficientLiquidity:
                     continue
     if not pairs:
-        raise NoPairFound(f"No pair found for {symbol_0}-{symbol_1}")
+        raise NoPairFound(f"No pair found for [{symbol_0}]-[{symbol_1}]")
     return pairs
 
 
