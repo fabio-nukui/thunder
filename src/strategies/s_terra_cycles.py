@@ -10,7 +10,7 @@ from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
-from typing import Any, Awaitable, Callable, Sequence
+from typing import Any, Awaitable, Callable, Iterable, Sequence
 
 from cosmos_sdk.core.auth import TxInfo
 from cosmos_sdk.core.coins import Coins
@@ -119,7 +119,7 @@ async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
     )
     nexus_factory = nexus.Factory(client)
     list_route_groups: list[list[MultiRoutes]] = await asyncio.gather(
-        _get_ust_native_routes(client, loop_factory, terraswap_factory),
+        _get_ust_luna_routes(client, loop_factory, terraswap_factory),
         _get_luna_native_routes(client, terraswap_factory),
         _get_psi_routes(client, nexus_factory, [terraswap_factory, loop_factory]),
         _get_aust_routes(client, anchor_market, [terraswap_factory, loop_factory]),
@@ -127,23 +127,23 @@ async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
         _get_ust_loopdex_terraswap_2cycle_routes(client, loop_factory, terraswap_factory),
         _get_ust_dex_3cycle_routes(client, [terraswap_factory, loop_factory]),
     )
+    routes = _reorder_routes([r for route_group in list_route_groups for r in route_group])
     arbs: list[TerraCyclesArbitrage] = []
-    for route_group in list_route_groups:
-        for multi_routes in route_group:
-            gas_adjustment = (
-                ANCHOR_MARKET_GAS_ADJUSMENT if anchor_market in multi_routes.pools else None
-            )
-            get_max_single_arbitrage = (
-                lunax_vault.get_max_deposit if lunax_vault in multi_routes.pools else None
-            )
-            try:
-                arbs.append(
-                    await TerraCyclesArbitrage.new(
-                        client, multi_routes, gas_adjustment, get_max_single_arbitrage
-                    )
+    for multi_routes in routes:
+        gas_adjustment = (
+            ANCHOR_MARKET_GAS_ADJUSMENT if anchor_market in multi_routes.pools else None
+        )
+        get_max_single_arbitrage = (
+            lunax_vault.get_max_deposit if lunax_vault in multi_routes.pools else None
+        )
+        try:
+            arbs.append(
+                await TerraCyclesArbitrage.new(
+                    client, multi_routes, gas_adjustment, get_max_single_arbitrage
                 )
-            except FeeEstimationError as e:
-                log.info(f"Error when initializing arbitrage with {multi_routes}: {e!r}")
+            )
+        except FeeEstimationError as e:
+            log.info(f"Error when initializing arbitrage with {multi_routes}: {e!r}")
     assert len(arbs) >= MIN_N_ARBITRAGES
     return arbs
 
@@ -164,7 +164,7 @@ def get_filters(
     return filters
 
 
-async def _get_ust_native_routes(
+async def _get_ust_luna_routes(
     client: TerraClient,
     loop_factory: terraswap.LoopFactory,
     terraswap_factory: terraswap.TerraswapFactory,
@@ -177,9 +177,14 @@ async def _get_ust_native_routes(
         MultiRoutes(
             client=client,
             start_token=UST,
-            list_steps=[[loop_pair, terraswap_pair], [native_pair]],
+            list_steps=[[terraswap_pair], [native_pair]],
             router_address=terraswap_factory.router_address,
-        )
+        ),
+        MultiRoutes(
+            client=client,
+            start_token=UST,
+            list_steps=[[loop_pair], [terraswap_pair, native_pair]],
+        ),
     ]
 
 
@@ -187,17 +192,12 @@ async def _get_luna_native_routes(
     client: TerraClient,
     factory: terraswap.TerraswapFactory,
 ) -> list[MultiRoutes]:
-    pat_token_symbol = re.compile(r"^\[[A-Z]+\]-\[LUNA\]$")
-
     routes: list[MultiRoutes] = []
-    for pair_symbol in factory.pairs_addresses:
-        if not (match := pat_token_symbol.match(pair_symbol)) or pair_symbol == "[UST]-[LUNA]":
+    for pair in await _pairs_from_factories([factory], "LUNA", excluded_symbols=["UST"]):
+        if not all(isinstance(token, TerraNativeToken) for token in pair.tokens):
             continue
-        terraswap_pair = await factory.get_pair(match.group(), check_liquidity=False)
-        if not isinstance(terraswap_pair.tokens[0], TerraNativeToken):
-            continue
-        native_pair = factory.get_native_pair(terraswap_pair.tokens)  # type: ignore
-        list_steps: Sequence[Sequence] = [[terraswap_pair], [native_pair]]
+        native_pair = factory.get_native_pair(pair.tokens)  # type: ignore
+        list_steps: Sequence[Sequence] = [[pair], [native_pair]]
 
         routes.append(
             MultiRoutes(client, LUNA, list_steps, router_address=factory.router_address)
@@ -251,8 +251,35 @@ async def _get_aust_routes(
     anchor_market: anchor.Market,
     factories: Sequence[terraswap.Factory],
 ) -> list[MultiRoutes]:
-    aust_pairs = await _pairs_from_factories(factories, "UST", "aUST")
-    return [MultiRoutes(client, UST, [[anchor_market], aust_pairs])]
+    routes: list[MultiRoutes] = []
+    aust_ust = await _pairs_from_factories(factories, "UST", "aUST")
+    routes.append(MultiRoutes(client, UST, [[anchor_market], aust_ust]))
+
+    pairs_aust_swap, pairs_swap_ust = await asyncio.gather(
+        _pairs_from_factories(factories, "aUST", "SWAP"),
+        _pairs_from_factories(factories, "SWAP", "UST"),
+    )
+
+    pairs_aust_ust = [anchor_market, *aust_ust]
+    routes.append(MultiRoutes(client, UST, [pairs_aust_ust, pairs_aust_swap, pairs_swap_ust]))
+
+    pairs_swap_token, pairs_ust_token = await asyncio.gather(
+        _pairs_from_factories(factories, "SWAP", excluded_symbols=["aUST", "UST"]),
+        _pairs_from_factories(factories, "UST"),
+    )
+
+    intermediary_tokens = {
+        token for pair in pairs_swap_token for token in pair.tokens if token.symbol != "SWAP"
+    }
+    for token in intermediary_tokens:
+        token_ust = [p for p in pairs_ust_token if token in p.tokens]
+        if not token_ust:
+            continue
+        swap_token = [p for p in pairs_swap_token if token in p.tokens]
+        routes.append(
+            MultiRoutes(client, UST, [pairs_aust_ust, pairs_aust_swap, swap_token, token_ust])
+        )
+    return routes
 
 
 async def _get_stader_routes(
@@ -268,16 +295,9 @@ async def _get_ust_dex_3cycle_routes(
     client: TerraClient,
     factories: list[terraswap.Factory],
 ) -> list[MultiRoutes]:
-    pat_ust_pair_symbol = re.compile(r"^(?:\[[a-zA-Z]+\]-\[UST\]|\[UST\]-\[[a-zA-Z]+\])$")
-    tasks = (
-        f.get_pair(name)
-        for f in factories
-        for name in f.pairs_addresses
-        if not pat_ust_pair_symbol.match(name)
-    )
     non_ust_pairs: dict[tuple[TerraToken, TerraToken], list[terraswap.LiquidityPair]]
     non_ust_pairs = defaultdict(list)
-    for pair in await asyncio.gather(*tasks, return_exceptions=True):
+    for pair in await _pairs_from_factories(factories, excluded_symbols=["UST", "aUST"]):
         if isinstance(pair, terraswap.LiquidityPair):
             non_ust_pairs[pair.sorted_tokens].append(pair)
 
@@ -291,8 +311,7 @@ async def _get_ust_dex_3cycle_routes(
         except NoPairFound:
             continue
         routes.append(MultiRoutes(client, UST, [ust_first_pairs, pairs, ust_second_pairs]))
-
-    return _reorder_routes(routes)
+    return routes
 
 
 async def _get_ust_loopdex_terraswap_2cycle_routes(
@@ -300,15 +319,14 @@ async def _get_ust_loopdex_terraswap_2cycle_routes(
     loop_factory: terraswap.LoopFactory,
     terraswap_factory: terraswap.TerraswapFactory,
 ) -> list[MultiRoutes]:
-    pat_token_symbol = re.compile(r"(\[[A-Z]+\])-\[UST\]|\[UST\]-(\[[A-Z]+\])")
-    pair_symbol: str
+    pat_token_symbol = re.compile(r"\[([\w\-]+)\]-\[UST\]|\[UST\]-\[([\w\-]+)\]")
 
     routes: list[MultiRoutes] = []
     for pair_symbol in loop_factory.pairs_addresses:
-        if not (match := pat_token_symbol.match(pair_symbol)):
+        if not (match := pat_token_symbol.match(pair_symbol)) or "LUNA" in match.groups():
             continue
         reversed_symbol = (
-            f"{match.group(2)}-[UST]" if match.group(2) else f"[UST]-{match.group(1)}"
+            f"[{match.group(2)}]-[UST]" if match.group(2) else f"[UST]-[{match.group(1)}]"
         )
         if pair_symbol in terraswap_factory.pairs_addresses:
             terraswap_pair_symbol = pair_symbol
@@ -329,33 +347,43 @@ async def _get_ust_loopdex_terraswap_2cycle_routes(
 
 def _reorder_routes(routes: list[MultiRoutes]) -> list[MultiRoutes]:
     main_routes = []
-    alte_routes = []
     swap_routes = []
+    alte_routes = []
     for r in routes:
-        if any(t.symbol == "ALTE" for p in r.pools for t in p.tokens):
-            alte_routes.append(r)
-        elif any(t.symbol == "SWAP" for p in r.pools for t in p.tokens):
+        if any(t.symbol == "SWAP" for p in r.pools for t in p.tokens):
             swap_routes.append(r)
+        elif any(t.symbol == "ALTE" for p in r.pools for t in p.tokens):
+            alte_routes.append(r)
         else:
             main_routes.append(r)
-    return main_routes + swap_routes + alte_routes
+    return main_routes + alte_routes + swap_routes
 
 
 async def _pairs_from_factories(
     terraswap_factories: Sequence[terraswap.Factory],
-    symbol_0: str,
-    symbol_1: str,
+    symbol_0: str = None,
+    symbol_1: str = None,
+    excluded_symbols: Iterable[str] = None,
 ) -> list[terraswap.LiquidityPair]:
-    if symbol_0 == symbol_1:
+    assert symbol_0 is None or "\\" not in symbol_0
+    assert symbol_1 is None or "\\" not in symbol_1
+    if symbol_0 == symbol_1 and symbol_0 is not None:
         raise NoPairFound(f"Invalid pair [{symbol_0}]-[{symbol_1}]")
+
+    symbol_0 = symbol_0 or r"[\w\-]+"
+    symbol_1 = symbol_1 or r"[\w\-]+"
+    excluded_symbols = set(excluded_symbols) if excluded_symbols else set()
+
+    pat = re.compile(fr"\[({symbol_0})\]-\[({symbol_1})\]|\[({symbol_1})\]-\[({symbol_0})\]")
     pairs = []
-    for pair_symbol in (f"[{symbol_0}]-[{symbol_1}]", f"[{symbol_1}]-[{symbol_0}]"):
-        for factory in terraswap_factories:
-            if pair_symbol in factory.pairs_addresses:
-                try:
-                    pairs.append(await factory.get_pair(pair_symbol))
-                except InsufficientLiquidity:
-                    continue
+    for factory in terraswap_factories:
+        for pair_symbol in factory.pairs_addresses:
+            if match := pat.match(pair_symbol):
+                if not excluded_symbols & set(match.groups()):
+                    try:
+                        pairs.append(await factory.get_pair(pair_symbol))
+                    except InsufficientLiquidity:
+                        continue
     if not pairs:
         raise NoPairFound(f"No pair found for [{symbol_0}]-[{symbol_1}]")
     return pairs

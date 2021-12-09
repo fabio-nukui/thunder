@@ -7,8 +7,9 @@ from functools import reduce
 from typing import TYPE_CHECKING, TypeVar
 
 from cosmos_sdk.core import AccAddress
+from cosmos_sdk.core.market import MsgSwap
 from cosmos_sdk.core.tx import Tx
-from cosmos_sdk.core.wasm.msgs import MsgExecuteContract
+from cosmos_sdk.core.wasm import MsgExecuteContract
 
 from exceptions import MaxSpreadAssertion
 
@@ -138,8 +139,15 @@ class NativeLiquidityPair(BaseTerraLiquidityPair):
         sender: AccAddress,
         amount_in: TerraTokenAmount,
         safety_margin: bool | int = True,
-    ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
-        raise NotImplementedError
+    ) -> tuple[TerraTokenAmount, list[MsgSwap]]:
+        amount_out = await self.get_swap_amount_out(amount_in, safety_margin)
+        token_out = self.tokens[0] if amount_in.token == self.tokens[1] else self.tokens[1]
+        msg = MsgSwap(
+            trader=sender,
+            offer_coin=amount_in.to_coin(),
+            ask_denom=token_out.denom,
+        )
+        return amount_out, [msg]
 
     async def simulate_reserve_change(
         self: _NativeLiquidityPairT,

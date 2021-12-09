@@ -207,7 +207,7 @@ async def _decode_router_msg(
                 pair_info["contract_addr"], client, check_liquidity=False
             )
             pairs.append(pair)
-    return RouterDecodedMsg(amount_in, min_out, pairs)
+    return RouterDecodedMsg(amount_in, min_out, pairs)  # type: ignore
 
 
 class RouterNativeLiquidityPair(NativeLiquidityPair):
