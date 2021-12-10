@@ -5,6 +5,7 @@ import logging
 import re
 import time
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from copy import copy
 from decimal import Decimal
 from typing import Generic, Sequence, cast
@@ -55,15 +56,9 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
         gas_adjustment = gas_adjustment or self.client.gas_adjustment
         signer = self.client.signer
         for i in range(1, _MAX_FEE_ESTIMATION_TRIES + 1):
-            create_tx_options = CreateTxOptions(
-                msgs,
-                gas_prices=gas_prices,
-                gas_adjustment=gas_adjustment,
-                fee_denoms=[fee_denom],
-                sequence=signer.sequence,
-            )
+            tx = self.get_unsigned_tx(msgs, [fee_denom], [signer])
             try:
-                fee = await self._fee_estimation([signer], create_tx_options)
+                fee = await self._fee_estimation(tx, gas_prices, gas_adjustment)
             except grpclib.GRPCError as e:
                 error_msg = e.message or ""
                 if match := _pat_sequence_error.search(error_msg):
@@ -92,35 +87,40 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
                 return fee
         raise Exception("Should never reach")
 
-    async def _fee_estimation(
-        self,
-        signer_opts: list[SignerOptions],
-        options: CreateTxOptions,
-    ) -> Fee:
-        gas_prices = options.gas_prices or self.client.gas_prices
-        gas_adjustment = options.gas_adjustment or self.client.gas_adjustment
-
-        tx = self._get_tx_empty_signatures(signer_opts, options)
-
+    async def _fee_estimation(self, tx: Tx, gas_prices: Coins, gas_adjustment: Decimal) -> Fee:
         sim = await self.grpc_service.simulate(tx=tx.to_proto())
         gas = int(sim.gas_info.gas_used * gas_adjustment)
         fee_amount = (gas_prices * gas).to_int_coins()
 
         return Fee(gas, fee_amount)
 
-    def _get_tx_empty_signatures(
+    def get_unsigned_tx(
         self,
-        signer_opts: list[SignerOptions],
-        options: CreateTxOptions,
+        msgs: Sequence[Msg],
+        fee_denoms: list[str] = None,
+        signer_opts: list[SignerOptions] = None,
     ) -> Tx:
-        tx_body = TxBody(messages=list(options.msgs), memo=options.memo or "")
-        coins_fee = Coins(",".join(f"0{denom}" for denom in options.fee_denoms or []))
+        fee_denoms = [self.client.fee_denom] if fee_denoms is None else fee_denoms
+        signer_opts = [self.client.signer] if signer_opts is None else signer_opts
+
+        tx_body = TxBody(messages=list(msgs), memo="")
+        coins_fee = Coins(",".join(f"0{denom}" for denom in fee_denoms))
         auth_info = AuthInfo([], Fee(0, coins_fee))
 
         tx = Tx(tx_body, auth_info, [])
         signers = cast(list[SignerData], signer_opts)
         tx.append_empty_signatures(signers)
         return tx
+
+    async def get_simulation_events(self, msgs: Sequence[Msg]) -> dict[str, list[dict]]:
+        tx = self.client.tx.get_unsigned_tx(msgs)
+        res = await self.grpc_service.simulate(tx=tx.to_proto())
+        events: dict[str, list[dict]] = defaultdict(list)
+        for e in res.result.events:
+            events[e.type].append(
+                {a.key.decode("utf-8"): a.value.decode("utf-8") for a in e.attributes}
+            )
+        return dict(events)
 
     @abstractmethod
     async def _fallback_fee_estimation(

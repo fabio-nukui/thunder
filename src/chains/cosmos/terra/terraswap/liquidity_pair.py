@@ -230,13 +230,14 @@ class RouterNativeLiquidityPair(NativeLiquidityPair):
         sender: AccAddress,
         amount_in: TerraTokenAmount,
         safety_margin: bool | int = True,
+        simulate: bool = False,
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract | MsgSwap]]:
         if not self.assert_limit_order_address:
             raise NotImplementedError(
                 "op_swap only implemented with assert_limit_order_address"
             )
         amount_out, [swap_msg] = await super().op_swap(
-            sender, amount_in, safety_margin=safety_margin
+            sender, amount_in, safety_margin, simulate
         )
         assert isinstance(amount_out.token, TerraNativeToken)
         execute_msg = {
@@ -425,10 +426,11 @@ class LiquidityPair(BaseTerraLiquidityPair):
         sender: AccAddress,
         amount_in: TerraTokenAmount,
         safety_margin: bool | int = True,
+        simulate: bool = False,
         max_slippage: Decimal = None,
     ) -> Operation:
         max_slippage = _MAX_SWAP_SLIPPAGE if max_slippage is None else max_slippage
-        amount_out = await self.get_swap_amount_out(amount_in, safety_margin)
+        amount_out = await self.get_swap_amount_out(amount_in, safety_margin, simulate=simulate)
         min_amount_out = (amount_out * (1 - max_slippage)).safe_margin(safety_margin)
         msg = self.build_swap_msg(sender, amount_in, min_amount_out)
 
@@ -438,11 +440,13 @@ class LiquidityPair(BaseTerraLiquidityPair):
         self,
         amount_in: TerraTokenAmount,
         safety_margin: bool | int = False,
+        simulate: bool = False,
+        simulate_msg: MsgExecuteContract = None,
         max_spread: Decimal = None,
         belief_price: Decimal = None,
     ) -> TerraTokenAmount:
         amounts = await self.get_swap_amounts(
-            amount_in, safety_margin, max_spread, belief_price
+            amount_in, safety_margin, simulate, simulate_msg, max_spread, belief_price
         )
         return amounts["amounts_out"][1]
 
@@ -450,12 +454,16 @@ class LiquidityPair(BaseTerraLiquidityPair):
         self,
         amount_in: TerraTokenAmount,
         safety_margin: bool | int = False,
+        simulate: bool = False,
+        simulate_msg: MsgExecuteContract = None,
         max_spread: Decimal = None,
         belief_price: Decimal = None,
     ) -> dict[str, AmountTuple]:
         """Based on
         https://github.com/terraswap/terraswap/blob/v2.4.1/contracts/terraswap_pair/src/contract.rs#L538  # noqa: E501
         """
+        if simulate:
+            raise NotImplementedError
         reserve_in, reserve_out = await self._get_in_out_reserves(amount_in=amount_in)
         if safety_margin:
             res_in = reserve_in.int_amount
@@ -593,7 +601,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
             amount_swap, amount_keep = amounts["amounts_out"]
         simulation = await self.simulate_reserve_change(amounts["pool_change"])
         amount_out, msgs_swap = await simulation.op_swap(
-            sender, amount_swap, safety_margin, max_slippage
+            sender, amount_swap, safety_margin, max_slippage=max_slippage
         )
         return amount_keep + amount_out, [msg_remove_liquidity] + msgs_swap
 

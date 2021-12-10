@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from cosmos_sdk.core import AccAddress, Coins
+from cosmos_sdk.core.msg import Msg
 from cosmos_sdk.core.wasm import MsgExecuteContract
 
 from utils.cache import CacheGroup, ttl_cache
@@ -55,12 +56,13 @@ class LunaXVault(BaseTerraLiquidityPair):
         sender: AccAddress,
         amount_in: TerraTokenAmount,
         safety_margin: bool | int = True,
+        simulate: bool = False,
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
-        amount_out = await self.get_swap_amount_out(amount_in, safety_margin)
         if amount_in.token == LUNA:
             msg = self.get_deposit_msg(sender, amount_in)
         else:
             msg = self.get_withdraw_msg(sender, amount_in)
+        amount_out = await self.get_swap_amount_out(amount_in, safety_margin, simulate, msg)
         return amount_out, [msg]
 
     async def get_exchange_rate(self) -> Decimal:
@@ -87,7 +89,11 @@ class LunaXVault(BaseTerraLiquidityPair):
         self,
         amount_in: TerraTokenAmount,
         safety_margin: bool | int = True,
+        simulate: bool = False,
+        simulate_msg: Msg = None,
     ) -> TerraTokenAmount:
+        if simulate:
+            raise NotImplementedError
         exchange_rate = await self.get_exchange_rate()
         if amount_in.token == LUNA:
             amount_out = self.lunax.to_amount(amount_in.amount / exchange_rate)

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, TypeVar
 
 from cosmos_sdk.core import AccAddress
 from cosmos_sdk.core.market import MsgSwap
+from cosmos_sdk.core.msg import Msg
 from cosmos_sdk.core.tx import Tx
 from cosmos_sdk.core.wasm import MsgExecuteContract
 
@@ -48,6 +49,7 @@ class BaseTerraLiquidityPair(ABC):
         sender: AccAddress,
         amount_in: TerraTokenAmount,
         safety_margin: bool | int = True,
+        simulate: bool = False,
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
         ...
 
@@ -56,6 +58,8 @@ class BaseTerraLiquidityPair(ABC):
         self,
         amount_in: TerraTokenAmount,
         safety_margin: bool | int = False,
+        simulate: bool = False,
+        simulate_msg: Msg = None,
     ) -> TerraTokenAmount:
         ...
 
@@ -127,27 +131,34 @@ class NativeLiquidityPair(BaseTerraLiquidityPair):
         self,
         amount_in: TerraTokenAmount,
         safety_margin: bool | int = False,
+        simulate: bool = False,
+        simulate_msg: MsgSwap = None,
     ) -> TerraTokenAmount:
         assert amount_in.token in self.tokens
         token_out = self.tokens[0] if amount_in.token == self.tokens[1] else self.tokens[1]
-        return await self.client.market.get_amount_out(
-            amount_in, token_out, safety_margin, self._pool_delta_changes
-        )
+        if not simulate:
+            return await self.client.market.get_amount_out(
+                amount_in, token_out, safety_margin, self._pool_delta_changes
+            )
+        if simulate_msg is None:
+            simulate_msg = self.get_swap_msg(self.client.address, amount_in)
+        amount_out = await self.client.market.get_simulation_amount_out(simulate_msg)
+        return amount_out.safe_margin(safety_margin)
 
     async def op_swap(
         self,
         sender: AccAddress,
         amount_in: TerraTokenAmount,
         safety_margin: bool | int = True,
+        simulate: bool = False,
     ) -> tuple[TerraTokenAmount, list[MsgSwap]]:
-        amount_out = await self.get_swap_amount_out(amount_in, safety_margin)
-        token_out = self.tokens[0] if amount_in.token == self.tokens[1] else self.tokens[1]
-        msg = MsgSwap(
-            trader=sender,
-            offer_coin=amount_in.to_coin(),
-            ask_denom=token_out.denom,
-        )
+        msg = self.get_swap_msg(sender, amount_in)
+        amount_out = await self.get_swap_amount_out(amount_in, safety_margin, simulate, msg)
         return amount_out, [msg]
+
+    def get_swap_msg(self, sender: AccAddress, amount_in: TerraTokenAmount) -> MsgSwap:
+        token_out = self.tokens[0] if amount_in.token == self.tokens[1] else self.tokens[1]
+        return MsgSwap(trader=sender, offer_coin=amount_in.to_coin(), ask_denom=token_out.denom)
 
     async def simulate_reserve_change(
         self: _NativeLiquidityPairT,

@@ -56,7 +56,7 @@ log = logging.getLogger(__name__)
 
 MIN_RESERVED_AMOUNT = UST.to_amount(30)
 MIN_N_ARBITRAGES = 20
-ANCHOR_MARKET_GAS_ADJUSMENT = Decimal("1.35")
+ANCHOR_MARKET_GAS_ADJUSTMENT = Decimal("1.35")
 FILTER_POOL_TYPES = (terraswap.LiquidityPair, terraswap.RouterNativeLiquidityPair)
 SLIPPAGE_TOLERANCE_PER_CONCAT_REPEAT = Decimal("0.001")
 
@@ -131,7 +131,7 @@ async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
     arbs: list[TerraCyclesArbitrage] = []
     for multi_routes in routes:
         gas_adjustment = (
-            ANCHOR_MARKET_GAS_ADJUSMENT if anchor_market in multi_routes.pools else None
+            ANCHOR_MARKET_GAS_ADJUSTMENT if anchor_market in multi_routes.pools else None
         )
         get_max_single_arbitrage = (
             lunax_vault.get_max_deposit if lunax_vault in multi_routes.pools else None
@@ -485,7 +485,9 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
         for route in self.routes:
             try:
                 _, msgs = await route.op_swap(
-                    self.min_start_amount, min_amount_out=self.start_token.to_amount(0)
+                    self.min_start_amount,
+                    min_amount_out=self.start_token.to_amount(0),
+                    # simulate=True,
                 )
                 fee = await self.client.tx.estimate_fee(msgs)
             except Exception as e:

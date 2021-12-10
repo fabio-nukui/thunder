@@ -122,19 +122,20 @@ class RoutePools:
         reverse: bool = False,
         safety_margin: bool | int = True,
         min_amount_out: TerraTokenAmount = None,
+        simulate: bool = False,
     ) -> Operation:
         if self.router is not None:
             min_amount_out = self._ensure_min_amount_out(amount_in, min_amount_out)
             route = self._get_route_steps(reverse)
             return await self.router.op_swap(
-                self.client.address, amount_in, route, min_amount_out, safety_margin
+                self.client.address, amount_in, route, min_amount_out, safety_margin, simulate
             )
         pools = self.pools if not reverse else reversed(self.pools)
         step_amount = amount_in
         msgs: list[MsgExecuteContract] = []
         for pool in pools:
             step_amount, step_msgs = await pool.op_swap(
-                self.client.address, step_amount, safety_margin
+                self.client.address, step_amount, safety_margin, simulate
             )
             msgs.extend(step_msgs)
         return step_amount, msgs

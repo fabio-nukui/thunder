@@ -103,14 +103,20 @@ class Router:
         route: Sequence[RouteStep],
         min_amount_out: TerraTokenAmount,
         safety_margin: bool | int = True,
+        simulate: bool = False,
     ) -> Operation:
+        if simulate:
+            raise NotImplementedError
         assert route, "route cannot be empty"
 
         swap_operations: list[dict] = []
         next_amount_in = await self.client.treasury.deduct_tax(amount_in)
         for step in route:
             pair = self._get_pair(step)
-            next_amount_in = await pair.get_swap_amount_out(next_amount_in, safety_margin)
+            next_amount_in = await pair.get_swap_amount_out(
+                next_amount_in,
+                safety_margin,
+            )
             swap_operations.append(step.to_data())
         amount_out: TerraTokenAmount = next_amount_in * ROUTER_EFFICIENCY
 
@@ -148,8 +154,11 @@ class Router:
         amount_in: TerraTokenAmount,
         route: Sequence[RouteStep],
         safety_margin: bool | int = False,
+        simulate: bool = False,
     ) -> TerraTokenAmount:
         assert route, "route cannot be empty"
+        if simulate:
+            raise NotImplementedError
 
         next_amount_in = await self.client.treasury.deduct_tax(amount_in)
         for step in route:

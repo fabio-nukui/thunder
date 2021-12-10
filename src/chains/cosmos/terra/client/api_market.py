@@ -4,6 +4,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from cosmos_proto.terra.market.v1beta1 import QueryStub
+from cosmos_sdk.core.market.msgs import MsgSwap
 
 from utils.cache import CacheGroup, ttl_cache
 
@@ -16,6 +17,7 @@ if TYPE_CHECKING:
 
 _MARKET_PARAMETERS_TTL = 3600
 _PRECISION = 18
+_DEFAULT_MIN_SAFETY_MARGIN = 100
 
 
 class MarketApi(Api["TerraClient"]):
@@ -32,6 +34,8 @@ class MarketApi(Api["TerraClient"]):
         """Get market swap amount, based on Terra implementation at
         https://github.com/terra-money/core/blob/v0.5.5/x/market/keeper/swap.go
         """
+        if safety_margin:
+            safety_margin = max(safety_margin, _DEFAULT_MIN_SAFETY_MARGIN)
         if not isinstance(offer_amount.token, TerraNativeToken):
             raise TypeError("Market trades only available to native tokens")
 
@@ -50,6 +54,15 @@ class MarketApi(Api["TerraClient"]):
 
         ask_amount = await self.compute_swap_no_spread(offer_amount, ask_denom)
         return (ask_amount * (1 - spread)).safe_margin(safety_margin)
+
+    async def get_simulation_amount_out(self, msg: MsgSwap) -> TerraTokenAmount:
+        events = await self.client.tx.get_simulation_events([msg])
+        (amount_out,) = [
+            TerraTokenAmount.from_str(e["amount"])
+            for e in events["coin_received"]
+            if e["receiver"] == self.client.address
+        ]
+        return amount_out
 
     @ttl_cache(CacheGroup.TERRA)
     async def get_virtual_pools(
