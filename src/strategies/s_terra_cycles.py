@@ -363,16 +363,23 @@ async def _get_ust_loopdex_terraswap_2cycle_routes(
 
 def _reorder_routes(routes: list[MultiRoutes]) -> list[MultiRoutes]:
     main_routes = []
-    swap_routes = []
+    loop_luna_ust_routes = []
     alte_routes = []
+    swap_routes = []
     for r in routes:
         if any(t.symbol == "SWAP" for p in r.pools for t in p.tokens):
             swap_routes.append(r)
         elif any(t.symbol == "ALTE" for p in r.pools for t in p.tokens):
             alte_routes.append(r)
+        elif r.n_steps == 2 and any(
+            p.factory_name == "loop" and p.repr_symbol == "LUNA/UST"
+            for p in r.pools
+            if isinstance(p, terraswap.LiquidityPair)
+        ):
+            loop_luna_ust_routes.append(r)
         else:
             main_routes.append(r)
-    return main_routes + alte_routes + swap_routes
+    return main_routes + loop_luna_ust_routes + alte_routes + swap_routes
 
 
 async def _pairs_from_factories(
