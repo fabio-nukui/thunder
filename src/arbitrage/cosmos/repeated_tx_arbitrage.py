@@ -28,7 +28,7 @@ from ..repeated_tx_arbitrage import (
 log = logging.getLogger(__name__)
 _CosmosClientT = TypeVar("_CosmosClientT", bound=CosmosClient)
 
-
+MAX_BLOCK_BROADCAST_DELAY = 1
 MIN_CONFIRMATIONS = 1
 MAX_BLOCKS_WAIT_RECEIPT = 4
 
@@ -66,7 +66,8 @@ class CosmosRepeatedTxArbitrage(
         height: int,
         fee_denom: str = None,
     ) -> list[ArbTx]:
-        if (latest_height := await self.client.get_latest_height()) != height:
+        latest_height = await self.client.get_latest_height()
+        if latest_height - height > MAX_BLOCK_BROADCAST_DELAY:
             raise BlockchainNewState(f"{latest_height=} different from {height=}")
         results = await self.client.tx.execute_multi_msgs(
             arb_params.msgs, arb_params.n_repeat, fee=arb_params.est_fee, fee_denom=fee_denom
