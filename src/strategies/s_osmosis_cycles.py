@@ -119,12 +119,26 @@ async def get_arbitrages(client: OsmosisClient) -> list[OsmosisCyclesArbitrage]:
     arbs: list[OsmosisCyclesArbitrage] = []
     for route_group in list_route_groups:
         for multi_routes in route_group:
-            try:
-                arbs.append(await OsmosisCyclesArbitrage.new(client, multi_routes))
-            except FeeEstimationError as e:
-                log.info(f"Error when initializing arbitrage with {multi_routes}: {e!r}")
+            arb = await _get_arb(client, multi_routes)
+            if arb is not None:
+                arbs.append(arb)
     assert len(arbs) >= MIN_N_ARBITRAGES
     return arbs
+
+
+async def _get_arb(
+    client: OsmosisClient,
+    multi_routes: MultiRoutes,
+) -> OsmosisCyclesArbitrage | None:
+    try:
+        return await OsmosisCyclesArbitrage.new(client, multi_routes)
+    except FeeEstimationError as e:
+        if client.height != (latest_height := await client.get_latest_height()):
+            utils.cache.clear_caches(CacheGroup.OSMOSIS)
+            client.height = latest_height
+            return await _get_arb(client, multi_routes)
+        log.warning(f"Error when initializing arbitrage with {multi_routes}: {e!r}")
+        return None
 
 
 async def _get_token_routes(

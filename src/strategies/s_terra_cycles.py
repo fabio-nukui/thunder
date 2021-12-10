@@ -136,16 +136,32 @@ async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
         get_max_single_arbitrage = (
             lunax_vault.get_max_deposit if lunax_vault in multi_routes.pools else None
         )
-        try:
-            arbs.append(
-                await TerraCyclesArbitrage.new(
-                    client, multi_routes, gas_adjustment, get_max_single_arbitrage
-                )
-            )
-        except FeeEstimationError as e:
-            log.info(f"Error when initializing arbitrage with {multi_routes}: {e!r}")
+        arb = await _get_arb(client, multi_routes, gas_adjustment, get_max_single_arbitrage)
+        if arb is not None:
+            arbs.append(arb)
     assert len(arbs) >= MIN_N_ARBITRAGES
     return arbs
+
+
+async def _get_arb(
+    client: TerraClient,
+    multi_routes: MultiRoutes,
+    gas_adjustment: Decimal | None,
+    get_max_single_arbitrage: Callable | None,
+) -> TerraCyclesArbitrage | None:
+    try:
+        return await TerraCyclesArbitrage.new(
+            client, multi_routes, gas_adjustment, get_max_single_arbitrage
+        )
+    except FeeEstimationError as e:
+        if client.height != (latest_height := await client.get_latest_height()):
+            utils.cache.clear_caches(CacheGroup.TERRA)
+            client.height = latest_height
+            return await _get_arb(
+                client, multi_routes, gas_adjustment, get_max_single_arbitrage
+            )
+        log.warning(f"Error when initializing arbitrage with {multi_routes}: {e!r}")
+        return None
 
 
 def get_filters(
