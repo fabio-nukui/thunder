@@ -185,7 +185,7 @@ async def _get_ust_luna_routes(
     loop_factory: terraswap.LoopFactory,
     terraswap_factory: terraswap.TerraswapFactory,
 ) -> list[MultiRoutes]:
-    loop_pair = await loop_factory.get_pair("[LUNA]-[UST]")  # noqa
+    loop_pair = await loop_factory.get_pair("[LUNA]-[UST]")
     terraswap_pair = await terraswap_factory.get_pair("[UST]-[LUNA]")
     native_pair = terraswap_factory.get_native_pair((UST, LUNA))
 
@@ -196,11 +196,11 @@ async def _get_ust_luna_routes(
             list_steps=[[terraswap_pair], [native_pair]],
             router_address=terraswap_factory.router_address,
         ),
-        # MultiRoutes(
-        #     client=client,
-        #     start_token=UST,
-        #     list_steps=[[loop_pair], [terraswap_pair, native_pair]],
-        # ),
+        MultiRoutes(
+            client=client,
+            start_token=UST,
+            list_steps=[[loop_pair], [terraswap_pair, native_pair]],
+        ),
     ]
 
 

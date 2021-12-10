@@ -11,6 +11,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, NamedTuple
 
 from cosmos_sdk.core import AccAddress, Coins
+from cosmos_sdk.core.market import MsgSwap
 from cosmos_sdk.core.tx import Tx
 from cosmos_sdk.core.wasm import MsgExecuteContract
 from cosmos_sdk.exceptions import LCDResponseError
@@ -223,6 +224,30 @@ class RouterNativeLiquidityPair(NativeLiquidityPair):
         self.factory_address = factory_address
         self.router_address = router_address
         self.assert_limit_order_address = assert_limit_order_address
+
+    async def op_swap(
+        self,
+        sender: AccAddress,
+        amount_in: TerraTokenAmount,
+        safety_margin: bool | int = True,
+    ) -> tuple[TerraTokenAmount, list[MsgExecuteContract | MsgSwap]]:
+        if not self.assert_limit_order_address:
+            raise NotImplementedError(
+                "op_swap only implemented with assert_limit_order_address"
+            )
+        amount_out, [swap_msg] = await super().op_swap(
+            sender, amount_in, safety_margin=safety_margin
+        )
+        assert isinstance(amount_out.token, TerraNativeToken)
+        execute_msg = {
+            "assert_limit_order": {
+                "ask_denom": amount_out.token.denom,
+                "offer_coin": amount_in.to_coin().to_data(),
+                "minimum_receive": str(amount_out.int_amount),
+            }
+        }
+        assert_msg = MsgExecuteContract(sender, self.assert_limit_order_address, execute_msg)
+        return amount_out, [assert_msg, swap_msg]
 
     async def get_reserve_changes_from_tx(self, tx: Tx) -> AmountTuple:
         changes = await super().get_reserve_changes_from_tx(tx)
