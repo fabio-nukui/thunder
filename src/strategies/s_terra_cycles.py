@@ -444,8 +444,10 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
             filter_keys=multi_routes.pools,
             fee_denom=self.start_token.denom,
             cls_amount=TerraTokenAmount,
+            verbose=False,
         )
         self.estimated_gas_use = await self._estimate_gas_use()
+        self.log.debug("Initialized")
         return self
 
     def __repr__(self) -> str:

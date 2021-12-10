@@ -257,6 +257,7 @@ class OsmosisCyclesArbitrage(
             filter_keys=multi_routes.pools,
             fee_denom=OSMO.denom,
             cls_amount=OsmosisTokenAmount,
+            verbose=False,
         )
 
         price = await self._get_start_token_price()
@@ -265,6 +266,7 @@ class OsmosisCyclesArbitrage(
         self.optimization_tolerance = self.start_token.to_amount(OPTIMIZATION_TOL_UST) / price
         self.estimated_gas_use = await self._estimate_gas_use()
 
+        self.log.debug("Initialized")
         return self
 
     def __repr__(self) -> str:

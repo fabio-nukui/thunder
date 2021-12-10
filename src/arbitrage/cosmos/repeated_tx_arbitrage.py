@@ -56,8 +56,8 @@ class CosmosRepeatedTxArbitrage(
         self.filter_keys = filter_keys
         self.fee_denom = fee_denom
         self.cls_amount = cls_amount
-        kwargs = kwargs.get("broadcast_kwargs", {})
-        kwargs["broadcast_kwargs"] = kwargs | {"fee_denom": fee_denom}
+        broadcast_kwargs = kwargs.get("broadcast_kwargs", {})
+        kwargs["broadcast_kwargs"] = broadcast_kwargs | {"fee_denom": fee_denom}
         super().__init__(*args, **kwargs)
 
     async def _broadcast_txs(  # type: ignore[override]
