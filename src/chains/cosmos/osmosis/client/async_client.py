@@ -85,11 +85,11 @@ class OsmosisClient(CosmosClient):
 
     @ttl_cache(CacheGroup.OSMOSIS, _CONTRACT_QUERY_CACHE_SIZE)
     async def contract_query(self, contract_addr: AccAddress, query_msg: dict) -> dict:
-        return await super().contract_query(contract_addr, query_msg)
+        raise NotImplementedError
 
     @ttl_cache(CacheGroup.OSMOSIS, _CONTRACT_QUERY_CACHE_SIZE, _CONTRACT_INFO_CACHE_TTL)
     async def contract_info(self, address: AccAddress) -> dict:
-        return await super().contract_info(address)
+        raise NotImplementedError
 
     @ttl_cache(CacheGroup.OSMOSIS)
     async def get_balance(self, denom: str, address: AccAddress = None) -> OsmosisTokenAmount:

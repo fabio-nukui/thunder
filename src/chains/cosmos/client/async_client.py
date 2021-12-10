@@ -17,13 +17,11 @@ from cosmos_sdk.client.lcd.api.tx import SignerOptions
 from cosmos_sdk.core import AccAddress, Coins
 from cosmos_sdk.core.auth.data import BaseAccount
 from cosmos_sdk.core.tx import TxLog
-from cosmos_sdk.exceptions import LCDResponseError
 from cosmos_sdk.key.mnemonic import MnemonicKey
 
 import utils
 from chains.cosmos.token import CosmosTokenAmount
 from common.blockchain_client import AsyncBlockchainClient
-from exceptions import NotContract
 
 from .. import utils_rpc
 from ..lcd import AsyncLCDClient
@@ -147,22 +145,13 @@ class CosmosClient(BroadcasterMixin, AsyncBlockchainClient, ABC):
         res = await self.grpc_service_tendermint.get_latest_block()
         return res.block.header.height
 
+    @abstractmethod
     async def contract_query(self, contract_addr: AccAddress, query_msg: dict) -> dict:
-        try:
-            return await self.lcd.wasm.contract_query(contract_addr, query_msg)
-        except LCDResponseError as e:
-            if e.response.status == 500 and (match := _PAT_MISSING_CONTRACT.search(e.message)):
-                raise NotContract(match.group(1))
-            else:
-                raise e
+        ...
 
+    @abstractmethod
     async def contract_info(self, address: AccAddress) -> dict:
-        try:
-            return await self.lcd.wasm.contract_info(address)
-        except LCDResponseError as e:
-            if e.response.status == 500:
-                raise NotContract
-            raise e
+        ...
 
     async def get_account_data(self, address: AccAddress = None) -> BaseAccount:
         address = self.address if address is None else address
