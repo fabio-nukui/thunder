@@ -231,6 +231,7 @@ class RouterNativeLiquidityPair(NativeLiquidityPair):
         amount_in: TerraTokenAmount,
         safety_margin: bool | int = True,
         simulate: bool = False,
+        min_out: TerraTokenAmount = None,
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract | MsgSwap]]:
         if not self.assert_limit_order_address:
             raise NotImplementedError(
@@ -239,12 +240,14 @@ class RouterNativeLiquidityPair(NativeLiquidityPair):
         amount_out, [swap_msg] = await super().op_swap(
             sender, amount_in, safety_margin, simulate
         )
+        if min_out is None:
+            min_out = amount_out
         assert isinstance(amount_out.token, TerraNativeToken)
         execute_msg = {
             "assert_limit_order": {
                 "ask_denom": amount_out.token.denom,
                 "offer_coin": amount_in.to_coin().to_data(),
-                "minimum_receive": str(amount_out.int_amount),
+                "minimum_receive": str(min_out.int_amount),
             }
         }
         assert_msg = MsgExecuteContract(sender, self.assert_limit_order_address, execute_msg)
