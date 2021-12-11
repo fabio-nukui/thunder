@@ -5,7 +5,7 @@ import itertools
 from typing import Iterable, Sequence, Union, cast
 
 from cosmos_sdk.core import AccAddress
-from cosmos_sdk.core.wasm import MsgExecuteContract
+from cosmos_sdk.core.msg import Msg
 
 from utils.cache import lru_cache
 
@@ -15,7 +15,7 @@ from .terraswap.liquidity_pair import LiquidityPair, RouterNativeLiquidityPair
 from .terraswap.router import Router, RouteStep, RouteStepNative, RouteStepTerraswap
 from .token import TerraToken, TerraTokenAmount
 
-Operation = tuple[TerraTokenAmount, list[MsgExecuteContract]]
+Operation = tuple[TerraTokenAmount, Sequence[Msg]]
 
 
 def _extract_tokens_from_routes(
@@ -124,19 +124,24 @@ class RoutePools:
         min_amount_out: TerraTokenAmount = None,
         simulate: bool = False,
     ) -> Operation:
+        min_amount_out = self._ensure_min_amount_out(amount_in, min_amount_out)
         if self.router is not None:
-            min_amount_out = self._ensure_min_amount_out(amount_in, min_amount_out)
             route = self._get_route_steps(reverse)
             return await self.router.op_swap(
                 self.client.address, amount_in, route, min_amount_out, safety_margin, simulate
             )
-        pools = self.pools if not reverse else reversed(self.pools)
+        pools = self.pools if not reverse else self.pools[::-1]
         step_amount = amount_in
-        msgs: list[MsgExecuteContract] = []
+        msgs: list[Msg] = []
         for pool in pools:
-            step_amount, step_msgs = await pool.op_swap(
-                self.client.address, step_amount, safety_margin, simulate
-            )
+            if isinstance(pool, RouterNativeLiquidityPair) and pool == pools[-1]:
+                step_amount, step_msgs = await pool.op_swap(
+                    self.client.address, step_amount, safety_margin, simulate, min_amount_out
+                )
+            else:
+                step_amount, step_msgs = await pool.op_swap(
+                    self.client.address, step_amount, safety_margin, simulate
+                )
             msgs.extend(step_msgs)
         return step_amount, msgs
 

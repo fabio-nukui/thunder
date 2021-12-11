@@ -8,7 +8,7 @@ import math
 from copy import copy
 from decimal import Decimal
 from enum import Enum
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, NamedTuple, Sequence
 
 from cosmos_sdk.core import AccAddress, Coins
 from cosmos_sdk.core.market import MsgSwap
@@ -232,7 +232,7 @@ class RouterNativeLiquidityPair(NativeLiquidityPair):
         safety_margin: bool | int = True,
         simulate: bool = False,
         min_out: TerraTokenAmount = None,
-    ) -> tuple[TerraTokenAmount, list[MsgExecuteContract | MsgSwap]]:
+    ) -> tuple[TerraTokenAmount, Sequence[MsgExecuteContract | MsgSwap]]:
         if not self.assert_limit_order_address:
             raise NotImplementedError(
                 "op_swap only implemented with assert_limit_order_address"
@@ -606,7 +606,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
         amount_out, msgs_swap = await simulation.op_swap(
             sender, amount_swap, safety_margin, max_slippage=max_slippage
         )
-        return amount_keep + amount_out, [msg_remove_liquidity] + msgs_swap
+        return amount_keep + amount_out, [msg_remove_liquidity, *msgs_swap]
 
     async def get_remove_liquidity_amounts_out(
         self,
@@ -710,7 +710,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
         amount_out, msgs_add_liquidity = await simulation.op_add_liquidity(
             sender, amounts_add, slippage_tolerance, safety_margin
         )
-        return amount_out, [msg_swap] + msgs_add_liquidity
+        return amount_out, [msg_swap, *msgs_add_liquidity]
 
     async def op_add_liquidity(
         self,

@@ -4,13 +4,12 @@ from abc import ABC, abstractmethod
 from copy import copy
 from decimal import Decimal
 from functools import reduce
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Sequence, TypeVar
 
 from cosmos_sdk.core import AccAddress
 from cosmos_sdk.core.market import MsgSwap
 from cosmos_sdk.core.msg import Msg
 from cosmos_sdk.core.tx import Tx
-from cosmos_sdk.core.wasm import MsgExecuteContract
 
 from exceptions import MaxSpreadAssertion
 
@@ -50,7 +49,7 @@ class BaseTerraLiquidityPair(ABC):
         amount_in: TerraTokenAmount,
         safety_margin: bool | int = True,
         simulate: bool = False,
-    ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
+    ) -> tuple[TerraTokenAmount, Sequence[Msg]]:
         ...
 
     @abstractmethod
@@ -151,7 +150,7 @@ class NativeLiquidityPair(BaseTerraLiquidityPair):
         amount_in: TerraTokenAmount,
         safety_margin: bool | int = True,
         simulate: bool = False,
-    ) -> tuple[TerraTokenAmount, list[MsgSwap]]:
+    ) -> tuple[TerraTokenAmount, Sequence[MsgSwap]]:
         msg = self.get_swap_msg(sender, amount_in)
         amount_out = await self.get_swap_amount_out(amount_in, safety_margin, simulate, msg)
         return amount_out, [msg]

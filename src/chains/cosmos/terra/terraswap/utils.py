@@ -1,8 +1,10 @@
-from cosmos_sdk.core.wasm import MsgExecuteContract
+from typing import Sequence
+
+from cosmos_sdk.core.msg import Msg
 
 from ..token import TerraNativeToken, TerraToken, TerraTokenAmount
 
-Operation = tuple[TerraTokenAmount, list[MsgExecuteContract]]
+Operation = tuple[TerraTokenAmount, Sequence[Msg]]
 
 
 def token_to_data(token: TerraToken) -> dict[str, dict[str, str]]:

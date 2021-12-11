@@ -15,8 +15,8 @@ from typing import Any, Awaitable, Callable, Iterable, Sequence
 from cosmos_sdk.core.auth import TxInfo
 from cosmos_sdk.core.coins import Coins
 from cosmos_sdk.core.fee import Fee
+from cosmos_sdk.core.msg import Msg
 from cosmos_sdk.core.tx import AuthInfo, Tx, TxBody
-from cosmos_sdk.core.wasm import MsgExecuteContract
 
 import utils
 from arbitrage.cosmos import (
@@ -88,7 +88,7 @@ class ArbParams(CosmosArbParams):
     reverse: bool
 
     initial_amount: TerraTokenAmount
-    msgs: list[MsgExecuteContract]
+    msgs: list[Msg]
     n_repeat: int
     est_final_amount: TerraTokenAmount
     est_fee: Fee
@@ -228,7 +228,7 @@ async def _get_psi_routes(
 ) -> list[MultiRoutes]:
     nexus_anchor_vaults = await nexus_factory.get_anchor_vaults()
 
-    steps: Sequence[Sequence[BaseTerraLiquidityPair]]
+    steps: Sequence[Sequence[BaseTerraLiquidityPair]] = []
     routes: list[MultiRoutes] = []
     for vault in nexus_anchor_vaults:
         if vault.b_token.symbol == "BETH":
@@ -564,7 +564,7 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
             else:
                 sim_mempool: dict[Any, list[Tx]] | None
                 msgs = []
-                step_msgs: list[MsgExecuteContract] = []
+                step_msgs: Sequence[Msg] = []
                 async with AsyncExitStack() as stack:
                     for n in range(n_repeat):
                         if step_msgs:

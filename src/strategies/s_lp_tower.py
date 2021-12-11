@@ -10,8 +10,8 @@ from typing import Any, NamedTuple
 
 from cosmos_sdk.core.auth import TxInfo
 from cosmos_sdk.core.fee import Fee
+from cosmos_sdk.core.msg import Msg
 from cosmos_sdk.core.tx import Tx
-from cosmos_sdk.core.wasm import MsgExecuteContract
 
 import utils
 from arbitrage.cosmos import (
@@ -77,7 +77,7 @@ class ArbParams(CosmosArbParams):
     direction: Direction
 
     initial_amount: TerraTokenAmount
-    msgs: list[MsgExecuteContract]
+    msgs: list[Msg]
     n_repeat: int
     est_final_amount: TerraTokenAmount
     est_fee: Fee
@@ -291,7 +291,7 @@ class LPTowerArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[Terra
         initial_lp_amount: TerraTokenAmount,
         direction: Direction,
         safety_margin: bool,
-    ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
+    ) -> tuple[TerraTokenAmount, list[Msg]]:
         if direction == Direction.remove_liquidity_first:
             luna_amount, msgs_remove_liquidity = await self.pools.pool_0.op_remove_single_side(
                 self.client.address, initial_lp_amount, LUNA, safety_margin
@@ -302,7 +302,7 @@ class LPTowerArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[Terra
             final_lp_amount, msgs_tower_swap = await self.pools.pool_tower.op_swap(
                 self.client.address, lp_amount, safety_margin
             )
-            msgs = msgs_remove_liquidity + msgs_add_liquidity + msgs_tower_swap
+            msgs = [*msgs_remove_liquidity, *msgs_add_liquidity, *msgs_tower_swap]
         else:
             lp_amount, msgs_tower_swap = await self.pools.pool_tower.op_swap(
                 self.client.address, initial_lp_amount, safety_margin
@@ -313,7 +313,7 @@ class LPTowerArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[Terra
             final_lp_amount, msgs_add_liquidity = await self.pools.pool_0.op_add_single_side(
                 self.client.address, luna_amount, safety_margin
             )
-            msgs = msgs_tower_swap + msgs_remove_liquidity + msgs_add_liquidity
+            msgs = [*msgs_tower_swap, *msgs_remove_liquidity, *msgs_add_liquidity]
         return final_lp_amount, msgs
 
     async def _extract_returns_from_info(
