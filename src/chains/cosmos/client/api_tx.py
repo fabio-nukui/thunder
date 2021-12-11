@@ -75,13 +75,16 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
                     raise FeeEstimationError(
                         "Could not use fallback fee estimation without estimated_gas_use", e
                     )
-                return await self._fallback_fee_estimation(
-                    estimated_gas_use,
-                    gas_adjustment,
-                    fee_denom,
-                    msgs,
-                    **kwargs,
-                )
+                try:
+                    return await self._fallback_fee_estimation(
+                        estimated_gas_use,
+                        gas_adjustment,
+                        fee_denom,
+                        msgs,
+                        **kwargs,
+                    )
+                except Exception as e:
+                    raise FeeEstimationError("Error on fallback fee estimation", e)
             else:
                 self.client.signer = signer
                 return fee

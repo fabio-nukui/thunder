@@ -146,6 +146,7 @@ async def run_strategy(
 ):
     log.info(f"Running strategy with {len(arb_routes)=} and {len(mempool_filters)=}")
     start_height = client.height
+    n_blocks = 0
     async for height, mempool in client.mempool.iter_height_mempool(
         mempool_filters, verbose_decode_warnings
     ):
