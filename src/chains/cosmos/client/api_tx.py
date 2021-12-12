@@ -193,7 +193,7 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
                     tx_bytes=bytes(tx.to_proto()), mode=BroadcastMode.BROADCAST_MODE_SYNC
                 )
                 if res.tx_response.code:
-                    raise BroadcastError(res.tx_response.raw_log)
+                    raise BroadcastError(res.tx_response)
             except (BroadcastError, LCDResponseError) as e:
                 if i == _MAX_BROADCAST_TRIES:
                     raise Exception(f"Broadcast failed after {i} tries", e)
@@ -210,10 +210,10 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
                 asyncio.create_task(self._broadcast_async(tx))
                 log.debug(f"Tx executed: {res.tx_response.txhash}")
                 return SyncTxBroadcastResult(
-                    res.tx_response.txhash,
-                    res.tx_response.raw_log,
-                    res.tx_response.code,
-                    res.tx_response.codespace,
+                    txhash=res.tx_response.txhash,
+                    raw_log=res.tx_response.raw_log,
+                    code=res.tx_response.code,
+                    codespace=res.tx_response.codespace,
                 )
         raise Exception("Should never reach")
 
