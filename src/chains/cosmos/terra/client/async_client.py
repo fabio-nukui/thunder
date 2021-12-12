@@ -92,16 +92,17 @@ class TerraClient(CosmosClient):
             if not self.gas_prices:
                 self.gas_prices = self.lcd.gas_prices = await self.tx.get_gas_prices()
 
-            self.grpc_bank = cosmos_bank_pb.QueryStub(self.grpc_channel)
-            self.grpc_wasm = terra_wasm_pb.QueryStub(self.grpc_channel)
-
-            self.market.start()
-            self.oracle.start()
-
             await self.update_active_broadcaster()
         except Exception as e:
             log.warning(f"{self}: Error in initialization: {e!r}")
             self.started = False
+
+        self.grpc_bank = cosmos_bank_pb.QueryStub(self.grpc_channel)
+        self.grpc_wasm = terra_wasm_pb.QueryStub(self.grpc_channel)
+
+        self.market.start()
+        self.oracle.start()
+        self.treasury.start()
 
     async def close(self):
         await self.fcd_client.aclose()

@@ -2,6 +2,8 @@ from decimal import Decimal
 from enum import Enum
 from typing import TYPE_CHECKING
 
+from cosmos_proto.terra.treasury.v1beta1 import QueryStub
+
 from utils.cache import CacheGroup, ttl_cache
 
 from ...client.base_api import Api
@@ -12,6 +14,7 @@ if TYPE_CHECKING:
     from .async_client import TerraClient  # noqa: F401
 
 _TERRA_TAX_CACHE_TTL = 3600
+_PROTO_RECISION = 10 ** 18
 
 
 class TaxPayer(str, Enum):
@@ -20,17 +23,21 @@ class TaxPayer(str, Enum):
 
 
 class TreasuryApi(Api["TerraClient"]):
+    def start(self):
+        self.grpc_query = QueryStub(self.client.grpc_channel)
+
     @ttl_cache(CacheGroup.TERRA, ttl=_TERRA_TAX_CACHE_TTL)
     async def get_tax_rate(self) -> Decimal:
-        return Decimal(str(await self.client.lcd.treasury.tax_rate()))
+        res = await self.grpc_query.tax_rate()
+        return Decimal(res.tax_rate) / _PROTO_RECISION
 
     @ttl_cache(CacheGroup.TERRA, ttl=_TERRA_TAX_CACHE_TTL)
     async def get_tax_caps(self) -> dict[TerraNativeToken, TerraTokenAmount]:
-        res = await self.client.lcd_http_client.get("/terra/treasury/v1beta1/tax_caps")
-        caps = {}
-        for cap in res.json()["tax_caps"]:
-            token = TerraNativeToken(cap["denom"])
-            caps[token] = token.to_amount(int_amount=cap["tax_cap"])
+        res = await self.grpc_query.tax_caps()
+        caps: dict[TerraNativeToken, TerraTokenAmount] = {}
+        for cap in res.tax_caps:
+            token = TerraNativeToken(cap.denom)
+            caps[token] = token.to_amount(int_amount=cap.tax_cap)
         return caps
 
     async def calculate_tax(
