@@ -193,7 +193,7 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
                     tx_bytes=bytes(tx.to_proto()), mode=BroadcastMode.BROADCAST_MODE_SYNC
                 )
                 if res.tx_response.code:
-                    raise BroadcastError(res)
+                    raise BroadcastError(res.tx_response.raw_log)
             except (BroadcastError, LCDResponseError) as e:
                 if i == _MAX_BROADCAST_TRIES:
                     raise Exception(f"Broadcast failed after {i} tries", e)
