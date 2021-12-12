@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import logging
 import re
 import time
@@ -11,7 +12,7 @@ from decimal import Decimal
 from typing import Generic, Sequence, cast
 
 import grpclib
-from cosmos_proto.cosmos.tx.v1beta1 import ServiceStub
+from cosmos_proto.cosmos.tx.v1beta1 import BroadcastMode, ServiceStub
 from cosmos_sdk.client.lcd.api.tx import CreateTxOptions, SignerOptions
 from cosmos_sdk.core import Coins
 from cosmos_sdk.core.broadcast import SyncTxBroadcastResult
@@ -188,8 +189,10 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
             )
             tx = await self.client.wallet.create_and_sign_tx([signer], create_tx_options)
             try:
-                res = await self.client.lcd.tx.broadcast_sync(tx)
-                if res.is_tx_error():
+                res = await self.grpc_service.broadcast_tx(
+                    tx_bytes=bytes(tx.to_proto()), mode=BroadcastMode.BROADCAST_MODE_SYNC
+                )
+                if res.tx_response.code:
                     raise BroadcastError(res)
             except (BroadcastError, LCDResponseError) as e:
                 if i == _MAX_BROADCAST_TRIES:
@@ -205,12 +208,20 @@ class TxApi(Generic[CosmosClientT], Api[CosmosClientT], ABC):
                 last_sequence = max(signer.sequence or 0, self.client.signer.sequence or 0)
                 self.client.signer.sequence = last_sequence + 1
                 asyncio.create_task(self._broadcast_async(tx))
-                log.debug(f"Tx executed: {res.txhash}")
-                return res
+                log.debug(f"Tx executed: {res.tx_response.txhash}")
+                return SyncTxBroadcastResult(
+                    res.tx_response.txhash,
+                    res.tx_response.raw_log,
+                    res.tx_response.code,
+                    res.tx_response.codespace,
+                )
         raise Exception("Should never reach")
 
     async def _broadcast_async(self, tx: Tx):
-        data = {"tx_bytes": self.client.lcd.tx.encode(tx), "mode": "BROADCAST_MODE_ASYNC"}
+        data = {
+            "tx_bytes": base64.b64encode(bytes(tx.to_proto())).decode("ascii"),
+            "mode": "BROADCAST_MODE_ASYNC",
+        }
         tasks = (
             client.post("cosmos/tx/v1beta1/txs", json=data, n_tries=2)
             for client in self.client.broadcast_lcd_clients

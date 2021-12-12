@@ -96,7 +96,7 @@ class TxApi(CosmosTxApi["TerraClient"]):
         tax = await self.client.treasury.calculate_tax(native_amount)
         try:
             gas_price = next(
-                coin for coin in self.client.lcd.gas_prices.to_list() if coin.denom == fee_denom
+                coin for coin in self.client.gas_prices.to_list() if coin.denom == fee_denom
             )
         except StopIteration:
             raise TypeError(f"Invalid {fee_denom=}")
