@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Sequence
 
 from cosmos_proto.terra.tx.v1beta1 import ServiceStub
 from cosmos_sdk.core import Coins
+from cosmos_sdk.core.coin import Coin
 from cosmos_sdk.core.fee import Fee
 from cosmos_sdk.core.msg import Msg
 from cosmos_sdk.core.tx import Tx
@@ -16,6 +17,7 @@ from exceptions import FeeEstimationError
 from utils.cache import CacheGroup, ttl_cache
 
 from ...client.api_tx import TxApi as CosmosTxApi
+from ..denoms import LUNA
 from ..token import TerraNativeToken, TerraTokenAmount
 
 if TYPE_CHECKING:
@@ -71,12 +73,17 @@ class TxApi(CosmosTxApi["TerraClient"]):
     ) -> Fee:
         if native_amount is None:
             try:
-                coins_send: Coins = msgs[0].coins
+                coins_send: list[Coin] = [
+                    c for c in msgs[0].coins.to_list() if c.denom != LUNA.denom
+                ]
             except AttributeError:
                 raise FeeEstimationError("Could not get native_amount from msg")
-            if not len(coins_send) == 1:
+            if not coins_send:
+                native_amount = LUNA.to_amount(0)
+            elif not len(coins_send) == 1:
+                native_amount = TerraTokenAmount.from_coin(coins_send[0])
+            else:
                 raise NotImplementedError
-            native_amount = TerraTokenAmount.from_coin(coins_send.to_list()[0])
 
         assert isinstance(native_amount.token, TerraNativeToken)
 
