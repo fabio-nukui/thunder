@@ -4,7 +4,6 @@ import asyncio
 import base64
 import json
 import logging
-import re
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from decimal import Decimal
@@ -32,8 +31,6 @@ from .api_tx import TxApi
 from .broadcaster_mixin import BroadcasterMixin
 
 log = logging.getLogger(__name__)
-
-_PAT_MISSING_CONTRACT = re.compile(r"contract (\w+): not found")
 
 
 class CosmosClient(BroadcasterMixin, AsyncBlockchainClient, ABC):
@@ -220,6 +217,6 @@ class CosmosClient(BroadcasterMixin, AsyncBlockchainClient, ABC):
                     contract_logs: dict[str, str] = {}
                     event_logs[log_["value"]].append(contract_logs)
                 else:
-                    contract_logs[log_["key"]] = log_["value"]
+                    contract_logs[log_["key"]] = log_["value"]  # type: ignore
             logs.append(dict(event_logs))
         return logs

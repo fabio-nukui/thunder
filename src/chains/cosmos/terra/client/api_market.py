@@ -11,12 +11,12 @@ from utils.cache import CacheGroup, ttl_cache
 from ...client.base_api import Api
 from ..denoms import LUNA, SDT
 from ..token import TerraNativeToken, TerraTokenAmount
+from .utils import parse_proto_decimal
 
 if TYPE_CHECKING:
     from .async_client import TerraClient  # noqa: F401
 
 _MARKET_PARAMETERS_TTL = 3600
-_PRECISION = 18
 _DEFAULT_MIN_SAFETY_MARGIN = 100
 
 
@@ -49,7 +49,7 @@ class MarketApi(Api["TerraClient"]):
 
             spread = max(vp_spread, await self.get_market_parameter("min_stability_spread"))
         else:
-            tobin_taxes = await self.get_tobin_taxes()
+            tobin_taxes = await self.client.oracle.get_tobin_taxes()
             spread = max(tobin_taxes[offer_amount.token], tobin_taxes[ask_denom])
 
         ask_amount = await self.compute_swap_no_spread(offer_amount, ask_denom)
@@ -74,7 +74,7 @@ class MarketApi(Api["TerraClient"]):
         """
         base_bool = SDT.decimalize(await self.get_market_parameter("base_pool"))
         res = await self.grpc_query.terra_pool_delta()
-        pool_delta = int(res.terra_pool_delta.decode("ascii")) / 10 ** _PRECISION
+        pool_delta = parse_proto_decimal(res.terra_pool_delta)
         terra_pool_delta = SDT.decimalize(pool_delta) + terra_pool_delta_change
 
         pool_terra = base_bool + terra_pool_delta
@@ -82,21 +82,17 @@ class MarketApi(Api["TerraClient"]):
 
         return pool_terra, pool_luna
 
-    @ttl_cache(CacheGroup.TERRA, ttl=_MARKET_PARAMETERS_TTL)
-    async def get_tobin_taxes(self) -> dict[TerraNativeToken, Decimal]:
-        response = await self.client.lcd.oracle.parameters()
-        return {
-            TerraNativeToken(item["name"]): Decimal(str(item["tobin_tax"]))
-            for item in response["whitelist"]
-        }
-
     async def get_market_parameter(self, param_name: str) -> Decimal:
         return (await self.get_market_parameters())[param_name]
 
     @ttl_cache(CacheGroup.TERRA, ttl=_MARKET_PARAMETERS_TTL)
     async def get_market_parameters(self) -> dict[str, Decimal]:
-        params = await self.client.lcd.market.parameters()
-        return {k: Decimal(str(v)) for k, v in params.items()}
+        res = await self.grpc_query.params()
+        return {
+            "base_pool": parse_proto_decimal(res.params.base_pool),
+            "min_stability_spread": parse_proto_decimal(res.params.min_stability_spread),
+            "pool_recovery_period": Decimal(res.params.pool_recovery_period),
+        }
 
     async def compute_swap_no_spread(
         self,

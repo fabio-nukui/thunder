@@ -10,11 +10,13 @@ from utils.cache import CacheGroup, ttl_cache
 from ...client.base_api import Api
 from ..denoms import LUNA
 from ..token import TerraNativeToken
+from .utils import parse_proto_decimal
 
 if TYPE_CHECKING:
     from .async_client import TerraClient  # noqa: F401
 
 _PRECISION = 18
+_PARAMETERS_TTL = 3600
 
 
 class OracleApi(Api["TerraClient"]):
@@ -42,3 +44,11 @@ class OracleApi(Api["TerraClient"]):
             to_coin = TerraNativeToken(to_coin)
         exchange_rates = await self.get_exchange_rates()
         return round(exchange_rates[to_coin] / exchange_rates[from_coin], _PRECISION)
+
+    @ttl_cache(CacheGroup.TERRA, ttl=_PARAMETERS_TTL)
+    async def get_tobin_taxes(self) -> dict[TerraNativeToken, Decimal]:
+        res = await self.grpc_query.params()
+        return {
+            TerraNativeToken(item.name): parse_proto_decimal(item.tobin_tax)
+            for item in res.params.whitelist
+        }
