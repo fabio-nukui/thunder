@@ -322,7 +322,8 @@ async def _get_ust_dex_3cycle_routes(
 ) -> list[MultiRoutes]:
     non_ust_pairs: dict[tuple[TerraToken, TerraToken], list[terraswap.LiquidityPair]]
     non_ust_pairs = defaultdict(list)
-    for pair in await _pairs_from_factories(factories, excluded_symbols=["UST", "aUST"]):
+    excluded_symbols = ["UST", "aUST", "LunaX"]
+    for pair in await _pairs_from_factories(factories, excluded_symbols=excluded_symbols):
         if isinstance(pair, terraswap.LiquidityPair):
             non_ust_pairs[pair.sorted_tokens].append(pair)
 
