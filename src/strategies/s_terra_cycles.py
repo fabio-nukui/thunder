@@ -303,8 +303,17 @@ async def _get_stader_routes(
     lunax_vault: stader.LunaXVault,
     factories: Sequence[terraswap.Factory],
 ) -> list[MultiRoutes]:
-    lunax_pairs = await _pairs_from_factories(factories, "LUNA", "LunaX")
-    return [MultiRoutes(client, LUNA, [[lunax_vault], lunax_pairs], single_direction=True)]
+    lunax_luna_pairs, lunax_bluna_pairs, bluna_luna_pairs = await asyncio.gather(
+        _pairs_from_factories(factories, "LUNA", "LunaX"),
+        _pairs_from_factories(factories, "BLUNA", "LunaX"),
+        _pairs_from_factories(factories, "LUNA", "BLUNA"),
+    )
+    lunax_luna_steps: Sequence[Any] = [[lunax_vault], lunax_luna_pairs]
+    lunax_bluna_steps: Sequence[Any] = [[lunax_vault], lunax_bluna_pairs, bluna_luna_pairs]
+    return [
+        MultiRoutes(client, LUNA, lunax_luna_steps, single_direction=True),
+        MultiRoutes(client, LUNA, lunax_bluna_steps, single_direction=True),
+    ]
 
 
 async def _get_ust_dex_3cycle_routes(
