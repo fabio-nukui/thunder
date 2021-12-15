@@ -124,7 +124,7 @@ async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
         _get_psi_routes(client, nexus_factory, [terraswap_factory, loop_factory]),
         _get_aust_routes(client, anchor_market, [terraswap_factory, loop_factory]),
         _get_stader_routes(client, lunax_vault, [terraswap_factory, loop_factory]),
-        _get_ust_loopdex_terraswap_2cycle_routes(client, loop_factory, terraswap_factory),
+        _get_loopdex_terraswap_2cycle_routes(client, loop_factory, terraswap_factory),
         _get_ust_dex_3cycle_routes(client, [terraswap_factory, loop_factory]),
     )
     routes = _reorder_routes([r for route_group in list_route_groups for r in route_group])
@@ -340,34 +340,42 @@ async def _get_ust_dex_3cycle_routes(
     return routes
 
 
-async def _get_ust_loopdex_terraswap_2cycle_routes(
+async def _get_loopdex_terraswap_2cycle_routes(
     client: TerraClient,
     loop_factory: terraswap.LoopFactory,
     terraswap_factory: terraswap.TerraswapFactory,
 ) -> list[MultiRoutes]:
-    pat_token_symbol = re.compile(r"\[([\w\-]+)\]-\[UST\]|\[UST\]-\[([\w\-]+)\]")
-
     routes: list[MultiRoutes] = []
-    for pair_symbol in loop_factory.pairs_addresses:
-        if not (match := pat_token_symbol.match(pair_symbol)) or "LUNA" in match.groups():
-            continue
-        reversed_symbol = (
-            f"[{match.group(2)}]-[UST]" if match.group(2) else f"[UST]-[{match.group(1)}]"
+    for start_token in [UST, LUNA]:
+        pat_token_symbol = re.compile(
+            fr"\[([\w\-]+)\]-\[{str(start_token)}\]|\[{str(start_token)}\]-\[([\w\-]+)\]"
         )
-        if pair_symbol in terraswap_factory.pairs_addresses:
-            terraswap_pair_symbol = pair_symbol
-        elif reversed_symbol in terraswap_factory.pairs_addresses:
-            terraswap_pair_symbol = reversed_symbol
-        else:
-            continue
-        try:
-            terraswap_pair, loop_pair = await asyncio.gather(
-                terraswap_factory.get_pair(terraswap_pair_symbol),
-                loop_factory.get_pair(pair_symbol),
+        for pair_symbol in loop_factory.pairs_addresses:
+            if (
+                not (match := pat_token_symbol.match(pair_symbol))
+                or (start_token == UST and "LUNA" in match.groups())
+                or (start_token == LUNA and "UST" in match.groups())
+            ):
+                continue
+            reversed_symbol = (
+                f"[{match.group(2)}]-[{str(start_token)}]"
+                if match.group(2)
+                else f"[{str(start_token)}]-[{match.group(1)}]"
             )
-        except InsufficientLiquidity:
-            continue
-        routes.append(MultiRoutes(client, UST, [[terraswap_pair], [loop_pair]]))
+            if pair_symbol in terraswap_factory.pairs_addresses:
+                terraswap_pair_symbol = pair_symbol
+            elif reversed_symbol in terraswap_factory.pairs_addresses:
+                terraswap_pair_symbol = reversed_symbol
+            else:
+                continue
+            try:
+                terraswap_pair, loop_pair = await asyncio.gather(
+                    terraswap_factory.get_pair(terraswap_pair_symbol),
+                    loop_factory.get_pair(pair_symbol),
+                )
+            except InsufficientLiquidity:
+                continue
+            routes.append(MultiRoutes(client, start_token, [[terraswap_pair], [loop_pair]]))
     return routes
 
 
