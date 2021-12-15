@@ -105,7 +105,7 @@ class TokenAmount:
         if margin is False:
             return self
         margin = ROUNDING_SAFETY_MARGIN if margin is True else margin
-        return self.token.to_amount(int_amount=self.int_amount - margin)
+        return self.token.to_amount(int_amount=max(1, self.int_amount - margin))
 
     def is_empty(self) -> bool:
         return self.amount.is_nan()
@@ -176,4 +176,4 @@ class TokenAmount:
         return self.__class__(self.token, +self.amount)
 
     def __bool__(self) -> bool:
-        return bool(self.amount)
+        return bool(self.int_amount)
