@@ -502,9 +502,6 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
             f"({self.multi_routes.repr_symbols}, n_routes={self.multi_routes.n_routes})"
         )
 
-    def _reset_mempool_params(self):
-        super()._reset_mempool_params()
-
     async def _get_max_single_arbitrage(self) -> TerraTokenAmount:
         if self.func_max_single_arbitrage is None:
             return self.max_single_arbitrage
@@ -514,15 +511,22 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
         list_gas: list[int] = []
         for route in self.routes:
             try:
-                _, msgs = await route.op_swap(
+                amount_out, msgs = await route.op_swap(
                     self.min_start_amount,
                     min_amount_out=self.start_token.to_amount(0),
                     # simulate=True,
                 )
+                if not amount_out:
+                    self.multi_routes.routes.remove(route)
+                    if not self.multi_routes.routes:
+                        raise Exception("No route with sufficient liquidity")
+                    self.log.debug(f"{route=} has too low liquidity")
+                    continue
                 fee = await self.client.tx.estimate_fee(msgs)
             except Exception as e:
                 raise FeeEstimationError(e)
             list_gas.append(fee.gas_limit)
+        self.routes = self.multi_routes.routes  # For cases where a route is removed
         return max(list_gas)
 
     async def _get_arbitrage_params(

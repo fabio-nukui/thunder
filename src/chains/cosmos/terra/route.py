@@ -58,7 +58,6 @@ class MultiRoutes:
             RoutePools(client, self.tokens, pools, single_direction, router_address)
             for pools in itertools.product(*list_steps)
         ]
-        self.n_routes = len(self.routes)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.repr_symbols}, n_routes={self.n_routes})"
@@ -66,6 +65,10 @@ class MultiRoutes:
     @property
     def repr_symbols(self) -> str:
         return _repr_route_symbols(self.tokens)
+
+    @property
+    def n_routes(self) -> int:
+        return len(self.routes)
 
 
 class RoutePools:
