@@ -125,7 +125,7 @@ async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
         _get_aust_routes(client, anchor_market, [terraswap_factory, loop_factory]),
         _get_stader_routes(client, lunax_vault, [terraswap_factory, loop_factory]),
         _get_loopdex_terraswap_2cycle_routes(client, loop_factory, terraswap_factory),
-        _get_ust_dex_3cycle_routes(client, [terraswap_factory, loop_factory]),
+        _get_3cycle_routes(client, [terraswap_factory, loop_factory]),
     )
     routes = _reorder_routes([r for route_group in list_route_groups for r in route_group])
     arbs: list[TerraCyclesArbitrage] = []
@@ -316,27 +316,32 @@ async def _get_stader_routes(
     ]
 
 
-async def _get_ust_dex_3cycle_routes(
+async def _get_3cycle_routes(
     client: TerraClient,
     factories: list[terraswap.Factory],
 ) -> list[MultiRoutes]:
     non_ust_pairs: dict[tuple[TerraToken, TerraToken], list[terraswap.LiquidityPair]]
     non_ust_pairs = defaultdict(list)
-    excluded_symbols = ["UST", "aUST", "LunaX"]
-    for pair in await _pairs_from_factories(factories, excluded_symbols=excluded_symbols):
-        if isinstance(pair, terraswap.LiquidityPair):
-            non_ust_pairs[pair.sorted_tokens].append(pair)
-
     routes: list[MultiRoutes] = []
-    for tokens, pairs in non_ust_pairs.items():
-        try:
-            ust_first_pairs, ust_second_pairs = await asyncio.gather(
-                _pairs_from_factories(factories, "UST", tokens[0].symbol),
-                _pairs_from_factories(factories, tokens[1].symbol, "UST"),
+    for start_token, excluded_symbols in [
+        (UST, ["UST", "aUST", "LunaX"]),
+        (LUNA, ["UST", "LUNA"]),
+    ]:
+        for pair in await _pairs_from_factories(factories, excluded_symbols=excluded_symbols):
+            if isinstance(pair, terraswap.LiquidityPair):
+                non_ust_pairs[pair.sorted_tokens].append(pair)
+
+        for tokens, pairs in non_ust_pairs.items():
+            try:
+                ust_first_pairs, ust_second_pairs = await asyncio.gather(
+                    _pairs_from_factories(factories, str(start_token), tokens[0].symbol),
+                    _pairs_from_factories(factories, tokens[1].symbol, str(start_token)),
+                )
+            except NoPairFound:
+                continue
+            routes.append(
+                MultiRoutes(client, start_token, [ust_first_pairs, pairs, ust_second_pairs])
             )
-        except NoPairFound:
-            continue
-        routes.append(MultiRoutes(client, UST, [ust_first_pairs, pairs, ust_second_pairs]))
     return routes
 
 
