@@ -3,6 +3,8 @@
   "pairs": {
     "[ALTE]-[UST]": "terra1whns5nyc8sw328uw3qqnyafxd5yfqsytkdkgqz",
     "[ANC]-[UST]": "terra1f6d3pggq7h2y7jrgwxp3xh08yhvj8znalql87h",
+    "[BLUNA]-[LUNA]": "terra1v93ll6kqp33unukuwls3pslquehnazudu653au",
+    "[BLUNA]-[UST]": "terra18r6rdnkgrg74zew3d8l9nhk0m4xanpeukw3e20",
     "[DPH]-[UST]": "terra178yhudw6cwtnrn4fq593z87y385m0xe9n6x423",
     "[LOOPR]-[UST]": "terra1dw5j23l6nwge69z0enemutfmyc93c36aqnzjj5",
     "[LOOP]-[ANC]": "terra1w7hny2catfwsv6dq8gfm4zgazx3hmpl3xwzxya",
@@ -21,6 +23,7 @@
     "[SPEC]-[UST]": "terra1jkr0ef9fpghdru38ht70ds6jfldprgttw6xlek",
     "[STT]-[UST]": "terra1lgazu0ltsxm3ayellqa2mhnhlvgx3hevkqeqy2",
     "[TWD]-[UST]": "terra1jfp5ew4tsru98wthajsqegtzaxt49ty4z2qws0",
+    "[UST]-[SWAP]": "terra1g5cj9fjch03ell8ea7esve54fms49dwpk5343h",
     "[whORION]-[UST]": "terra18z7sjrnxydznm0zzpflkhxc7xrkejfesa46y9v",
     "[whWBTC]-[LUNA]": "terra1fgc8tmys2kxzyl39k3gtgw9dlxxuhlqux7k38e",
     "[whWBTC]-[UST]": "terra17e0aslpj3rrt62gwh7utj3fayas4h8dl3y8ju3",
