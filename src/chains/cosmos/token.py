@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from abc import ABC, abstractmethod
 from decimal import Decimal
+from functools import lru_cache
 from typing import TYPE_CHECKING, Generic, Optional, TypeVar, Union
 
 from cosmos_sdk.core import AccAddress, Coin, Dec
@@ -19,9 +20,18 @@ _CW20TokenT = TypeVar("_CW20TokenT", bound="CW20Token")
 _CosmosTokenAmountT = TypeVar("_CosmosTokenAmountT", bound="CosmosTokenAmount")
 
 
+@lru_cache()
 def get_cw20_whitelist(chain_id: str) -> dict[str, AccAddress]:
     with open(_CW20_WHITELIST_FILE.format(chain_id=chain_id)) as f:
         return json.load(f)
+
+
+def check_cw20_whitelist(token: CosmosToken, whitelist: dict[str, AccAddress]) -> bool:
+    if isinstance(token, CosmosNativeToken):
+        return True
+    if pair_tokens := getattr(token, "pair_tokens", None):  # For LPToken
+        return all(check_cw20_whitelist(t, whitelist) for t in pair_tokens)
+    return whitelist.get(token.symbol) == token.contract_addr
 
 
 class CosmosTokenAmount(TokenAmount, ABC):

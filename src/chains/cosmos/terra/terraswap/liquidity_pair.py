@@ -8,7 +8,7 @@ import math
 from copy import copy
 from decimal import Decimal
 from enum import Enum
-from typing import TYPE_CHECKING, NamedTuple, Sequence
+from typing import TYPE_CHECKING, NamedTuple, Sequence, TypeVar
 
 from cosmos_sdk.core import AccAddress, Coins
 from cosmos_sdk.core.market import MsgSwap
@@ -38,6 +38,7 @@ _ROUTER_DECODE_MSG_CACHE_TTL = 30
 _RESERVES_CACHE_SIZE = 1000
 
 AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
+_LiquidityPairT = TypeVar("_LiquidityPairT", bound="LiquidityPair")
 
 
 class RouterDecodedMsg(NamedTuple):
@@ -304,7 +305,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
 
     @classmethod
     async def new(
-        cls: type[LiquidityPair],
+        cls: type[_LiquidityPairT],
         contract_addr: AccAddress,
         client: TerraClient,
         fee_rate: Decimal = None,
@@ -314,15 +315,37 @@ class LiquidityPair(BaseTerraLiquidityPair):
         assert_limit_order_address: AccAddress = None,
         recursive_lp_token_code_id: int = None,
         check_liquidity: bool = True,
-    ) -> LiquidityPair:
-        if contract_addr in cls.__instances:
-            return await cls._get_instance(contract_addr, client, check_liquidity)
-        if contract_addr in cls.__instances_creation:
-            await cls.__instances_creation[contract_addr].wait()
+    ) -> _LiquidityPairT:
+        if contract_addr in cls.__instances or contract_addr in cls.__instances_creation:
             return await cls._get_instance(contract_addr, client, check_liquidity)
         cls.__instances_creation[contract_addr] = asyncio.Event()
 
         self = super().__new__(cls)
+        await self._init(
+            contract_addr,
+            client,
+            fee_rate,
+            factory_name,
+            factory_address,
+            router_address,
+            assert_limit_order_address,
+            recursive_lp_token_code_id,
+            check_liquidity,
+        )
+        return self
+
+    async def _init(
+        self,
+        contract_addr: AccAddress,
+        client: TerraClient,
+        fee_rate: Decimal = None,
+        factory_name: str = None,
+        factory_address: AccAddress = None,
+        router_address: AccAddress = None,
+        assert_limit_order_address: AccAddress = None,
+        recursive_lp_token_code_id: int = None,
+        check_liquidity: bool = True,
+    ):
         try:
             self.contract_addr = contract_addr
             self.client = client
@@ -339,15 +362,14 @@ class LiquidityPair(BaseTerraLiquidityPair):
             )
             self.tokens = self.lp_token.pair_tokens
         except Exception as e:
-            cls.__instances[contract_addr] = e
+            self.__instances[contract_addr] = e
         else:
-            cls.__instances[contract_addr] = self
+            self.__instances[contract_addr] = self
         finally:
-            cls.__instances_creation[contract_addr].set()
-            del cls.__instances_creation[contract_addr]
+            self.__instances_creation[contract_addr].set()
+            del self.__instances_creation[contract_addr]
         if check_liquidity:
             await self._check_liquidity()
-        return self
 
     async def _check_liquidity(self):
         if any(r == 0 for r in await self.get_reserves()):
@@ -356,18 +378,20 @@ class LiquidityPair(BaseTerraLiquidityPair):
 
     @classmethod
     async def _get_instance(
-        cls,
+        cls: type[_LiquidityPairT],
         contract_addr: AccAddress,
         client: TerraClient,
         check_liquidity: bool,
-    ) -> LiquidityPair:
+    ) -> _LiquidityPairT:
+        if contract_addr in cls.__instances_creation:
+            await cls.__instances_creation[contract_addr].wait()
         instance = cls.__instances[contract_addr]
         if isinstance(instance, Exception):
             raise instance
         instance.client = client
         if check_liquidity:
             await instance._check_liquidity()
-        return instance
+        return instance  # type: ignore
 
     def __repr__(self) -> str:
         if self.factory_name is None:
@@ -466,7 +490,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
         https://github.com/terraswap/terraswap/blob/v2.4.1/contracts/terraswap_pair/src/contract.rs#L538  # noqa: E501
         """
         if simulate:
-            raise NotImplementedError
+            raise NotImplementedError(simulate_msg)
         reserve_in, reserve_out = await self._get_in_out_reserves(amount_in=amount_in)
         if safety_margin:
             res_in = reserve_in.int_amount

@@ -3,22 +3,17 @@ from __future__ import annotations
 import asyncio
 import logging
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Iterable, Tuple, TypeVar
+from typing import TYPE_CHECKING, Any, Iterable, TypeVar
 
 import grpclib
 from cosmos_sdk.core import AccAddress
 from cosmos_sdk.exceptions import LCDResponseError
 
-from chains.cosmos.terra.token import TerraCW20Token, TerraNativeToken, TerraToken
+from chains.cosmos.terra.token import TerraNativeToken
 from exceptions import NotContract
 
-from ...token import get_cw20_whitelist
-from .liquidity_pair import (
-    LiquidityPair,
-    LPToken,
-    RouterNativeLiquidityPair,
-    pair_tokens_from_data,
-)
+from ...token import check_cw20_whitelist, get_cw20_whitelist
+from .liquidity_pair import LiquidityPair, RouterNativeLiquidityPair, pair_tokens_from_data
 from .router import Router, RouterLiquidityPair
 
 if TYPE_CHECKING:
@@ -39,14 +34,6 @@ _FEES: dict[str, Decimal] = {
 
 def _get_fee_rate(contract_addr: str) -> Decimal | None:
     return _FEES.get(contract_addr)
-
-
-def _check_cw20_whitelist(token: TerraToken, cw20_whitelist: dict[str, AccAddress]) -> bool:
-    if not isinstance(token, TerraCW20Token):
-        return True
-    if isinstance(token, LPToken):
-        return all(_check_cw20_whitelist(t, cw20_whitelist) for t in token.pair_tokens)
-    return cw20_whitelist.get(token.symbol) == token.contract_addr
 
 
 class Factory:
@@ -126,7 +113,7 @@ class Factory:
                 status = e.response.status if isinstance(e, LCDResponseError) else e.status
                 log.debug(f"Error querying {info['contract_addr']}: {status=} {e.message}")
                 continue
-            if not all(_check_cw20_whitelist(token, cw20_whitelist) for token in tokens):
+            if not all(check_cw20_whitelist(token, cw20_whitelist) for token in tokens):
                 log.debug(f"Rejected {info['contract_addr']}: one of {tokens} not in whitelist")
                 continue
             pair_symbol = "-".join(f"[{token.repr_symbol}]" for token in tokens)
@@ -137,8 +124,8 @@ class Factory:
         addresses["pairs"] = dict(sorted(addresses["pairs"].items()))
         return addresses
 
-    async def get_pairs(self, pairs_names: Iterable[str]) -> Tuple[LiquidityPair, ...]:
-        return await asyncio.gather(*(self.get_pair(pair) for pair in pairs_names))  # type: ignore  # noqa: E501
+    async def get_pairs(self, pairs_names: Iterable[str]) -> tuple[LiquidityPair, ...]:
+        return await asyncio.gather(*(self.get_pair(pair) for pair in pairs_names))  # type: ignore # noqa: E501
 
     async def get_pair(self, pair_name: str, check_liquidity: bool = True) -> LiquidityPair:
         try:
