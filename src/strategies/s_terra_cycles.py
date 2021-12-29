@@ -35,6 +35,7 @@ from chains.cosmos.terra import (
     TerraToken,
     TerraTokenAmount,
     anchor,
+    astroport,
     nexus,
     stader,
     terraswap,
@@ -111,21 +112,29 @@ class ArbParams(CosmosArbParams):
 
 
 async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
-    terraswap_factory, loop_factory, anchor_market, lunax_vault = await asyncio.gather(
+    (
+        terraswap_factory,
+        loop_factory,
+        astroport_factory,
+        anchor_market,
+        lunax_vault,
+    ) = await asyncio.gather(
         terraswap.TerraswapFactory.new(client),
         terraswap.LoopFactory.new(client),
+        astroport.AstroportFactory.new(client),
         anchor.Market.new(client),
         stader.LunaXVault.new(client),
     )
     nexus_factory = nexus.Factory(client)
+    dex_factories = [terraswap_factory, loop_factory, astroport_factory]
     list_route_groups: list[list[MultiRoutes]] = await asyncio.gather(
-        _get_ust_luna_routes(client, loop_factory, terraswap_factory),
-        _get_luna_native_routes(client, terraswap_factory),
-        _get_psi_routes(client, nexus_factory, [terraswap_factory, loop_factory]),
-        _get_aust_routes(client, anchor_market, [terraswap_factory, loop_factory]),
-        _get_stader_routes(client, lunax_vault, [terraswap_factory, loop_factory]),
-        _get_loopdex_terraswap_2cycle_routes(client, loop_factory, terraswap_factory),
-        _get_3cycle_routes(client, [terraswap_factory, loop_factory]),
+        _get_ust_luna_routes(client, loop_factory, terraswap_factory, astroport_factory),
+        _get_luna_native_routes(client, [terraswap_factory, astroport_factory]),
+        _get_psi_routes(client, nexus_factory, dex_factories),
+        _get_aust_routes(client, anchor_market, dex_factories),
+        _get_stader_routes(client, lunax_vault, dex_factories),
+        _get_2cycle_routes(client, dex_factories),
+        _get_3cycle_routes(client, dex_factories),
     )
     routes = _reorder_routes([r for route_group in list_route_groups for r in route_group])
     arbs: list[TerraCyclesArbitrage] = []
@@ -184,40 +193,41 @@ async def _get_ust_luna_routes(
     client: TerraClient,
     loop_factory: terraswap.LoopFactory,
     terraswap_factory: terraswap.TerraswapFactory,
+    astroport_factory: astroport.AstroportFactory,
 ) -> list[MultiRoutes]:
-    loop_pair = await loop_factory.get_pair("[LUNA]-[UST]")
-    terraswap_pair = await terraswap_factory.get_pair("[UST]-[LUNA]")
+    dex_pairs = await asyncio.gather(
+        loop_factory.get_pair("[LUNA]-[UST]"),
+        terraswap_factory.get_pair("[UST]-[LUNA]"),
+        astroport_factory.get_pair("[UST]-[LUNA]"),
+    )
     native_pair = terraswap_factory.get_native_pair((UST, LUNA))
+    pairs = [*dex_pairs, native_pair]
 
     return [
         MultiRoutes(
             client=client,
             start_token=UST,
-            list_steps=[[terraswap_pair], [native_pair]],
+            list_steps=[pairs, pairs],
             router_address=terraswap_factory.router_address,
-        ),
-        MultiRoutes(
-            client=client,
-            start_token=UST,
-            list_steps=[[loop_pair], [terraswap_pair, native_pair]],
-        ),
+        )
     ]
 
 
 async def _get_luna_native_routes(
     client: TerraClient,
-    factory: terraswap.TerraswapFactory,
+    terraswap_factories: Sequence[terraswap.Factory],
 ) -> list[MultiRoutes]:
     routes: list[MultiRoutes] = []
-    for pair in await _pairs_from_factories([factory], "LUNA", excluded_symbols=["UST"]):
-        if not all(isinstance(token, TerraNativeToken) for token in pair.tokens):
-            continue
-        native_pair = factory.get_native_pair(pair.tokens)  # type: ignore
-        list_steps: Sequence[Sequence] = [[pair], [native_pair]]
+    for factory in terraswap_factories:
+        for pair in await _pairs_from_factories([factory], "LUNA", excluded_symbols=["UST"]):
+            if not all(isinstance(token, TerraNativeToken) for token in pair.tokens):
+                continue
+            native_pair = factory.get_native_pair(pair.tokens)  # type: ignore
+            list_steps: Sequence[Sequence] = [[pair], [native_pair]]
 
-        routes.append(
-            MultiRoutes(client, LUNA, list_steps, router_address=factory.router_address)
-        )
+            routes.append(
+                MultiRoutes(client, LUNA, list_steps, router_address=factory.router_address)
+            )
     return routes
 
 
@@ -320,73 +330,45 @@ async def _get_3cycle_routes(
     client: TerraClient,
     factories: list[terraswap.Factory],
 ) -> list[MultiRoutes]:
-    non_ust_pairs: dict[tuple[TerraToken, TerraToken], list[terraswap.LiquidityPair]]
-    non_ust_pairs = defaultdict(list)
+    non_start_pairs: dict[tuple[TerraToken, TerraToken], list[terraswap.LiquidityPair]]
+    non_start_pairs = defaultdict(list)
     routes: list[MultiRoutes] = []
     for start_token, excluded_symbols in [
         (UST, ["UST", "aUST", "LunaX"]),
         (LUNA, ["UST", "LUNA"]),
     ]:
         for pair in await _pairs_from_factories(factories, excluded_symbols=excluded_symbols):
-            if isinstance(pair, terraswap.LiquidityPair):
-                non_ust_pairs[pair.sorted_tokens].append(pair)
+            non_start_pairs[pair.sorted_tokens].append(pair)
 
-        for tokens, pairs in non_ust_pairs.items():
+        for tokens, pairs in non_start_pairs.items():
             try:
-                ust_first_pairs, ust_second_pairs = await asyncio.gather(
+                first_pairs, last_pairs = await asyncio.gather(
                     _pairs_from_factories(factories, str(start_token), tokens[0].symbol),
                     _pairs_from_factories(factories, tokens[1].symbol, str(start_token)),
                 )
             except NoPairFound:
                 continue
-            routes.append(
-                MultiRoutes(client, start_token, [ust_first_pairs, pairs, ust_second_pairs])
-            )
+            routes.append(MultiRoutes(client, start_token, [first_pairs, pairs, last_pairs]))
     return routes
 
 
-async def _get_loopdex_terraswap_2cycle_routes(
+async def _get_2cycle_routes(
     client: TerraClient,
-    loop_factory: terraswap.LoopFactory,
-    terraswap_factory: terraswap.TerraswapFactory,
+    factories: list[terraswap.Factory],
 ) -> list[MultiRoutes]:
     routes: list[MultiRoutes] = []
     for start_token in [UST, LUNA]:
-        pat_token_symbol = re.compile(
-            fr"\[([\w\-]+)\]-\[{str(start_token)}\]|\[{str(start_token)}\]-\[([\w\-]+)\]"
-        )
-        for pair_symbol in loop_factory.pairs_addresses:
-            if (
-                not (match := pat_token_symbol.match(pair_symbol))
-                or (start_token == UST and "LUNA" in match.groups())
-                or (start_token == LUNA and "UST" in match.groups())
-            ):
-                continue
-            reversed_symbol = (
-                f"[{match.group(2)}]-[{str(start_token)}]"
-                if match.group(2)
-                else f"[{str(start_token)}]-[{match.group(1)}]"
-            )
-            if pair_symbol in terraswap_factory.pairs_addresses:
-                terraswap_pair_symbol = pair_symbol
-            elif reversed_symbol in terraswap_factory.pairs_addresses:
-                terraswap_pair_symbol = reversed_symbol
-            else:
-                continue
-            try:
-                terraswap_pair, loop_pair = await asyncio.gather(
-                    terraswap_factory.get_pair(terraswap_pair_symbol),
-                    loop_factory.get_pair(pair_symbol),
-                )
-            except InsufficientLiquidity:
-                continue
-            routes.append(MultiRoutes(client, start_token, [[terraswap_pair], [loop_pair]]))
+        pairs = await _pairs_from_factories(factories, str(start_token))
+        tokens = {t for p in pairs for t in p.tokens if t not in [UST, LUNA]}
+        for token in tokens:
+            token_pairs = [p for p in pairs if token in p.tokens]
+            if len(token_pairs) > 1:
+                routes.append(MultiRoutes(client, start_token, [token_pairs, token_pairs]))
     return routes
 
 
 def _reorder_routes(routes: list[MultiRoutes]) -> list[MultiRoutes]:
     main_routes = []
-    loop_luna_ust_routes = []
     alte_routes = []
     swap_routes = []
     for r in routes:
@@ -394,15 +376,9 @@ def _reorder_routes(routes: list[MultiRoutes]) -> list[MultiRoutes]:
             swap_routes.append(r)
         elif any(t.symbol == "ALTE" for p in r.pools for t in p.tokens):
             alte_routes.append(r)
-        elif r.n_steps == 2 and any(
-            p.factory_name == "loop" and p.repr_symbol == "LUNA/UST"
-            for p in r.pools
-            if isinstance(p, terraswap.LiquidityPair)
-        ):
-            loop_luna_ust_routes.append(r)
         else:
             main_routes.append(r)
-    return main_routes + loop_luna_ust_routes + alte_routes + swap_routes
+    return main_routes + alte_routes + swap_routes
 
 
 async def _pairs_from_factories(
@@ -518,8 +494,6 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
                 )
                 if not amount_out:
                     self.multi_routes.routes.remove(route)
-                    if not self.multi_routes.routes:
-                        raise Exception("No route with sufficient liquidity")
                     self.log.debug(f"{route=} has too low liquidity")
                     continue
                 fee = await self.client.tx.estimate_fee(msgs)
@@ -527,6 +501,8 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
                 raise FeeEstimationError(e)
             list_gas.append(fee.gas_limit)
         self.routes = self.multi_routes.routes  # For cases where a route is removed
+        if not self.routes:
+            raise FeeEstimationError("No route with sufficient liquidity")
         return max(list_gas)
 
     async def _get_arbitrage_params(

@@ -49,15 +49,22 @@ class MultiRoutes:
         self.client = client
         self.list_steps = list_steps
         self.router_address = router_address
-        self.pools = [pool for step in list_steps for pool in step]
+        self.pools = list({pool for step in list_steps for pool in step})
         self.tokens = _extract_tokens_from_routes(start_token, list_steps)
         self.n_steps = len(list_steps)
 
         self.is_cycle = self.tokens[0] == self.tokens[-1]
-        self.routes = [
-            RoutePools(client, self.tokens, pools, single_direction, router_address)
-            for pools in itertools.product(*list_steps)
-        ]
+        self.routes: list[RoutePools] = []
+        appended_pools: set[tuple[BaseTerraLiquidityPair, ...]] = set()
+        for pools in itertools.product(*list_steps):
+            if len(pools) != len(set(pools)):
+                continue  # Circular route
+            if (sorted_pools := tuple(sorted(pools, key=str))) in appended_pools:
+                continue  # Repeated route
+            self.routes.append(
+                RoutePools(client, self.tokens, pools, single_direction, router_address)
+            )
+            appended_pools.add(sorted_pools)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.repr_symbols}, n_routes={self.n_routes})"
