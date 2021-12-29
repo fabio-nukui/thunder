@@ -82,6 +82,7 @@ def _compute_new_reserve_out(leverage: Decimal, new_reserve_in: Decimal, d: Deci
 
 class LiquidityPair(TerraswapLiquidityPair):
     pair_type: PairType
+    router_swap_acton = ROUTER_SWAP_ACTION
 
     @classmethod
     async def new(

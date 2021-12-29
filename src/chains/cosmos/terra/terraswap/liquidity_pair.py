@@ -30,6 +30,8 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 FEE = Decimal("0.003")
+ROUTER_SWAP_ACTION = "terra_swap"
+
 _MAX_SWAP_SLIPPAGE = Decimal("0.00001")
 _MAX_ADD_LIQUIDITY_SLIPPAGE = Decimal("0.0005")
 _TOKEN_FROM_DATA_CACHE_SIZE = 1000
@@ -125,11 +127,12 @@ async def get_router_reserve_changes_from_msg(
     msg: dict,
     factory_address: AccAddress,
     router_address: AccAddress,
+    swap_action: str,
     assert_limit_order_address: AccAddress | None,
 ) -> dict[RouterLiquidityPair, tuple[TerraTokenAmount, TerraTokenAmount]]:
     changes: dict[RouterLiquidityPair, tuple[TerraTokenAmount, TerraTokenAmount]] = {}
     amount_in, min_out, pairs = await _decode_router_msg(
-        client, msg, factory_address, router_address, assert_limit_order_address
+        client, msg, factory_address, router_address, swap_action, assert_limit_order_address
     )
     for pair in pairs:
         amounts = await pair.get_swap_amounts(amount_in)
@@ -152,6 +155,7 @@ async def _decode_router_msg(
     msg: dict,
     factory_address: AccAddress,
     router_address: AccAddress,
+    swap_action: str,
     assert_limit_order_address: AccAddress | None,
 ) -> RouterDecodedMsg:
     action = "execute_swap_operations"
@@ -177,7 +181,7 @@ async def _decode_router_msg(
             if "native_swap" in op:
                 token_in = TerraNativeToken(op["native_swap"]["offer_denom"])
             else:
-                token_in = await token_from_data(op["terra_swap"]["offer_asset_info"], client)
+                token_in = await token_from_data(op[swap_action]["offer_asset_info"], client)
             if isinstance(token_in, TerraNativeToken):
                 amount_in = token_in.to_amount(int_amount=swap_operations["offer_amount"])
             else:
@@ -186,7 +190,7 @@ async def _decode_router_msg(
             if "native_swap" in op:
                 token_out = TerraNativeToken(op["native_swap"]["ask_denom"])
             else:
-                token_out = await token_from_data(op["terra_swap"]["ask_asset_info"], client)
+                token_out = await token_from_data(op[swap_action]["ask_asset_info"], client)
             min_out = token_out.to_amount(int_amount=msg.get("minimum_receive", 0))
         if "native_swap" in op:
             tokens = (
@@ -195,13 +199,18 @@ async def _decode_router_msg(
             )
             pairs.append(
                 RouterNativeLiquidityPair(
-                    client, tokens, factory_address, router_address, assert_limit_order_address
+                    client,
+                    tokens,
+                    factory_address,
+                    router_address,
+                    swap_action,
+                    assert_limit_order_address,
                 )
             )
         else:
             asset_infos = [
-                op["terra_swap"]["offer_asset_info"],
-                op["terra_swap"]["ask_asset_info"],
+                op[swap_action]["offer_asset_info"],
+                op[swap_action]["ask_asset_info"],
             ]
             query = {"pair": {"asset_infos": asset_infos}}
             pair_info = await client.contract_query(factory_address, query)
@@ -219,11 +228,13 @@ class RouterNativeLiquidityPair(NativeLiquidityPair):
         tokens: tuple[TerraNativeToken, TerraNativeToken],
         factory_address: AccAddress,
         router_address: AccAddress,
+        router_swap_action: str,
         assert_limit_order_address: AccAddress | None,
     ):
         super().__init__(client, tokens)
         self.factory_address = factory_address
         self.router_address = router_address
+        self.router_swap_action = router_swap_action
         self.assert_limit_order_address = assert_limit_order_address
 
     async def op_swap(
@@ -284,6 +295,7 @@ class RouterNativeLiquidityPair(NativeLiquidityPair):
                 msg,
                 self.factory_address,
                 self.router_address,
+                self.router_swap_action,
                 self.assert_limit_order_address,
             )
             return changes[self]
@@ -296,6 +308,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
     factory_name: str | None
     factory_address: AccAddress | None
     router_address: AccAddress | None
+    router_swap_action = ROUTER_SWAP_ACTION
     assert_limit_order_address: AccAddress | None
     lp_token: LPToken
     _reserves: AmountTuple
@@ -823,6 +836,7 @@ class LiquidityPair(BaseTerraLiquidityPair):
                 msg,
                 self.factory_address,
                 self.router_address,
+                self.router_swap_action,
                 self.assert_limit_order_address,
             )
             return changes[self]

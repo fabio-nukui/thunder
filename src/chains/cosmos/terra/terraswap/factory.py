@@ -13,7 +13,12 @@ from chains.cosmos.terra.token import TerraNativeToken
 from exceptions import NotContract
 
 from ...token import check_cw20_whitelist, get_cw20_whitelist
-from .liquidity_pair import LiquidityPair, RouterNativeLiquidityPair, pair_tokens_from_data
+from .liquidity_pair import (
+    ROUTER_SWAP_ACTION,
+    LiquidityPair,
+    RouterNativeLiquidityPair,
+    pair_tokens_from_data,
+)
 from .router import Router, RouterLiquidityPair
 
 if TYPE_CHECKING:
@@ -41,6 +46,7 @@ class Factory:
     name: str | None
     contract_addr: AccAddress
     router_address: AccAddress | None
+    router_swap_action = ROUTER_SWAP_ACTION
     pairs_addresses: dict[str, AccAddress]
     assert_limit_order_address: AccAddress | None
     pair_code_id: int
@@ -154,6 +160,7 @@ class Factory:
             tokens,
             self.contract_addr,
             self.router_address,
+            self.router_swap_action,
             self.assert_limit_order_address,
         )
 

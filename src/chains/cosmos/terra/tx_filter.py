@@ -95,9 +95,10 @@ class FilterFirstActionRouterSwap(Filter):
         self.aways_base64 = aways_base64
         self.pairs = pairs
         self.router_addresses = router_addresses
+        (self.swap_action,) = {p.router_swap_action for p in pairs}
         self._pair_ids = [
             (
-                "native" if isinstance(p, terraswap.RouterNativeLiquidityPair) else "terraswap",
+                "native" if isinstance(p, terraswap.RouterNativeLiquidityPair) else "lp",
                 {_get_token_id(p.tokens[0]), _get_token_id(p.tokens[1])},
             )
             for p in self.pairs
@@ -132,18 +133,21 @@ class FilterFirstActionRouterSwap(Filter):
             operations = swap_operations["operations"]
         else:
             return False
+
+        native_swap: dict[str, str]
+        pair_swap: dict[str, dict[str, dict[str, str]]]
         try:
             for operation in operations:
                 if "native_swap" in operation:
-                    native_swap: dict[str, str] = operation["native_swap"]
+                    native_swap = operation["native_swap"]
                     pair_id = ("native", {native_swap["ask_denom"], native_swap["offer_denom"]})
                 else:
-                    pair_swap: dict[str, dict[str, dict[str, str]]] = operation["terra_swap"]
+                    pair_swap = operation[self.swap_action]
                     (ask_asset,) = pair_swap["ask_asset_info"].values()
                     (offer_asset,) = pair_swap["offer_asset_info"].values()
                     (ask_asset_id,) = ask_asset.values()
                     (offer_asset_id,) = offer_asset.values()
-                    pair_id = ("terraswap", {ask_asset_id, offer_asset_id})
+                    pair_id = ("lp", {ask_asset_id, offer_asset_id})
                 if any(pair_id == ids for ids in self._pair_ids):
                     return True
         except (KeyError, AttributeError, ValueError):

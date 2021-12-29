@@ -4,10 +4,14 @@ import logging
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, TypeVar
 
+from cosmos_sdk.core import AccAddress
+
+from exceptions import NotContract
+
 from ...token import check_cw20_whitelist, get_cw20_whitelist
 from ..terraswap.factory import Factory as TerraswapFactory
 from ..terraswap.liquidity_pair import pair_tokens_from_data
-from .liquidity_pair import LiquidityPair, PairType
+from .liquidity_pair import ROUTER_SWAP_ACTION, LiquidityPair, PairType
 
 if TYPE_CHECKING:
     from ..client import TerraClient
@@ -20,6 +24,7 @@ _FactoryT = TypeVar("_FactoryT", bound="Factory")
 class Factory(TerraswapFactory):
     pair_codes: dict[PairType, int] = {}
     fee_rates: dict[PairType, Decimal] = {}
+    router_swap_action = ROUTER_SWAP_ACTION
 
     @classmethod
     async def new(
@@ -92,3 +97,10 @@ class Factory(TerraswapFactory):
             router_address=self.router_address,
             check_liquidity=check_liquidity,
         )
+
+    async def is_pair(self, contract_addr: AccAddress) -> bool:
+        try:
+            info = await self.client.contract_info(contract_addr)
+        except NotContract:
+            return False
+        return int(info["code_id"]) in self.pair_codes.values()

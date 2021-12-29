@@ -19,11 +19,7 @@ ROUTER_EFFICIENCY = Decimal("0.9995")
 
 
 class RouteStep(ABC):
-    def __init__(
-        self,
-        token_in: TerraToken,
-        token_out: TerraToken,
-    ) -> None:
+    def __init__(self, token_in: TerraToken, token_out: TerraToken):
         self.token_in = token_in
         self.token_out = token_out
 
@@ -44,9 +40,18 @@ class RouteStep(ABC):
 
 
 class RouteStepTerraswap(RouteStep):
+    def __init__(
+        self,
+        token_in: TerraToken,
+        token_out: TerraToken,
+        swap_action: str,
+    ):
+        super().__init__(token_in, token_out)
+        self.swap_action = swap_action
+
     def to_data(self) -> dict:
         return {
-            "terra_swap": {
+            self.swap_action: {
                 "offer_asset_info": token_to_data(self.token_in),
                 "ask_asset_info": token_to_data(self.token_out),
             }
