@@ -59,7 +59,7 @@ MIN_RESERVED_AMOUNT = UST.to_amount(30)
 MIN_N_ARBITRAGES = 20
 ANCHOR_MARKET_GAS_ADJUSTMENT = Decimal("1.35")
 FILTER_POOL_TYPES = (terraswap.LiquidityPair, terraswap.RouterNativeLiquidityPair)
-SLIPPAGE_TOLERANCE_PER_CONCAT_REPEAT = Decimal("0.001")
+SLIPPAGE_TOLERANCE_PER_CONCAT_REPEAT = Decimal("0.0015")
 
 
 class NoPairFound(Exception):
