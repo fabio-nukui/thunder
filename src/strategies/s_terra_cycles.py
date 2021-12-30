@@ -464,7 +464,7 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
             pools=multi_routes.pools,
             routes=multi_routes.routes,
             filter_keys=multi_routes.pools,
-            fee_denom=self.start_token.denom,
+            fee_denom=UST,
             cls_amount=TerraTokenAmount,
             verbose=False,
         )
@@ -601,6 +601,10 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
         )
         gas_cost = TerraTokenAmount.from_coin(*fee.amount) * n_repeat
         gas_cost_raw = gas_cost / self.client.gas_adjustment
+        if gas_cost_raw.token != self.start_token:
+            gas_cost_raw = await self.client.market.compute_swap_no_spread(
+                gas_cost_raw, self.start_token
+            )
         net_profit = final_amount - initial_amount - gas_cost_raw
         return {
             "route": route,
