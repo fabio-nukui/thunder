@@ -464,7 +464,7 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
             pools=multi_routes.pools,
             routes=multi_routes.routes,
             filter_keys=multi_routes.pools,
-            fee_denom=UST,
+            fee_denom=UST.denom,
             cls_amount=TerraTokenAmount,
             verbose=False,
         )
