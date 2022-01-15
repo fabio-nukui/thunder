@@ -12,6 +12,7 @@ log = logging.getLogger(__name__)
 
 
 _ASTROPORT_ADDRESSES_DIR = "resources/addresses/cosmos/{chain_id}/astroport"
+_ASTROPORT_DEX_ROUTER = "terra16t7dpwwgx9n3lq6l6te3753lsjqwhxwpday9zx"
 _TERRASWAP_ADDRESSES_DIR = "resources/addresses/cosmos/{chain_id}/terraswap"
 _TERRASWAP_DEX_ROUTER = "terra19qx5xe6q9ll4w0890ux7lv2p4mf3csd4qvt3ex"
 _TERRASWAP_DEX_ASSERT_LIMIT_ORDER = "terra1vs9jr7pxuqwct3j29lez3pfetuu8xmq7tk3lzk"
@@ -61,7 +62,7 @@ async def main():
         await write_to_file(loop_factory, "loop")
 
         astroport_factory = await astroport.AstroportFactory.new(client)
-        await write_to_file(astroport_factory, "astroport")
+        await write_to_file(astroport_factory, "astroport", _ASTROPORT_DEX_ROUTER)
 
 
 if __name__ == "__main__":
