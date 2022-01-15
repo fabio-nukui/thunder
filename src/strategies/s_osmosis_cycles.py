@@ -37,6 +37,7 @@ from chains.cosmos.osmosis.tx_filter import FilterSwap
 from exceptions import (
     FeeEstimationError,
     InsufficientLiquidity,
+    TokenAmountRoundingError,
     TokenNotFound,
     UnprofitableArbitrage,
 )
@@ -324,7 +325,11 @@ class OsmosisCyclesArbitrage(
             for route in self.routes:
                 try:
                     params.append(await self._get_params_single_route(route, initial_balance))
-                except (FeeEstimationError, UnprofitableArbitrage) as e:
+                except (
+                    FeeEstimationError,
+                    UnprofitableArbitrage,
+                    TokenAmountRoundingError,
+                ) as e:
                     errors.append(e)
         if not params:
             raise UnprofitableArbitrage(errors)

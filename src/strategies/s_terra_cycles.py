@@ -42,7 +42,12 @@ from chains.cosmos.terra import (
 )
 from chains.cosmos.terra.route import MultiRoutes, RoutePools
 from chains.cosmos.terra.tx_filter import Filter, FilterNativeSwap, FilterSwapTerraswap
-from exceptions import FeeEstimationError, InsufficientLiquidity, UnprofitableArbitrage
+from exceptions import (
+    FeeEstimationError,
+    InsufficientLiquidity,
+    TokenAmountRoundingError,
+    UnprofitableArbitrage,
+)
 from strategies.common.default_params import (
     MAX_CONCAT_REPEATS,
     MAX_N_REPEATS,
@@ -515,7 +520,11 @@ class TerraCyclesArbitrage(LPReserveSimulationMixin, CosmosRepeatedTxArbitrage[T
                             route, initial_balance, max_single_arbitrage
                         )
                     )
-                except (FeeEstimationError, UnprofitableArbitrage) as e:
+                except (
+                    FeeEstimationError,
+                    UnprofitableArbitrage,
+                    TokenAmountRoundingError,
+                ) as e:
                     errors.append(e)
         if not params:
             raise UnprofitableArbitrage(errors)

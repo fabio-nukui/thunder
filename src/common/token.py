@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 from decimal import ROUND_DOWN, Decimal, getcontext
 from typing import Generic, Optional, TypeVar, Union, overload
 
+from exceptions import TokenAmountRoundingError
+
 DecInput = Union[str, int, float, Decimal]
 ROUNDING_SAFETY_MARGIN = 10
 
@@ -105,7 +107,10 @@ class TokenAmount:
         if margin is False:
             return self
         margin = ROUNDING_SAFETY_MARGIN if margin is True else margin
-        return self.token.to_amount(int_amount=max(1, self.int_amount - margin))
+        int_amount = self.int_amount - margin
+        if int_amount < ROUNDING_SAFETY_MARGIN:
+            raise TokenAmountRoundingError
+        return self.token.to_amount(int_amount=int_amount)
 
     def is_empty(self) -> bool:
         return self.amount.is_nan()

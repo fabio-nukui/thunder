@@ -32,6 +32,10 @@ class OptimizationError(Exception):
     pass
 
 
+class TokenAmountRoundingError(Exception):
+    pass
+
+
 class TokenNotFound(Exception):
     pass
 
