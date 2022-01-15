@@ -8,6 +8,7 @@ log = logging.getLogger(__name__)
 
 DEFAULT_MAX_ITER = 100
 BISSECTION_SEARCH_EXPANSION = 2
+_MIN_LEFT_BOUND_FACTOR = 10
 
 
 async def optimize(
@@ -101,9 +102,13 @@ async def optimize_bissection(
     x_left = x0
     x_right = x0 * BISSECTION_SEARCH_EXPANSION
 
-    y_left = await derivative(x0)
+    y_left = await derivative(x_left)
+
     if y_left < 0:
-        raise OptimizationError("bissection_optimizer only work for f'(x0) >= 0")
+        x_left /= _MIN_LEFT_BOUND_FACTOR
+        y_left = await derivative(x_left)
+        if y_left < 0:
+            raise OptimizationError("bissection_optimizer only work for f'(x0) >= 0")
 
     x = await bissection_search(derivative, x_left, x_right, tol, max_iter, y_left=y_left)
     return x, await func(x)
