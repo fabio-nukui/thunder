@@ -14,12 +14,16 @@
     "[STT]-[UST]": "terra1m95udvvdame93kl6j2mk8d03kc982wqgr75jsr",
     "[SWAP]-[UST]": "terra14glht7py7e3zp09wex9awej5cu4jql90yygdw0",
     "[TFLOKI]-[UST]": "terra1ffjjxeu5l9f027qtkwseulgz6ddx5f04czyf0w",
+    "[USDC]-[UST]": "terra1x0ulpvp6m46c5j7t40nj24mjp900954ys2jsnu",
+    "[USDC]-[nLuna]": "terra1t59ywlkkmvy7rmkdmdpy0z7wdqez5tne9mrd0r",
     "[UST]-[LUNA]": "terra1m6ywlgn6wrjuagcmmezzz2a029gtldhey5k552",
     "[VKR]-[UST]": "terra15s2wgdeqhuc4gfg7sfjyaep5cch38mwtzmwqrx",
     "[stLuna]-[LUNA]": "terra1gxjjrer8mywt4020xdl5e5x7n6ncn6w38gjzae",
+    "[stSOL]-[UST]": "terra18dq84qfpz267xuu0k47066svuaez9hr4xvwlex",
     "[whORION]-[UST]": "terra1mxyp5z27xxgmv70xpqjk7jvfq54as9dfzug74m",
     "[whWBNB]-[LUNA]": "terra1tehmd65kyleuwuf3a362mhnupkpza29vd86sml",
-    "[whWETH]-[LUNA]": "terra1m32zs8725j9jzvva7zmytzasj392wpss63j2v0"
+    "[whWETH]-[LUNA]": "terra1m32zs8725j9jzvva7zmytzasj392wpss63j2v0",
+    "[wstETH]-[UST]": "terra1edurrzv6hhd8u48engmydwhvz8qzmhhuakhwj3"
   },
   "router": "terra16t7dpwwgx9n3lq6l6te3753lsjqwhxwpday9zx"
 }

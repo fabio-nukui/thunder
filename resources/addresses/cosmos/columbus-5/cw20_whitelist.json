@@ -34,6 +34,7 @@
   "TKUB": "terra1sn208s2cmya87707w4r9hf36znv8ml8dcnhr2d",
   "TMeta": "terra1u72jtyujxu8dmpxedrrtmt5tekn0usf09r2a9h",
   "TWD": "terra19djkaepjjswucys4npd5ltaxgsntl7jf0xz7w6",
+  "USDC": "terra1pepwcav40nvj3kh60qqgrk8k07ydmc00xyat06",
   "VKR": "terra1dy9kmlm4anr92e42mrkjwzyvfqwz66un00rwr5",
   "WHALE": "terra1php5m8a6qd68z02t3zpw4jv2pj4vgw4wz0t8mz",
   "aUST": "terra1hzh9vpxhsk8253se0vv5jj6etdvxu3nv8z07zu",
@@ -73,9 +74,12 @@
   "nETH": "terra178v546c407pdnx5rer3hu8s2c0fc924k74ymnn",
   "nLuna": "terra10f2mt82kjnkxqj2gepgwl637u2w4ue2z5nhz5j",
   "stLuna": "terra1yg3j2s986nyp5z7r2lvt0hx3r0lnd7kwvwwtsc",
+  "stSOL": "terra1t9ul45l7m6jw6sxgvnp8e5hj8xzkjsg82g84ap",
   "tSHIBA": "terra140k6k2pmh2lmy4q4wyz5znqmtgwvs3gkgfeevq",
   "whWBNB": "terra1cetg5wruw2wsdjp7j46rj44xdel00z006e9yg8",
   "whWBTC": "terra1aa7upykmmqqc63l924l5qfap8mrmx5rfdm0v55",
   "whORION": "terra1mddcdx0ujx89f38gu7zspk2r2ffdl5enyz2u03",
-  "whWETH": "terra14tl83xcwqjy0ken9peu4pjjuu755lrry2uy25r"
+  "whXDEFI": "terra169edevav3pdrtjcx35j6pvzuv54aevewar4nlh",
+  "whWETH": "terra14tl83xcwqjy0ken9peu4pjjuu755lrry2uy25r",
+  "wstETH": "terra133chr09wu8sakfte5v7vd8qzq9vghtkv4tn0ur"
 }
