@@ -11,7 +11,7 @@ from exceptions import NotContract
 from ...token import check_cw20_whitelist, get_cw20_whitelist
 from ..terraswap.factory import Factory as TerraswapFactory
 from ..terraswap.liquidity_pair import pair_tokens_from_data
-from .liquidity_pair import ROUTER_SWAP_ACTION, LiquidityPair, PairType
+from .liquidity_pair import ROUTER_SWAP_ACTION, LiquidityPair, PairConfig
 
 if TYPE_CHECKING:
     from ..client import TerraClient
@@ -22,8 +22,7 @@ _FactoryT = TypeVar("_FactoryT", bound="Factory")
 
 
 class Factory(TerraswapFactory):
-    pair_codes: dict[PairType, int] = {}
-    fee_rates: dict[PairType, Decimal] = {}
+    pair_configs: list[PairConfig]
     router_swap_action = ROUTER_SWAP_ACTION
 
     @classmethod
@@ -42,16 +41,15 @@ class Factory(TerraswapFactory):
         self.assert_limit_order_address = addresses.get("assert_limit_order")
 
         config = await client.contract_query(self.contract_addr, {"config": {}})
-        for pair_config in config["pair_configs"]:
-            if "xyk" in pair_config["pair_type"]:
-                self.pair_codes[PairType.xyk] = pair_config["code_id"]
-                self.fee_rates[PairType.xyk] = Decimal(pair_config["total_fee_bps"]) / 10_000
-            elif "stable" in pair_config["pair_type"]:
-                self.pair_codes[PairType.stable] = pair_config["code_id"]
-                self.fee_rates[PairType.stable] = Decimal(pair_config["total_fee_bps"]) / 10_000
-            else:
-                raise Exception(f"Unexpected config format: {config}")
-
+        self.pair_configs = [
+            PairConfig(
+                pair_config["pair_type"],
+                pair_config["code_id"],
+                Decimal(pair_config["total_fee_bps"]) / 10_000,
+                pair_config["is_disabled"],
+            )
+            for pair_config in config["pair_configs"]
+        ]
         return self
 
     async def generate_addresses_dict(
@@ -91,11 +89,11 @@ class Factory(TerraswapFactory):
         return await LiquidityPair.new(
             contract_addr,
             self.client,
-            fee_rates=self.fee_rates,
             factory_name=self.name,
             factory_address=self.contract_addr,
             router_address=self.router_address,
             check_liquidity=check_liquidity,
+            pair_configs=self.pair_configs,
         )
 
     async def is_pair(self, contract_addr: AccAddress) -> bool:
@@ -103,4 +101,5 @@ class Factory(TerraswapFactory):
             info = await self.client.contract_info(contract_addr)
         except NotContract:
             return False
-        return int(info["code_id"]) in self.pair_codes.values()
+        code_id = int(info["code_id"])
+        return any(code_id == c.code_id for c in self.pair_configs)

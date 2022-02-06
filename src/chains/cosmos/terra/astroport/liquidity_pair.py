@@ -5,8 +5,7 @@ import base64
 import json
 import logging
 from decimal import Decimal
-from enum import Enum
-from typing import TypeVar
+from typing import Any, NamedTuple, TypeVar
 
 from cosmos_sdk.core import AccAddress
 from cosmos_sdk.core.wasm import MsgExecuteContract
@@ -31,19 +30,27 @@ _TOL = Decimal("0.000001")
 AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
 _LiquidityPairT = TypeVar("_LiquidityPairT", bound="LiquidityPair")
 
-
-class PairType(str, Enum):
-    xyk = "xyk"
-    stable = "stable"
+STABLE_PAIR_TYPE: dict[str, dict] = {"stable": {}}
+XYK_PAIR_TYPE: dict[str, dict] = {"xyk": {}}
 
 
-async def _get_pair_type(client: TerraClient, contract_addr: AccAddress) -> PairType:
+class PairConfig(NamedTuple):
+    pair_type: dict[str, Any]
+    code_id: int
+    fee: Decimal
+    is_disabled: bool
+
+
+async def _get_pair_config(
+    client: TerraClient,
+    contract_addr: AccAddress,
+    pair_configs: list[PairConfig],
+) -> PairConfig:
     data = await client.contract_query(contract_addr, {"pair": {}})
-    if PairType.xyk in data["pair_type"]:
-        return PairType.xyk
-    if PairType.stable in data["pair_type"]:
-        return PairType.stable
-    raise Exception(f"Could not parse pair_type={data['pair_type']}")
+    for config in pair_configs:
+        if data["pair_type"] == config.pair_type:
+            return config
+    raise Exception(f"Could not find config for pair_type={data['pair_type']}")
 
 
 def _compute_d(leverage: Decimal, amount_a: Decimal, amount_b: Decimal) -> Decimal:
@@ -81,7 +88,7 @@ def _compute_new_reserve_out(leverage: Decimal, new_reserve_in: Decimal, d: Deci
 
 
 class LiquidityPair(TerraswapLiquidityPair):
-    pair_type: PairType
+    pair_config: PairConfig
     router_swap_acton = ROUTER_SWAP_ACTION
 
     @classmethod
@@ -96,22 +103,22 @@ class LiquidityPair(TerraswapLiquidityPair):
         assert_limit_order_address: AccAddress = None,
         recursive_lp_token_code_id: int = None,
         check_liquidity: bool = True,
-        fee_rates: dict[PairType, Decimal] = None,
+        pair_configs: list[PairConfig] = None,
     ) -> _LiquidityPairT:
         if contract_addr in cls.__instances or contract_addr in cls.__instances_creation:
             return await cls._get_instance(contract_addr, client, check_liquidity)
+        if not pair_configs:
+            raise Exception("pair_configs is empty")
         cls.__instances_creation[contract_addr] = asyncio.Event()
 
         self = super().__new__(cls)
 
-        self.pair_type = await _get_pair_type(client, contract_addr)
-        fee_rates = fee_rates or {}
-        fee_rate = fee_rate if fee_rate is not None else fee_rates.get(self.pair_type)
+        self.pair_config = await _get_pair_config(client, contract_addr, pair_configs)
 
         await self._init(
             contract_addr,
             client,
-            fee_rate,
+            fee_rate or self.pair_config.fee,
             factory_name,
             factory_address,
             router_address,
@@ -123,7 +130,7 @@ class LiquidityPair(TerraswapLiquidityPair):
 
     @ttl_cache(CacheGroup.TERRA, _AMP_CACHE_SIZE)
     async def _get_amp(self) -> Decimal:
-        if self.pair_type != PairType.stable:
+        if self.pair_config.pair_type != STABLE_PAIR_TYPE:
             raise TypeError("amp only valid for stable pairs")
         config = await self.client.contract_query(self.contract_addr, {"config": {}})
         params = json.loads(base64.b64decode(config["params"]))
@@ -138,12 +145,16 @@ class LiquidityPair(TerraswapLiquidityPair):
         max_spread: Decimal = None,
         belief_price: Decimal = None,
     ) -> dict[str, AmountTuple]:
-        if self.pair_type == PairType.xyk:
-            return await super().get_swap_amounts(
+        if self.pair_config.pair_type == STABLE_PAIR_TYPE:
+            return await self._get_swap_amounts_stable(
                 amount_in, safety_margin, simulate, simulate_msg, max_spread, belief_price
             )
-        if self.pair_type == PairType.stable:
-            return await self._get_swap_amounts_stable(
+        if self.pair_config.pair_type == XYK_PAIR_TYPE or (
+            "custom" in self.pair_config.pair_type
+            and isinstance(self.pair_config.pair_type["custom"], str)
+            and "xyk" in self.pair_config.pair_type["custom"].lower()
+        ):
+            return await super().get_swap_amounts(
                 amount_in, safety_margin, simulate, simulate_msg, max_spread, belief_price
             )
         raise NotImplementedError
