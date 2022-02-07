@@ -11,7 +11,8 @@ from exceptions import NotContract
 from ...token import check_cw20_whitelist, get_cw20_whitelist
 from ..terraswap.factory import Factory as TerraswapFactory
 from ..terraswap.liquidity_pair import pair_tokens_from_data
-from .liquidity_pair import ROUTER_SWAP_ACTION, LiquidityPair, PairConfig
+from ..terraswap.utils import EncodingVersion
+from .liquidity_pair import LiquidityPair, PairConfig
 
 if TYPE_CHECKING:
     from ..client import TerraClient
@@ -20,10 +21,11 @@ log = logging.getLogger(__name__)
 
 _FactoryT = TypeVar("_FactoryT", bound="Factory")
 
+DEFAULT_ROUTER_SWAP_ACTION = "astro_swap"
+
 
 class Factory(TerraswapFactory):
     pair_configs: list[PairConfig]
-    router_swap_action = ROUTER_SWAP_ACTION
 
     @classmethod
     async def new(
@@ -31,12 +33,16 @@ class Factory(TerraswapFactory):
         client: TerraClient,
         addresses: dict,
         name: str = None,
+        router_swap_action: str = None,
+        encoding_verion: EncodingVersion = None,
     ) -> _FactoryT:
         self = super().__new__(cls)
         self.client = client
         self.name = name
         self.contract_addr = addresses["factory"]
         self.router_address = addresses.get("router")
+        self.router_swap_action = router_swap_action or DEFAULT_ROUTER_SWAP_ACTION
+        self.encoding_version = encoding_verion or EncodingVersion.v1
         self.pairs_addresses = addresses["pairs"]
         self.assert_limit_order_address = addresses.get("assert_limit_order")
 
@@ -92,6 +98,8 @@ class Factory(TerraswapFactory):
             factory_name=self.name,
             factory_address=self.contract_addr,
             router_address=self.router_address,
+            router_swap_action=self.router_swap_action,
+            encoding_version=self.encoding_version,
             check_liquidity=check_liquidity,
             pair_configs=self.pair_configs,
         )

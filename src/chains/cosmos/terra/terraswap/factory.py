@@ -9,12 +9,13 @@ import grpclib
 from cosmos_sdk.core import AccAddress
 from cosmos_sdk.exceptions import LCDResponseError
 
+from chains.cosmos.terra.terraswap.utils import EncodingVersion
 from chains.cosmos.terra.token import TerraNativeToken
 from exceptions import NotContract
 
 from ...token import check_cw20_whitelist, get_cw20_whitelist
 from .liquidity_pair import (
-    ROUTER_SWAP_ACTION,
+    DEFAULT_ROUTER_SWAP_ACTION,
     LiquidityPair,
     RouterNativeLiquidityPair,
     pair_tokens_from_data,
@@ -46,7 +47,8 @@ class Factory:
     name: str | None
     contract_addr: AccAddress
     router_address: AccAddress | None
-    router_swap_action = ROUTER_SWAP_ACTION
+    router_swap_action: str
+    encoding_version: EncodingVersion
     pairs_addresses: dict[str, AccAddress]
     assert_limit_order_address: AccAddress | None
     pair_code_id: int
@@ -61,12 +63,16 @@ class Factory:
         client: TerraClient,
         addresses: dict,
         name: str = None,
+        router_swap_action: str = None,
+        encoding_version: EncodingVersion = None,
     ) -> _FactoryT:
         self = super().__new__(cls)
         self.client = client
         self.name = name
         self.contract_addr = addresses["factory"]
         self.router_address = addresses.get("router")
+        self.router_swap_action = router_swap_action or DEFAULT_ROUTER_SWAP_ACTION
+        self.encoding_version = encoding_version or EncodingVersion.v1
         self.pairs_addresses = addresses["pairs"]
         self.assert_limit_order_address = addresses.get("assert_limit_order")
 
@@ -146,6 +152,8 @@ class Factory:
             factory_name=self.name,
             factory_address=self.contract_addr,
             router_address=self.router_address,
+            router_swap_action=self.router_swap_action,
+            encoding_version=self.encoding_version,
             assert_limit_order_address=self.assert_limit_order_address,
             check_liquidity=check_liquidity,
         )

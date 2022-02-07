@@ -178,7 +178,11 @@ class RoutePools:
         for pool in pools:
             token_out = pool.tokens[0] if token_in == pool.tokens[1] else pool.tokens[1]
             if isinstance(pool, LiquidityPair):
-                steps.append(RouteStepTerraswap(token_in, token_out, pool.router_swap_action))
+                steps.append(
+                    RouteStepTerraswap(
+                        token_in, token_out, pool.router_swap_action, pool.encoding_version
+                    )
+                )
             else:
                 steps.append(RouteStepNative(token_in, token_out))  # type: ignore
             token_in = token_out

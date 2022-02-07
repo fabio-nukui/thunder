@@ -14,12 +14,12 @@ from utils.cache import CacheGroup, ttl_cache
 
 from ..client import TerraClient
 from ..terraswap.liquidity_pair import LiquidityPair as TerraswapLiquidityPair
+from ..terraswap.utils import EncodingVersion
 from ..token import TerraTokenAmount
 
 log = logging.getLogger(__name__)
 
 FEE = Decimal("0.003")
-ROUTER_SWAP_ACTION = "astro_swap"
 
 _AMP_CACHE_SIZE = 200
 _ITERATIONS = 32
@@ -89,7 +89,6 @@ def _compute_new_reserve_out(leverage: Decimal, new_reserve_in: Decimal, d: Deci
 
 class LiquidityPair(TerraswapLiquidityPair):
     pair_config: PairConfig
-    router_swap_acton = ROUTER_SWAP_ACTION
 
     @classmethod
     async def new(
@@ -100,6 +99,8 @@ class LiquidityPair(TerraswapLiquidityPair):
         factory_name: str = None,
         factory_address: AccAddress = None,
         router_address: AccAddress = None,
+        router_swap_action: str = None,
+        encoding_version: EncodingVersion = None,
         assert_limit_order_address: AccAddress = None,
         recursive_lp_token_code_id: int = None,
         check_liquidity: bool = True,
@@ -122,6 +123,8 @@ class LiquidityPair(TerraswapLiquidityPair):
             factory_name,
             factory_address,
             router_address,
+            router_swap_action,
+            encoding_version,
             assert_limit_order_address,
             recursive_lp_token_code_id,
             check_liquidity,

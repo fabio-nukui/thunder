@@ -10,7 +10,7 @@ from cosmos_sdk.core.wasm import MsgExecuteContract
 from ..client import TerraClient
 from ..token import TerraCW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
 from .liquidity_pair import LiquidityPair, RouterNativeLiquidityPair
-from .utils import Operation, token_to_data
+from .utils import EncodingVersion, Operation, token_to_data
 
 AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
 RouterLiquidityPair = Union[LiquidityPair, RouterNativeLiquidityPair]
@@ -45,15 +45,17 @@ class RouteStepTerraswap(RouteStep):
         token_in: TerraToken,
         token_out: TerraToken,
         swap_action: str,
+        encoding_version: EncodingVersion,
     ):
         super().__init__(token_in, token_out)
         self.swap_action = swap_action
+        self.encoding_version = encoding_version
 
     def to_data(self) -> dict:
         return {
             self.swap_action: {
-                "offer_asset_info": token_to_data(self.token_in),
-                "ask_asset_info": token_to_data(self.token_out),
+                "offer_asset_info": token_to_data(self.token_in, self.encoding_version),
+                "ask_asset_info": token_to_data(self.token_out, self.encoding_version),
             }
         }
 

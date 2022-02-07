@@ -6,13 +6,12 @@ from typing import TYPE_CHECKING
 from cosmos_sdk.core import AccAddress
 
 from .factory import Factory
-from .liquidity_pair import ROUTER_SWAP_ACTION, LiquidityPair
+from .liquidity_pair import LiquidityPair
 
 if TYPE_CHECKING:
     from ..client import TerraClient
 
 __all__ = [
-    "ROUTER_SWAP_ACTION",
     "LiquidityPair",
     "AstroportFactory",
 ]

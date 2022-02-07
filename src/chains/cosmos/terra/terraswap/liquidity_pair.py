@@ -22,7 +22,7 @@ from utils.cache import CacheGroup, lru_cache, ttl_cache
 from ..client import TerraClient
 from ..native_liquidity_pair import BaseTerraLiquidityPair, NativeLiquidityPair
 from ..token import TerraCW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
-from .utils import Operation, token_to_data
+from .utils import EncodingVersion, Operation, token_to_data
 
 if TYPE_CHECKING:
     from .router import RouterLiquidityPair
@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 FEE = Decimal("0.003")
-ROUTER_SWAP_ACTION = "terra_swap"
+DEFAULT_ROUTER_SWAP_ACTION = "terra_swap"
 
 _MAX_SWAP_SLIPPAGE = Decimal("0.00001")
 _MAX_ADD_LIQUIDITY_SLIPPAGE = Decimal("0.0005")
@@ -108,9 +108,9 @@ async def token_from_data(
     raise TypeError(f"Unexpected data format: {asset_info}")
 
 
-def _token_amount_to_data(token_amount: TerraTokenAmount) -> dict:
+def _token_amount_to_data(token_amount: TerraTokenAmount, encoding: EncodingVersion) -> dict:
     return {
-        "info": token_to_data(token_amount.token),
+        "info": token_to_data(token_amount.token, encoding),
         "amount": str(token_amount.int_amount),
     }
 
@@ -312,7 +312,8 @@ class LiquidityPair(BaseTerraLiquidityPair):
     factory_name: str | None
     factory_address: AccAddress | None
     router_address: AccAddress | None
-    router_swap_action = ROUTER_SWAP_ACTION
+    router_swap_action: str
+    encoding_version: EncodingVersion
     assert_limit_order_address: AccAddress | None
     lp_token: LPToken
     _reserves: AmountTuple
@@ -329,6 +330,8 @@ class LiquidityPair(BaseTerraLiquidityPair):
         factory_name: str = None,
         factory_address: AccAddress = None,
         router_address: AccAddress = None,
+        router_swap_action: str = None,
+        encoding_version: EncodingVersion = None,
         assert_limit_order_address: AccAddress = None,
         recursive_lp_token_code_id: int = None,
         check_liquidity: bool = True,
@@ -345,6 +348,8 @@ class LiquidityPair(BaseTerraLiquidityPair):
             factory_name,
             factory_address,
             router_address,
+            router_swap_action,
+            encoding_version,
             assert_limit_order_address,
             recursive_lp_token_code_id,
             check_liquidity,
@@ -359,6 +364,8 @@ class LiquidityPair(BaseTerraLiquidityPair):
         factory_name: str = None,
         factory_address: AccAddress = None,
         router_address: AccAddress = None,
+        router_swap_action: str = None,
+        encoding_version: EncodingVersion = None,
         assert_limit_order_address: AccAddress = None,
         recursive_lp_token_code_id: int = None,
         check_liquidity: bool = True,
@@ -370,6 +377,8 @@ class LiquidityPair(BaseTerraLiquidityPair):
             self.factory_name = factory_name
             self.factory_address = factory_address
             self.router_address = router_address
+            self.router_swap_action = router_swap_action or DEFAULT_ROUTER_SWAP_ACTION
+            self.encoding_version = encoding_version or EncodingVersion.v1
             self.assert_limit_order_address = assert_limit_order_address
 
             self.stop_updates = False
@@ -620,7 +629,10 @@ class LiquidityPair(BaseTerraLiquidityPair):
         else:
             contract = self.contract_addr
             execute_msg = {
-                Action.swap: {"offer_asset": _token_amount_to_data(amount_in), **swap_msg}
+                Action.swap: {
+                    "offer_asset": _token_amount_to_data(amount_in, self.encoding_version),
+                    **swap_msg,
+                }
             }
             coins = Coins([amount_in.to_coin()])
 
@@ -810,8 +822,8 @@ class LiquidityPair(BaseTerraLiquidityPair):
         execute_msg = {
             Action.provide_liquidity: {
                 "assets": [
-                    _token_amount_to_data(amounts_in[0]),
-                    _token_amount_to_data(amounts_in[1]),
+                    _token_amount_to_data(amounts_in[0], self.encoding_version),
+                    _token_amount_to_data(amounts_in[1], self.encoding_version),
                 ],
                 "slippage_tolerance": str(round(slippage_tolerance, 18)),
             }
