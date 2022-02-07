@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from decimal import Decimal
 from typing import TYPE_CHECKING
@@ -10,14 +11,13 @@ from cosmos_sdk.core.wasm import MsgExecuteContract
 
 from utils.cache import CacheGroup, ttl_cache
 
-from .denoms import LUNA
 from .native_liquidity_pair import BaseTerraLiquidityPair
 from .token import TerraCW20Token, TerraTokenAmount
 
 if TYPE_CHECKING:
     from .client import TerraClient
 
-ADDRESSES_FILE = "resources/addresses/cosmos/{chain_id}/stader.json"
+ADDRESSES_FILE = "resources/addresses/cosmos/{chain_id}/prism.json"
 _CONFIG_CACHE_TTL = 60
 
 
@@ -25,29 +25,32 @@ def _get_addresses(chain_id: str) -> dict[str, AccAddress]:
     return json.load(open(ADDRESSES_FILE.format(chain_id=chain_id)))
 
 
-class LunaXVault(BaseTerraLiquidityPair):
+class XPrismMinter(BaseTerraLiquidityPair):
     contract_addr: AccAddress
     client: TerraClient
-    lunax: TerraCW20Token
+    prism: TerraCW20Token
+    xprism: TerraCW20Token
     _exchange_rate: Decimal
 
     @classmethod
-    async def new(cls, client: TerraClient) -> LunaXVault:
+    async def new(cls, client: TerraClient) -> XPrismMinter:
         self = super().__new__(cls)
         self.client = client
-        self.contract_addr = _get_addresses(client.chain_id)["lunax_vault"]
+        self.contract_addr = _get_addresses(client.chain_id)["prism_gov"]
 
         config = await self.get_config()
-        self.lunax = await TerraCW20Token.from_contract(config["cw20_token_contract"], client)
-        self.tokens = self.lunax, LUNA
-        self._exchange_rate = Decimal(1)
+        self.tokens = self.prism, self.xprism = await asyncio.gather(
+            TerraCW20Token.from_contract(config["prism_token"], client),
+            TerraCW20Token.from_contract(config["xprism_token"], client),
+        )
 
+        self._exchange_rate = Decimal(1)
         self.stop_updates = False
 
         return self
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self.lunax.symbol})"
+        return f"{self.__class__.__name__}"
 
     async def op_swap(
         self,
@@ -56,7 +59,7 @@ class LunaXVault(BaseTerraLiquidityPair):
         safety_margin: bool | int = True,
         simulate: bool = False,
     ) -> tuple[TerraTokenAmount, list[MsgExecuteContract]]:
-        if amount_in.token == LUNA:
+        if amount_in.token == self.prism:
             msg = self.get_deposit_msg(sender, amount_in)
         else:
             msg = self.get_withdraw_msg(sender, amount_in)
@@ -76,12 +79,8 @@ class LunaXVault(BaseTerraLiquidityPair):
 
     @ttl_cache(CacheGroup.TERRA)
     async def get_state(self) -> dict:
-        res = await self.client.contract_query(self.contract_addr, {"state": {}})
-        return res["state"]
-
-    async def get_max_deposit(self) -> TerraTokenAmount:
-        config = await self.get_config()
-        return LUNA.to_amount(int_amount=config["max_deposit"])
+        res = await self.client.contract_query(self.contract_addr, {"xprism_state": {}})
+        return res["xprism_state"]
 
     async def get_swap_amount_out(
         self,
@@ -93,12 +92,12 @@ class LunaXVault(BaseTerraLiquidityPair):
         if simulate:
             raise NotImplementedError
         exchange_rate = await self.get_exchange_rate()
-        if amount_in.token == LUNA:
-            amount_out = self.lunax.to_amount(amount_in.amount / exchange_rate)
-        elif amount_in.token == self.lunax:
-            amount_out = LUNA.to_amount(amount_in.amount * exchange_rate)
+        if amount_in.token == self.prism:
+            amount_out = self.xprism.to_amount(amount_in.amount / exchange_rate)
+        elif amount_in.token == self.xprism:
+            amount_out = self.prism.to_amount(amount_in.amount * exchange_rate)
         else:
-            raise TypeError(f"{amount_in.token=} not LUNA nor LunaX")
+            raise TypeError(f"{amount_in.token=} not PRISM nor xPRISM")
         return amount_out.safe_margin(safety_margin)
 
     def get_deposit_msg(
@@ -118,11 +117,11 @@ class LunaXVault(BaseTerraLiquidityPair):
         sender: AccAddress,
         amount_withdraw: TerraTokenAmount,
     ) -> MsgExecuteContract:
-        raise NotImplementedError("LunaX burn not implemented")
+        raise NotImplementedError("xPRISM burn not implemented")
 
     async def simulate_reserve_change(
         self, amounts: tuple[TerraTokenAmount, TerraTokenAmount]
-    ) -> LunaXVault:
+    ) -> XPrismMinter:
         return self
 
     async def get_reserve_changes_from_msg(
