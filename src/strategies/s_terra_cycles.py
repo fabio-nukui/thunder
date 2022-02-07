@@ -224,7 +224,11 @@ async def _get_luna_native_routes(
 ) -> list[MultiRoutes]:
     routes: list[MultiRoutes] = []
     for factory in terraswap_factories:
-        for pair in await _pairs_from_factories([factory], "LUNA", excluded_symbols=["UST"]):
+        try:
+            pairs = await _pairs_from_factories([factory], "LUNA", excluded_symbols=["UST"])
+        except NoPairFound:
+            continue
+        for pair in pairs:
             if not all(isinstance(token, TerraNativeToken) for token in pair.tokens):
                 continue
             native_pair = factory.get_native_pair(pair.tokens)  # type: ignore
