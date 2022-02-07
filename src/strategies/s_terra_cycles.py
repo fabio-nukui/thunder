@@ -37,6 +37,7 @@ from chains.cosmos.terra import (
     anchor,
     astroport,
     nexus,
+    prism,
     stader,
     terraswap,
 )
@@ -120,24 +121,29 @@ async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
     (
         terraswap_factory,
         loop_factory,
+        prismswap_factory,
         astroport_factory,
         anchor_market,
         lunax_vault,
+        xprism_minter,
     ) = await asyncio.gather(
         terraswap.TerraswapFactory.new(client),
         terraswap.LoopFactory.new(client),
+        terraswap.PrismFactory.new(client),
         astroport.AstroportFactory.new(client),
         anchor.Market.new(client),
         stader.LunaXVault.new(client),
+        prism.XPrismMinter.new(client),
     )
     nexus_factory = nexus.Factory(client)
-    dex_factories = [terraswap_factory, loop_factory, astroport_factory]
+    dex_factories = [terraswap_factory, loop_factory, astroport_factory, prismswap_factory]
     list_route_groups: list[list[MultiRoutes]] = await asyncio.gather(
-        _get_ust_luna_routes(client, loop_factory, terraswap_factory, astroport_factory),
-        _get_luna_native_routes(client, [terraswap_factory, astroport_factory]),
+        _get_ust_luna_routes(client, dex_factories),
+        _get_luna_native_routes(client, dex_factories),
         _get_psi_routes(client, nexus_factory, dex_factories),
         _get_aust_routes(client, anchor_market, dex_factories),
         _get_stader_routes(client, lunax_vault, dex_factories),
+        _get_prism_routes(client, xprism_minter, dex_factories),
         _get_2cycle_routes(client, dex_factories),
         _get_3cycle_routes(client, dex_factories),
     )
@@ -196,16 +202,10 @@ def get_filters(
 
 async def _get_ust_luna_routes(
     client: TerraClient,
-    loop_factory: terraswap.LoopFactory,
-    terraswap_factory: terraswap.TerraswapFactory,
-    astroport_factory: astroport.AstroportFactory,
+    terraswap_factories: Sequence[terraswap.Factory],
 ) -> list[MultiRoutes]:
-    dex_pairs = await asyncio.gather(
-        loop_factory.get_pair("[LUNA]-[UST]"),
-        terraswap_factory.get_pair("[UST]-[LUNA]"),
-        astroport_factory.get_pair("[UST]-[LUNA]"),
-    )
-    native_pair = terraswap_factory.get_native_pair((UST, LUNA))
+    dex_pairs = await _pairs_from_factories(terraswap_factories, "UST", "LUNA")
+    native_pair = NativeLiquidityPair(client, (UST, LUNA))
     pairs = [*dex_pairs, native_pair]
 
     return [
@@ -213,7 +213,7 @@ async def _get_ust_luna_routes(
             client=client,
             start_token=UST,
             list_steps=[pairs, pairs],
-            router_address=terraswap_factory.router_address,
+            infer_router=True,
         )
     ]
 
@@ -316,6 +316,36 @@ async def _get_stader_routes(
         MultiRoutes(client, LUNA, lunax_luna_steps, single_direction=True),
         MultiRoutes(client, LUNA, lunax_bluna_steps, single_direction=True),
     ]
+
+
+async def _get_prism_routes(
+    client: TerraClient,
+    xprism_minter: prism.XPrismMinter,
+    factories: Sequence[terraswap.Factory],
+) -> list[MultiRoutes]:
+    routes: list[MultiRoutes] = []
+
+    xprism_prism_pairs, prism_ust_pairs = await asyncio.gather(
+        _pairs_from_factories(factories, "xPRISM", "PRISM"),
+        _pairs_from_factories(factories, "PRISM", "UST"),
+    )
+    xprism_prism_steps: Sequence = [
+        prism_ust_pairs,
+        [xprism_minter],
+        xprism_prism_pairs,
+        prism_ust_pairs,
+    ]
+    routes.append(MultiRoutes(client, UST, xprism_prism_steps, single_direction=True))
+
+    try:
+        xprism_ust_pairs = await _pairs_from_factories(factories, "xPRISM", "UST")
+    except NoPairFound:
+        pass
+    else:
+        xprism_ust_steps: Sequence = [prism_ust_pairs, [xprism_minter], xprism_ust_pairs]
+        routes.append(MultiRoutes(client, UST, xprism_ust_steps, single_direction=True))
+
+    return routes
 
 
 async def _get_3cycle_routes(

@@ -36,9 +36,11 @@ class LunaXVault(BaseTerraLiquidityPair):
         self = super().__new__(cls)
         self.client = client
         self.contract_addr = _get_addresses(client.chain_id)["lunax_vault"]
+        data: dict = await client.contract_query(self.contract_addr, {"config": {}})
 
-        config = await self.get_config()
-        self.lunax = await TerraCW20Token.from_contract(config["cw20_token_contract"], client)
+        self.lunax = await TerraCW20Token.from_contract(
+            data["config"]["cw20_token_contract"], client
+        )
         self.tokens = self.lunax, LUNA
         self._exchange_rate = Decimal(1)
 

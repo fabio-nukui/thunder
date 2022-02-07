@@ -5,7 +5,7 @@ import json
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from cosmos_sdk.core import AccAddress, Coins
+from cosmos_sdk.core import AccAddress
 from cosmos_sdk.core.msg import Msg
 from cosmos_sdk.core.wasm import MsgExecuteContract
 
@@ -74,13 +74,11 @@ class XPrismMinter(BaseTerraLiquidityPair):
 
     @ttl_cache(CacheGroup.TERRA, ttl=_CONFIG_CACHE_TTL)
     async def get_config(self) -> dict:
-        res = await self.client.contract_query(self.contract_addr, {"config": {}})
-        return res["config"]
+        return await self.client.contract_query(self.contract_addr, {"config": {}})
 
     @ttl_cache(CacheGroup.TERRA)
     async def get_state(self) -> dict:
-        res = await self.client.contract_query(self.contract_addr, {"xprism_state": {}})
-        return res["xprism_state"]
+        return await self.client.contract_query(self.contract_addr, {"xprism_state": {}})
 
     async def get_swap_amount_out(
         self,
@@ -107,9 +105,14 @@ class XPrismMinter(BaseTerraLiquidityPair):
     ) -> MsgExecuteContract:
         return MsgExecuteContract(
             sender=sender,
-            contract=self.contract_addr,
-            execute_msg={"deposit": {}},
-            coins=Coins([amount_deposit.to_coin()]),
+            contract=self.prism.contract_addr,
+            execute_msg={
+                "send": {
+                    "msg": "eyJtaW50X3hwcmlzbSI6e319",  # {"mint_xprism":{}}
+                    "amount": str(amount_deposit.int_amount),
+                    "contract": self.contract_addr,
+                }
+            },
         )
 
     def get_withdraw_msg(

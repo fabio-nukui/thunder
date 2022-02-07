@@ -8,12 +8,13 @@ from cosmos_sdk.core import AccAddress, Coins
 from cosmos_sdk.core.wasm import MsgExecuteContract
 
 from ..client import TerraClient
+from ..native_liquidity_pair import NativeLiquidityPair
 from ..token import TerraCW20Token, TerraNativeToken, TerraToken, TerraTokenAmount
-from .liquidity_pair import LiquidityPair, RouterNativeLiquidityPair
+from .liquidity_pair import LiquidityPair
 from .utils import EncodingVersion, Operation, token_to_data
 
 AmountTuple = tuple[TerraTokenAmount, TerraTokenAmount]
-RouterLiquidityPair = Union[LiquidityPair, RouterNativeLiquidityPair]
+RouterLiquidityPair = Union[LiquidityPair, NativeLiquidityPair]
 
 ROUTER_EFFICIENCY = Decimal("0.9995")
 
@@ -89,11 +90,11 @@ class Router:
         client: TerraClient,
     ):
         self.terraswap_pairs: dict[tuple[TerraToken, TerraToken], LiquidityPair] = {}
-        self.native_pairs: dict[tuple[TerraToken, TerraToken], RouterNativeLiquidityPair] = {}
+        self.native_pairs: dict[tuple[TerraToken, TerraToken], NativeLiquidityPair] = {}
         for pair in liquidity_pairs:
             if isinstance(pair, LiquidityPair):
                 self.terraswap_pairs[pair.sorted_tokens] = pair
-            elif isinstance(pair, RouterNativeLiquidityPair):
+            elif isinstance(pair, NativeLiquidityPair):
                 self.native_pairs[pair.sorted_tokens] = pair
             else:
                 raise TypeError(

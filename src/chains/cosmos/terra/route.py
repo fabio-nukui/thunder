@@ -10,7 +10,7 @@ from cosmos_sdk.core.msg import Msg
 from utils.cache import lru_cache
 
 from .client import TerraClient
-from .native_liquidity_pair import BaseTerraLiquidityPair
+from .native_liquidity_pair import BaseTerraLiquidityPair, NativeLiquidityPair
 from .terraswap.liquidity_pair import LiquidityPair, RouterNativeLiquidityPair
 from .terraswap.router import Router, RouteStep, RouteStepNative, RouteStepTerraswap
 from .token import TerraToken, TerraTokenAmount
@@ -45,10 +45,12 @@ class MultiRoutes:
         list_steps: Sequence[Sequence[BaseTerraLiquidityPair]],
         single_direction: bool = False,
         router_address: AccAddress = None,
+        infer_router: bool = False,
     ):
         self.client = client
         self.list_steps = list_steps
         self.router_address = router_address
+        self.infer_router = infer_router
         self.pools = list({pool for step in list_steps for pool in step})
         self.tokens = _extract_tokens_from_routes(start_token, list_steps)
         self.n_steps = len(list_steps)
@@ -59,10 +61,13 @@ class MultiRoutes:
         for pools in itertools.product(*list_steps):
             if len(pools) != len(set(pools)):
                 continue  # Circular route
-            if (sorted_pools := tuple(sorted(pools, key=str))) in appended_pools:
+            sorted_pools = tuple(sorted(pools, key=str))
+            if sorted_pools in appended_pools and not single_direction:
                 continue  # Repeated route
             self.routes.append(
-                RoutePools(client, self.tokens, pools, single_direction, router_address)
+                RoutePools(
+                    client, self.tokens, pools, single_direction, router_address, infer_router
+                )
             )
             appended_pools.add(sorted_pools)
 
@@ -86,16 +91,25 @@ class RoutePools:
         pools: Iterable[BaseTerraLiquidityPair],
         single_direction: bool = False,
         router_address: AccAddress = None,
+        infer_router: bool = False,
     ):
         self.client = client
         self.tokens = list(tokens)
         self._pools = list(pools)
         self.single_direction = single_direction
+        if infer_router:
+            router_addresses: set[AccAddress] = {
+                getattr(pool, "router_address")
+                for pool in pools
+                if hasattr(pool, "router_address")
+            }
+            if len(router_addresses) == 1:
+                router_address = router_addresses.pop()
         if router_address is None:
             self.router = None
         else:
-            assert all(isinstance(p, (LiquidityPair, RouterNativeLiquidityPair)) for p in pools)
-            pools_r = cast(Iterable[Union[LiquidityPair, RouterNativeLiquidityPair]], pools)
+            assert all(isinstance(p, (LiquidityPair, NativeLiquidityPair)) for p in pools)
+            pools_r = cast(Iterable[Union[LiquidityPair, NativeLiquidityPair]], pools)
             self.router = Router(router_address, pools_r, client)
         self.is_cycle = self.tokens[0] == self.tokens[-1]
 
@@ -113,7 +127,7 @@ class RoutePools:
             for pool in pools:
                 if isinstance(pool, LiquidityPair):
                     self.router.terraswap_pairs[pool.sorted_tokens] = pool
-                elif isinstance(pool, RouterNativeLiquidityPair):
+                elif isinstance(pool, NativeLiquidityPair):
                     self.router.native_pairs[pool.sorted_tokens] = pool
 
     async def should_reverse(self, amount_in: TerraTokenAmount) -> bool:
