@@ -1,0 +1,8 @@
+{
+  "factory": "terra1sfw7vvwhsczkeje22ramy76pj5cm9gtvvnzn94",
+  "pairs": {
+    "[PRISM]-[UST]": "terra19d2alknajcngdezrdhq40h6362k92kz23sz62u",
+    "[PRISM]-[xPRISM]": "terra1czynvm64nslq2xxavzyrrhau09smvana003nrf"
+  },
+  "router": "terra1yrc0zpwhuqezfnhdgvvh7vs5svqtgyl7pu3n6c"
+}

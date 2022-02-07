@@ -47,3 +47,10 @@ class LoopFactory(Factory):
     async def new(cls, client: TerraClient) -> LoopFactory:  # type: ignore[override]
         addresses = _get_addresses(client.chain_id, "loop")
         return await super().new(client, addresses, "loop")
+
+
+class PrismFactory(Factory):
+    @classmethod
+    async def new(cls, client: TerraClient) -> PrismFactory:  # type: ignore[override]
+        addresses = _get_addresses(client.chain_id, "prism")
+        return await super().new(client, addresses, "prism")

@@ -101,6 +101,10 @@ async def token_from_data(
             except NotTerraswapLPToken:
                 pass
         return await TerraCW20Token.from_contract(contract_addr, client)
+    if "native" in asset_info:
+        return TerraNativeToken(asset_info["native"])
+    if "cw20" in asset_info:
+        return await TerraCW20Token.from_contract(asset_info["cw20"], client)
     raise TypeError(f"Unexpected data format: {asset_info}")
 
 

@@ -16,12 +16,13 @@ _ASTROPORT_DEX_ROUTER = "terra16t7dpwwgx9n3lq6l6te3753lsjqwhxwpday9zx"
 _TERRASWAP_ADDRESSES_DIR = "resources/addresses/cosmos/{chain_id}/terraswap"
 _TERRASWAP_DEX_ROUTER = "terra19qx5xe6q9ll4w0890ux7lv2p4mf3csd4qvt3ex"
 _TERRASWAP_DEX_ASSERT_LIMIT_ORDER = "terra1vs9jr7pxuqwct3j29lez3pfetuu8xmq7tk3lzk"
+_PRISMSWAP_DEX_ROUTER = "terra1yrc0zpwhuqezfnhdgvvh7vs5svqtgyl7pu3n6c"
 
 
 def get_filepath(chain_id: str, dex_name: str) -> str:
     if dex_name == "astroport":
         dirname = _ASTROPORT_ADDRESSES_DIR
-    elif dex_name in ("terraswap", "loop"):
+    elif dex_name in ("terraswap", "loop", "prism"):
         dirname = _TERRASWAP_ADDRESSES_DIR
     else:
         raise NotImplementedError(dex_name)
@@ -63,6 +64,9 @@ async def main():
 
         astroport_factory = await astroport.AstroportFactory.new(client)
         await write_to_file(astroport_factory, "astroport", _ASTROPORT_DEX_ROUTER)
+
+        prism_factory = await terraswap.PrismFactory.new(client)
+        await write_to_file(prism_factory, "prism", _PRISMSWAP_DEX_ROUTER)
 
 
 if __name__ == "__main__":
