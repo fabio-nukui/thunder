@@ -152,7 +152,7 @@ class FilterFirstActionRouterSwap(Filter):
                 if any(pair_id == ids for ids in self._pair_ids):
                     return True
         except (KeyError, AttributeError, ValueError):
-            log.debug("Unexpected msg format", extra={"data": msg})
+            log.debug("Unexpected msg format", extra={"data": msg.to_data()})
         return False
 
 

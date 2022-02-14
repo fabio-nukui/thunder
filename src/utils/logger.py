@@ -11,10 +11,17 @@ import aiofiles
 from aiofiles.threadpool.text import AsyncTextIOWrapper
 
 
+def to_str(x) -> str:
+    try:
+        return json.dumps(x)
+    except TypeError:
+        return str(x)
+
+
 class ExtraDataFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
-        if data := getattr(record, "data", None):
-            return f"{super().format(record)}; data={json.dumps(data)}"
+        if (data := getattr(record, "data", None)) is not None:
+            return f"{super().format(record)}; data={to_str(data)}"
         return super().format(record)
 
 
