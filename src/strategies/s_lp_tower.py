@@ -121,7 +121,9 @@ def get_filters(
             ):
                 continue
             router_addresses = {pair.router_address} if pair.router_address else set()
-            filter_ = FilterSwapTerraswap([pair], router_addresses)
+            filter_ = FilterSwapTerraswap(
+                [pair], router_addresses, terraswap.liquidity_pair.DEFAULT_ROUTER_SWAP_ACTION
+            )
             if isinstance(pair, NativeLiquidityPair):
                 filter_ = filter_ | FilterNativeSwap([pair])
             filters[pair] = filter_

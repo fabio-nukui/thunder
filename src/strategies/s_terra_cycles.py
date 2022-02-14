@@ -193,7 +193,9 @@ def get_filters(
             if not isinstance(pool, FILTER_POOL_TYPES):
                 continue
             router_addresses = {pool.router_address} if pool.router_address else set()
-            filter_: Filter = FilterSwapTerraswap([pool], router_addresses)
+            filter_: Filter = FilterSwapTerraswap(
+                [pool], router_addresses, pool.router_swap_action
+            )
             if isinstance(pool, NativeLiquidityPair):
                 filter_ = filter_ | FilterNativeSwap([pool])
             filters[pool] = filter_  # type: ignore

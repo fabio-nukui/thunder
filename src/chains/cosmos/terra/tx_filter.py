@@ -90,12 +90,13 @@ class FilterFirstActionRouterSwap(Filter):
         self,
         pairs: Iterable[terraswap.RouterLiquidityPair],
         router_addresses: Iterable[AccAddress],
+        router_swap_action: str,
         aways_base64: bool = False,
     ):
         self.aways_base64 = aways_base64
         self.pairs = pairs
         self.router_addresses = router_addresses
-        (self.swap_action,) = {p.router_swap_action for p in pairs}
+        self.swap_action = router_swap_action
         self._pair_ids = [
             (
                 "native" if isinstance(p, terraswap.RouterNativeLiquidityPair) else "lp",
@@ -160,13 +161,16 @@ class FilterSwapTerraswap(Filter):
         self,
         pairs: Iterable[terraswap.RouterLiquidityPair],
         router_addresses: Iterable[AccAddress],
+        router_swap_action: str,
     ):
         self.pairs = pairs
 
         filter_length = FilterMsgsLength(1)
         terraswap_pairs = [p for p in self.pairs if isinstance(p, terraswap.LiquidityPair)]
         filter_pair = FilterFirstActionPairSwap(terraswap.Action.swap, terraswap_pairs)
-        filter_router = FilterFirstActionRouterSwap(self.pairs, router_addresses)
+        filter_router = FilterFirstActionRouterSwap(
+            self.pairs, router_addresses, router_swap_action
+        )
 
         self._filter = filter_length & (filter_pair | filter_router)
 
