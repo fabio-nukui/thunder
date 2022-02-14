@@ -1,8 +1,12 @@
 {
   "factory": "terra1sfw7vvwhsczkeje22ramy76pj5cm9gtvvnzn94",
   "pairs": {
+    "[PRISM]-[LUNA]": "terra1r38qlqt69lez4nja5h56qwf4drzjpnu8gz04jd",
     "[PRISM]-[UST]": "terra19d2alknajcngdezrdhq40h6362k92kz23sz62u",
-    "[PRISM]-[xPRISM]": "terra1czynvm64nslq2xxavzyrrhau09smvana003nrf"
+    "[PRISM]-[cLuna]": "terra1yxgq5y6mw30xy9mmvz9mllneddy9jaxndrphvk",
+    "[PRISM]-[pLuna]": "terra1persuahr6f8fm6nyup0xjc7aveaur89nwgs5vs",
+    "[PRISM]-[xPRISM]": "terra1czynvm64nslq2xxavzyrrhau09smvana003nrf",
+    "[PRISM]-[yLuna]": "terra1kqc65n5060rtvcgcktsxycdt2a4r67q2zlvhce"
   },
   "router": "terra1yrc0zpwhuqezfnhdgvvh7vs5svqtgyl7pu3n6c"
 }
