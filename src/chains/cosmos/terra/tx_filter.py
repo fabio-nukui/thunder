@@ -136,7 +136,7 @@ class FilterFirstActionRouterSwap(Filter):
             return False
 
         native_swap: dict[str, str]
-        pair_swap: dict[str, dict[str, dict[str, str]]]
+        pair_swap: dict[str, dict[str, dict[str, str] | str]]
         try:
             for operation in operations:
                 if "native_swap" in operation:
@@ -146,8 +146,14 @@ class FilterFirstActionRouterSwap(Filter):
                     pair_swap = operation[self.swap_action]
                     (ask_asset,) = pair_swap["ask_asset_info"].values()
                     (offer_asset,) = pair_swap["offer_asset_info"].values()
-                    (ask_asset_id,) = ask_asset.values()
-                    (offer_asset_id,) = offer_asset.values()
+                    if isinstance(ask_asset, dict):
+                        (ask_asset_id,) = ask_asset.values()
+                    else:
+                        ask_asset_id = ask_asset
+                    if isinstance(offer_asset, dict):
+                        (offer_asset_id,) = offer_asset.values()
+                    else:
+                        offer_asset_id = offer_asset
                     pair_id = ("lp", {ask_asset_id, offer_asset_id})
                 if any(pair_id == ids for ids in self._pair_ids):
                     return True
