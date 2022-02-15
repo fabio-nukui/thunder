@@ -126,6 +126,7 @@ async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
         anchor_market,
         lunax_vault,
         xprism_minter,
+        prism_luna_bonder,
     ) = await asyncio.gather(
         terraswap.TerraswapFactory.new(client),
         terraswap.LoopFactory.new(client),
@@ -134,6 +135,7 @@ async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
         anchor.Market.new(client),
         stader.LunaXVault.new(client),
         prism.XPrismMinter.new(client),
+        prism.PrismLunaBonder.new(client),
     )
     nexus_factory = nexus.Factory(client)
     dex_factories = [terraswap_factory, loop_factory, astroport_factory, prismswap_factory]
@@ -143,7 +145,7 @@ async def get_arbitrages(client: TerraClient) -> list[TerraCyclesArbitrage]:
         _get_psi_routes(client, nexus_factory, dex_factories),
         _get_aust_routes(client, anchor_market, dex_factories),
         _get_stader_routes(client, lunax_vault, dex_factories),
-        _get_prism_routes(client, xprism_minter, dex_factories),
+        _get_prism_routes(client, xprism_minter, prism_luna_bonder, dex_factories),
         _get_2cycle_routes(client, dex_factories),
         _get_3cycle_routes(client, dex_factories),
     )
@@ -327,6 +329,7 @@ async def _get_stader_routes(
 async def _get_prism_routes(
     client: TerraClient,
     xprism_minter: prism.XPrismMinter,
+    prism_luna_bonder: prism.PrismLunaBonder,
     factories: Sequence[terraswap.Factory],
 ) -> list[MultiRoutes]:
     routes: list[MultiRoutes] = []
@@ -350,6 +353,25 @@ async def _get_prism_routes(
     else:
         xprism_ust_steps: Sequence = [prism_ust_pairs, [xprism_minter], xprism_ust_pairs]
         routes.append(MultiRoutes(client, UST, xprism_ust_steps, single_direction=True))
+
+    cluna_prism_pairs, prism_luna_pairs = await asyncio.gather(
+        _pairs_from_factories(factories, "cLuna", "PRISM"),
+        _pairs_from_factories(factories, "PRISM", "LUNA"),
+    )
+    luna_cluna_prism_steps: Sequence = [
+        [prism_luna_bonder],
+        cluna_prism_pairs,
+        prism_luna_pairs,
+    ]
+    routes.append(MultiRoutes(client, LUNA, luna_cluna_prism_steps, single_direction=True))
+
+    try:
+        cluna_luna_pairs = await _pairs_from_factories(factories, "cLuna", "LUNA")
+    except NoPairFound:
+        pass
+    else:
+        cluna_luna_steps: Sequence = [prism_ust_pairs, [prism_luna_bonder], cluna_luna_pairs]
+        routes.append(MultiRoutes(client, UST, cluna_luna_steps, single_direction=True))
 
     return routes
 
