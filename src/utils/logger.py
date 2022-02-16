@@ -131,11 +131,15 @@ class AsyncFileHandler(AsyncHandler):
 
     async def async_emit(self, record: logging.LogRecord):
         async with self._initialization_lock:
-            if self._stream is None:
+            if self._stream is None or self._stream.closed:
                 self._stream = await self._get_stream()
 
-        await self._stream.write(self.format(record) + "\n")
-        await self._stream.flush()
+        msg = self.format(record) + "\n"
+        try:
+            await self._stream.write(msg)
+            await self._stream.flush()
+        except ValueError:  # Fix for I/O operation on closed file.
+            await self.async_emit(record)
 
 
 class AsyncRotatingFileHandler(AsyncFileHandler):
