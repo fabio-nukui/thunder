@@ -28,6 +28,10 @@ class NotContract(Exception):
     pass
 
 
+class NoPairFound(Exception):
+    pass
+
+
 class OptimizationError(Exception):
     pass
 

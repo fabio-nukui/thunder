@@ -3,14 +3,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
-import re
 import time
 from collections import defaultdict
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
-from typing import Any, Awaitable, Callable, Iterable, Sequence
+from typing import Any, Awaitable, Callable, Sequence
 
 from cosmos_sdk.core.auth import TxInfo
 from cosmos_sdk.core.coins import Coins
@@ -45,7 +44,7 @@ from chains.cosmos.terra.route import MultiRoutes, RoutePools
 from chains.cosmos.terra.tx_filter import Filter, FilterNativeSwap, FilterSwapTerraswap
 from exceptions import (
     FeeEstimationError,
-    InsufficientLiquidity,
+    NoPairFound,
     TokenAmountRoundingError,
     UnprofitableArbitrage,
 )
@@ -59,6 +58,8 @@ from strategies.common.default_params import (
 )
 from utils.cache import CacheGroup
 
+from .common.utils import pairs_from_factories
+
 log = logging.getLogger(__name__)
 
 MIN_RESERVED_AMOUNT = UST.to_amount(30)
@@ -66,10 +67,6 @@ MIN_N_ARBITRAGES = 20
 ANCHOR_MARKET_GAS_ADJUSTMENT = Decimal("1.35")
 FILTER_POOL_TYPES = (terraswap.LiquidityPair, terraswap.RouterNativeLiquidityPair)
 SLIPPAGE_TOLERANCE_PER_CONCAT_REPEAT = Decimal("0.0015")
-
-
-class NoPairFound(Exception):
-    pass
 
 
 @dataclass
@@ -208,7 +205,7 @@ async def _get_ust_luna_routes(
     client: TerraClient,
     terraswap_factories: Sequence[terraswap.Factory],
 ) -> list[MultiRoutes]:
-    dex_pairs = await _pairs_from_factories(terraswap_factories, "UST", "LUNA")
+    dex_pairs = await pairs_from_factories(terraswap_factories, "UST", "LUNA")
     native_pair = NativeLiquidityPair(client, (UST, LUNA))
     pairs = [*dex_pairs, native_pair]
 
@@ -229,7 +226,7 @@ async def _get_luna_native_routes(
     routes: list[MultiRoutes] = []
     for factory in terraswap_factories:
         try:
-            pairs = await _pairs_from_factories([factory], "LUNA", excluded_symbols=["UST"])
+            pairs = await pairs_from_factories([factory], "LUNA", excluded_symbols=["UST"])
         except NoPairFound:
             continue
         for pair in pairs:
@@ -256,9 +253,9 @@ async def _get_psi_routes(
     for vault in nexus_anchor_vaults:
         if vault.b_token.symbol == "BETH":
             ust_b_asset_pairs, n_asset_psi_pairs, ust_psi_pairs = await asyncio.gather(
-                _pairs_from_factories(terraswap_factories, "UST", vault.b_token.symbol),
-                _pairs_from_factories(terraswap_factories, "Psi", vault.n_token.symbol),
-                _pairs_from_factories(terraswap_factories, "UST", "Psi"),
+                pairs_from_factories(terraswap_factories, "UST", vault.b_token.symbol),
+                pairs_from_factories(terraswap_factories, "Psi", vault.n_token.symbol),
+                pairs_from_factories(terraswap_factories, "UST", "Psi"),
             )
             steps = [ust_b_asset_pairs, [vault], n_asset_psi_pairs, ust_psi_pairs]
         elif vault.b_token.symbol == "BLUNA":
@@ -269,10 +266,10 @@ async def _get_psi_routes(
                 n_asset_psi_pairs,
                 ust_psi_pairs,
             ) = await asyncio.gather(
-                _pairs_from_factories(terraswap_factories, "UST", asset_symbol),
-                _pairs_from_factories(terraswap_factories, asset_symbol, vault.b_token.symbol),
-                _pairs_from_factories(terraswap_factories, "Psi", vault.n_token.symbol),
-                _pairs_from_factories(terraswap_factories, "UST", "Psi"),
+                pairs_from_factories(terraswap_factories, "UST", asset_symbol),
+                pairs_from_factories(terraswap_factories, asset_symbol, vault.b_token.symbol),
+                pairs_from_factories(terraswap_factories, "Psi", vault.n_token.symbol),
+                pairs_from_factories(terraswap_factories, "UST", "Psi"),
             )
             steps = [
                 ust_asset_pairs,
@@ -291,16 +288,16 @@ async def _get_aust_routes(
     factories: Sequence[terraswap.Factory],
 ) -> list[MultiRoutes]:
     routes: list[MultiRoutes] = []
-    aust_ust = await _pairs_from_factories(factories, "UST", "aUST")
+    aust_ust = await pairs_from_factories(factories, "UST", "aUST")
     pairs_aust_ust = [anchor_market, *aust_ust]
     routes.append(MultiRoutes(client, UST, [pairs_aust_ust, pairs_aust_ust]))
 
-    pairs_aust_other = await _pairs_from_factories(factories, "aUST", excluded_symbols=["UST"])
+    pairs_aust_other = await pairs_from_factories(factories, "aUST", excluded_symbols=["UST"])
     symbols_other = {t.symbol for p in pairs_aust_other for t in p.tokens if t.symbol != "aUST"}
     for symbol in symbols_other:
         pairs_aust_other, pairs_other_ust = await asyncio.gather(
-            _pairs_from_factories(factories, "aUST", symbol),
-            _pairs_from_factories(factories, symbol, "UST"),
+            pairs_from_factories(factories, "aUST", symbol),
+            pairs_from_factories(factories, symbol, "UST"),
         )
         routes.append(
             MultiRoutes(client, UST, [pairs_aust_ust, pairs_aust_other, pairs_other_ust])
@@ -314,9 +311,9 @@ async def _get_stader_routes(
     factories: Sequence[terraswap.Factory],
 ) -> list[MultiRoutes]:
     lunax_luna_pairs, lunax_bluna_pairs, bluna_luna_pairs = await asyncio.gather(
-        _pairs_from_factories(factories, "LUNA", "LunaX"),
-        _pairs_from_factories(factories, "BLUNA", "LunaX"),
-        _pairs_from_factories(factories, "LUNA", "BLUNA"),
+        pairs_from_factories(factories, "LUNA", "LunaX"),
+        pairs_from_factories(factories, "BLUNA", "LunaX"),
+        pairs_from_factories(factories, "LUNA", "BLUNA"),
     )
     lunax_luna_steps: Sequence = [[lunax_vault], lunax_luna_pairs]
     lunax_bluna_steps: Sequence = [[lunax_vault], lunax_bluna_pairs, bluna_luna_pairs]
@@ -335,8 +332,8 @@ async def _get_prism_routes(
     routes: list[MultiRoutes] = []
 
     xprism_prism_pairs, prism_ust_pairs = await asyncio.gather(
-        _pairs_from_factories(factories, "xPRISM", "PRISM"),
-        _pairs_from_factories(factories, "PRISM", "UST"),
+        pairs_from_factories(factories, "xPRISM", "PRISM"),
+        pairs_from_factories(factories, "PRISM", "UST"),
     )
     xprism_prism_steps: Sequence = [
         prism_ust_pairs,
@@ -347,7 +344,7 @@ async def _get_prism_routes(
     routes.append(MultiRoutes(client, UST, xprism_prism_steps, single_direction=True))
 
     try:
-        xprism_ust_pairs = await _pairs_from_factories(factories, "xPRISM", "UST")
+        xprism_ust_pairs = await pairs_from_factories(factories, "xPRISM", "UST")
     except NoPairFound:
         pass
     else:
@@ -355,8 +352,8 @@ async def _get_prism_routes(
         routes.append(MultiRoutes(client, UST, xprism_ust_steps, single_direction=True))
 
     cluna_prism_pairs, prism_luna_pairs = await asyncio.gather(
-        _pairs_from_factories(factories, "cLuna", "PRISM"),
-        _pairs_from_factories(factories, "PRISM", "LUNA"),
+        pairs_from_factories(factories, "cLuna", "PRISM"),
+        pairs_from_factories(factories, "PRISM", "LUNA"),
     )
     luna_cluna_prism_steps: Sequence = [
         [prism_luna_bonder],
@@ -366,7 +363,7 @@ async def _get_prism_routes(
     routes.append(MultiRoutes(client, LUNA, luna_cluna_prism_steps, single_direction=True))
 
     try:
-        cluna_luna_pairs = await _pairs_from_factories(factories, "cLuna", "LUNA")
+        cluna_luna_pairs = await pairs_from_factories(factories, "cLuna", "LUNA")
     except NoPairFound:
         pass
     else:
@@ -387,14 +384,14 @@ async def _get_3cycle_routes(
         (UST, ["UST", "aUST", "LunaX"]),
         (LUNA, ["UST", "LUNA"]),
     ]:
-        for pair in await _pairs_from_factories(factories, excluded_symbols=excluded_symbols):
+        for pair in await pairs_from_factories(factories, excluded_symbols=excluded_symbols):
             non_start_pairs[pair.sorted_tokens].append(pair)
 
         for tokens, pairs in non_start_pairs.items():
             try:
                 first_pairs, last_pairs = await asyncio.gather(
-                    _pairs_from_factories(factories, str(start_token), tokens[0].symbol),
-                    _pairs_from_factories(factories, tokens[1].symbol, str(start_token)),
+                    pairs_from_factories(factories, str(start_token), tokens[0].symbol),
+                    pairs_from_factories(factories, tokens[1].symbol, str(start_token)),
                 )
             except NoPairFound:
                 continue
@@ -408,7 +405,7 @@ async def _get_2cycle_routes(
 ) -> list[MultiRoutes]:
     routes: list[MultiRoutes] = []
     for start_token in [UST, LUNA]:
-        pairs = await _pairs_from_factories(
+        pairs = await pairs_from_factories(
             factories, str(start_token), excluded_symbols=["aUST"]
         )
         tokens = {t for p in pairs for t in p.tokens if t not in [UST, LUNA]}
@@ -431,39 +428,6 @@ def _reorder_routes(routes: list[MultiRoutes]) -> list[MultiRoutes]:
         else:
             main_routes.append(r)
     return main_routes + alte_routes + swap_routes
-
-
-async def _pairs_from_factories(
-    terraswap_factories: Sequence[terraswap.Factory],
-    symbol_0: str = None,
-    symbol_1: str = None,
-    excluded_symbols: Iterable[str] = None,
-    include_repeated: bool = False,
-) -> list[terraswap.LiquidityPair]:
-    assert symbol_0 is None or "\\" not in symbol_0
-    assert symbol_1 is None or "\\" not in symbol_1
-    if symbol_0 == symbol_1 and symbol_0 is not None:
-        raise NoPairFound(f"Invalid pair [{symbol_0}]-[{symbol_1}]")
-
-    symbol_0 = symbol_0 or r"[\w\-]+"
-    symbol_1 = symbol_1 or r"[\w\-]+"
-    excluded_symbols = set(excluded_symbols) if excluded_symbols else set()
-
-    pat = re.compile(fr"\[({symbol_0})\]-\[({symbol_1})\]|\[({symbol_1})\]-\[({symbol_0})\]")
-    pairs = []
-    for factory in terraswap_factories:
-        for pair_symbol in factory.pairs_addresses:
-            if match := pat.match(pair_symbol):
-                if not excluded_symbols & set(match.groups()):
-                    try:
-                        pair = await factory.get_pair(pair_symbol)
-                    except InsufficientLiquidity:
-                        continue
-                    if include_repeated or pair.tokens[0] != pair.tokens[1]:
-                        pairs.append(pair)
-    if not pairs:
-        raise NoPairFound(f"No pair found for [{symbol_0}]-[{symbol_1}]")
-    return pairs
 
 
 def _get_slippage_tolerance(n_repeat_total: int, n: int) -> Decimal:
