@@ -370,8 +370,8 @@ async def _get_prism_routes(
     except NoPairFound:
         pass
     else:
-        cluna_luna_steps: Sequence = [prism_ust_pairs, [prism_luna_bonder], cluna_luna_pairs]
-        routes.append(MultiRoutes(client, UST, cluna_luna_steps, single_direction=True))
+        cluna_luna_steps: Sequence = [[prism_luna_bonder], cluna_luna_pairs]
+        routes.append(MultiRoutes(client, LUNA, cluna_luna_steps, single_direction=True))
 
     return routes
 
