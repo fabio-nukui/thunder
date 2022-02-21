@@ -2,7 +2,6 @@ import asyncio
 import importlib
 import logging
 import signal
-from functools import partial
 from types import ModuleType
 
 import configs
@@ -47,9 +46,8 @@ def handle_exception(loop: asyncio.AbstractEventLoop, context: dict):
 def get_event_loop() -> asyncio.AbstractEventLoop:
     loop = asyncio.get_event_loop()
     signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
-    for sig in signals:
-        handler = partial(loop.create_task, shutdown(loop, sig))
-        loop.add_signal_handler(sig, handler)
+    for s in signals:
+        loop.add_signal_handler(s, lambda s=s: asyncio.create_task(shutdown(loop, s)))
     loop.set_exception_handler(handle_exception)
     return loop
 
