@@ -2,7 +2,7 @@
 
 Arbitrage strategies
 
-Ran on columbus-5 from Sep/2021-Feb/2022
+Ran on Terra columbus-5 from Sep/2021-Feb/2022
 
 
 ## Requirements
