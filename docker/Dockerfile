@@ -36,11 +36,9 @@ RUN conda install --quiet --yes \
     conda clean --all -f -y && \
     fix-permissions $HOME $CONDA_DIR
 
-ARG RELEASES_URL=https://mg4r5dq4tpgvnm6tu5rwukctke5x3gfw.s3.amazonaws.com
-
 RUN pip install --no-cache-dir \
         'python-binance==1.0.15' \
-        ${RELEASES_URL}'/cosmos.py/dist/cosmos_sdk-2.0.0b9-py3-none-any.whl' && \
+        'https://github.com/fabio-nukui/cosmos.py/releases/download/v2.0.0-beta9/cosmos_sdk-2.0.0b9-py3-none-any.whl' && \
     fix-permissions $HOME $CONDA_DIR
 
 ENV PATH="${HOME}/.local/bin:${PATH}"
